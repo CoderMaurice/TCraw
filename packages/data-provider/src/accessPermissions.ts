@@ -44,6 +44,7 @@ export type TAccessLevel = 'none' | 'viewer' | 'editor' | 'owner';
  */
 export enum ResourceType {
   AGENT = 'agent',
+  KNOWLEDGE_BASE = 'knowledgeBase',
   PROMPTGROUP = 'promptGroup',
   MCPSERVER = 'mcpServer',
   REMOTE_AGENT = 'remoteAgent',
@@ -72,6 +73,9 @@ export enum AccessRoleIds {
   AGENT_VIEWER = 'agent_viewer',
   AGENT_EDITOR = 'agent_editor',
   AGENT_OWNER = 'agent_owner',
+  KNOWLEDGE_BASE_VIEWER = 'knowledgeBase_viewer',
+  KNOWLEDGE_BASE_EDITOR = 'knowledgeBase_editor',
+  KNOWLEDGE_BASE_OWNER = 'knowledgeBase_owner',
   PROMPTGROUP_VIEWER = 'promptGroup_viewer',
   PROMPTGROUP_EDITOR = 'promptGroup_editor',
   PROMPTGROUP_OWNER = 'promptGroup_owner',
@@ -321,6 +325,7 @@ export function permBitsToAccessLevel(permBits: number): TAccessLevel {
 export function accessRoleToPermBits(accessRoleId: string): number {
   switch (accessRoleId) {
     case AccessRoleIds.AGENT_VIEWER:
+    case AccessRoleIds.KNOWLEDGE_BASE_VIEWER:
     case AccessRoleIds.PROMPTGROUP_VIEWER:
     case AccessRoleIds.MCPSERVER_VIEWER:
     case AccessRoleIds.REMOTE_AGENT_VIEWER:
@@ -328,12 +333,14 @@ export function accessRoleToPermBits(accessRoleId: string): number {
     case AccessRoleIds.SHARED_LINK_VIEWER:
       return PermissionBits.VIEW;
     case AccessRoleIds.AGENT_EDITOR:
+    case AccessRoleIds.KNOWLEDGE_BASE_EDITOR:
     case AccessRoleIds.PROMPTGROUP_EDITOR:
     case AccessRoleIds.MCPSERVER_EDITOR:
     case AccessRoleIds.REMOTE_AGENT_EDITOR:
     case AccessRoleIds.SKILL_EDITOR:
       return PermissionBits.VIEW | PermissionBits.EDIT;
     case AccessRoleIds.AGENT_OWNER:
+    case AccessRoleIds.KNOWLEDGE_BASE_OWNER:
     case AccessRoleIds.PROMPTGROUP_OWNER:
     case AccessRoleIds.MCPSERVER_OWNER:
     case AccessRoleIds.REMOTE_AGENT_OWNER:
