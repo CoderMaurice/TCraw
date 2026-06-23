@@ -144,13 +144,15 @@ export function createKnowledgeBaseMethods(
       }
     }
 
-    return orderedKeys.reduce<IKnowledgeBase[]>((ordered, key) => {
+    const orderedKnowledgeBases: IKnowledgeBase[] = [];
+    for (const key of orderedKeys) {
       const kb = byResourceId.get(key);
       if (!kb) {
-        return ordered;
+        continue;
       }
-      return [...ordered, kb];
-    }, []);
+      orderedKnowledgeBases.push(kb);
+    }
+    return orderedKnowledgeBases;
   }
 
   async function updateKnowledgeBase(
