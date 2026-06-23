@@ -749,6 +749,43 @@ describe('Agent Controllers - Mass Assignment Protection', () => {
       expect(agentInDb.knowledge_base_ids).toEqual(['kb_existing']);
     });
 
+    test('should clear knowledge bases without auto-enabling file_search when update sends an empty list', async () => {
+      validateKnowledgeBaseBindings.mockResolvedValueOnce([]);
+
+      await Agent.updateOne(
+        { id: existingAgentId },
+        {
+          $set: {
+            knowledge_base_ids: ['kb_existing'],
+            tools: ['web_search'],
+          },
+        },
+      );
+
+      mockReq.user.id = existingAgentAuthorId.toString();
+      mockReq.params.id = existingAgentId;
+      mockReq.body = {
+        knowledge_base_ids: [],
+      };
+
+      await updateAgentHandler(mockReq, mockRes);
+
+      expect(validateKnowledgeBaseBindings).toHaveBeenCalledWith(
+        {
+          userId: mockReq.user.id,
+          role: mockReq.user.role,
+          tenantId: undefined,
+        },
+        [],
+        expect.any(Object),
+      );
+
+      const agentInDb = await Agent.findOne({ id: existingAgentId }).lean();
+      expect(agentInDb.knowledge_base_ids).toEqual([]);
+      expect(agentInDb.tools).toEqual(['web_search']);
+      expect(agentInDb.tools).not.toContain(Tools.file_search);
+    });
+
     test('should prune admin-supplied file_ids against the agent author', async () => {
       const File = mongoose.models.File;
       const adminUserId = new mongoose.Types.ObjectId().toString();
