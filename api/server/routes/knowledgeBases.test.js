@@ -4,13 +4,53 @@ const { Permissions, PermissionBits, PermissionTypes } = require('librechat-data
 
 const mockListKnowledgeBasesForUser = jest.fn();
 const mockCreateKnowledgeBaseForUser = jest.fn();
+const mockGetKnowledgeBaseForUser = jest.fn();
+const mockUpdateKnowledgeBaseForUser = jest.fn();
+const mockDeleteKnowledgeBaseForUser = jest.fn();
+const mockListKnowledgeBaseDocumentsForUser = jest.fn();
+const mockCreateKnowledgeBaseDocumentForUser = jest.fn();
+const mockDeleteKnowledgeBaseDocumentForUser = jest.fn();
+const mockRequireKnowledgeBasePermission = jest.fn();
+const mockGetStorageMetadata = jest.fn();
+const mockSanitizeFilename = jest.fn((filename) => filename.trim());
 const mockKnowledgeBaseAccessMiddleware = jest.fn((_req, _res, next) => next());
 const mockKnowledgeBaseCreateMiddleware = jest.fn((_req, _res, next) => next());
 const mockCheckAccessConfigs = [];
+const mockUploadMiddleware = jest.fn((req, _res, next) => {
+  req.file = {
+    originalname: 'handbook.pdf',
+    mimetype: 'application/pdf',
+    size: 1234,
+    path: '/tmp/handbook.pdf',
+  };
+  req.file_id = 'file_route';
+  next();
+});
+const mockSingleUpload = jest.fn(() => mockUploadMiddleware);
+const mockCreateMulterInstance = jest.fn(() =>
+  Promise.resolve({
+    single: mockSingleUpload,
+  }),
+);
+const mockGetFileStrategy = jest.fn(() => 'local');
+const mockHandleFileUpload = jest.fn();
+const mockGetStrategyFunctions = jest.fn(() => ({
+  handleFileUpload: mockHandleFileUpload,
+}));
+const mockUploadVectors = jest.fn();
 
 jest.mock('@librechat/api', () => ({
   listKnowledgeBasesForUser: mockListKnowledgeBasesForUser,
   createKnowledgeBaseForUser: mockCreateKnowledgeBaseForUser,
+  getKnowledgeBaseForUser: mockGetKnowledgeBaseForUser,
+  updateKnowledgeBaseForUser: mockUpdateKnowledgeBaseForUser,
+  deleteKnowledgeBaseForUser: mockDeleteKnowledgeBaseForUser,
+  listKnowledgeBaseDocumentsForUser: mockListKnowledgeBaseDocumentsForUser,
+  createKnowledgeBaseDocumentForUser: mockCreateKnowledgeBaseDocumentForUser,
+  deleteKnowledgeBaseDocumentForUser: mockDeleteKnowledgeBaseDocumentForUser,
+  requireKnowledgeBasePermission: mockRequireKnowledgeBasePermission,
+  getStorageMetadata: mockGetStorageMetadata,
+  sanitizeFilename: mockSanitizeFilename,
   generateCheckAccess: jest.fn((config) => {
     mockCheckAccessConfigs.push(config);
 
@@ -38,11 +78,41 @@ jest.mock('~/server/middleware/requireJwtAuth', () => (req, _res, next) => {
   next();
 });
 
+jest.mock('~/server/middleware/config/app', () => (req, _res, next) => {
+  req.config = {
+    paths: { uploads: '/tmp/uploads' },
+    fileConfig: {},
+  };
+  next();
+});
+
+jest.mock('./files/multer', () => ({
+  createMulterInstance: mockCreateMulterInstance,
+}));
+
+jest.mock('~/server/utils/getFileStrategy', () => ({
+  getFileStrategy: mockGetFileStrategy,
+}));
+
+jest.mock('~/server/services/Files/strategies', () => ({
+  getStrategyFunctions: mockGetStrategyFunctions,
+}));
+
+jest.mock('~/server/services/Files/VectorDB/crud', () => ({
+  uploadVectors: mockUploadVectors,
+}));
+
 jest.mock('~/models', () => ({
   createKnowledgeBase: jest.fn(),
   findKnowledgeBaseById: jest.fn(),
   findKnowledgeBasesByResourceIds: jest.fn(),
+  updateKnowledgeBase: jest.fn(),
+  createKnowledgeBaseDocument: jest.fn(),
+  findKnowledgeBaseDocuments: jest.fn(),
   findReadyKnowledgeBaseDocumentFileIds: jest.fn(),
+  updateKnowledgeBaseCounts: jest.fn(),
+  deleteKnowledgeBaseDocument: jest.fn(),
+  deleteKnowledgeBaseWithDocuments: jest.fn(),
   getRoleByName: jest.fn(),
 }));
 
@@ -63,9 +133,40 @@ describe('knowledge base routes', () => {
   beforeEach(() => {
     mockListKnowledgeBasesForUser.mockReset();
     mockCreateKnowledgeBaseForUser.mockReset();
+    mockGetKnowledgeBaseForUser.mockReset();
+    mockUpdateKnowledgeBaseForUser.mockReset();
+    mockDeleteKnowledgeBaseForUser.mockReset();
+    mockListKnowledgeBaseDocumentsForUser.mockReset();
+    mockCreateKnowledgeBaseDocumentForUser.mockReset();
+    mockDeleteKnowledgeBaseDocumentForUser.mockReset();
+    mockRequireKnowledgeBasePermission.mockReset();
+    mockGetStorageMetadata.mockReset();
+    mockSanitizeFilename.mockClear();
+    mockUploadMiddleware.mockClear();
+    mockSingleUpload.mockClear();
+    mockCreateMulterInstance.mockClear();
+    mockGetFileStrategy.mockClear();
+    mockHandleFileUpload.mockReset();
+    mockGetStrategyFunctions.mockClear();
+    mockUploadVectors.mockReset();
     mockKnowledgeBaseAccessMiddleware.mockClear();
     mockKnowledgeBaseCreateMiddleware.mockClear();
     logger.error.mockClear();
+
+    mockGetStorageMetadata.mockReturnValue({ storageKey: 'stored/key' });
+    mockHandleFileUpload.mockResolvedValue({
+      bytes: 1234,
+      filename: 'handbook.pdf',
+      filepath: '/uploads/user_1/file_route__handbook.pdf',
+      storageKey: 'stored/key',
+      storageRegion: 'us-east-1',
+    });
+    mockUploadVectors.mockResolvedValue({
+      bytes: 1234,
+      filename: 'handbook.pdf',
+      embedded: true,
+    });
+    mockRequireKnowledgeBasePermission.mockResolvedValue({ id: 'kb_1' });
 
     app = express();
     app.use(express.json());
@@ -110,7 +211,13 @@ describe('knowledge base routes', () => {
         createKnowledgeBase: db.createKnowledgeBase,
         findKnowledgeBaseById: db.findKnowledgeBaseById,
         findKnowledgeBasesByResourceIds: db.findKnowledgeBasesByResourceIds,
+        updateKnowledgeBase: db.updateKnowledgeBase,
+        createKnowledgeBaseDocument: db.createKnowledgeBaseDocument,
+        findKnowledgeBaseDocuments: db.findKnowledgeBaseDocuments,
         findReadyKnowledgeBaseDocumentFileIds: db.findReadyKnowledgeBaseDocumentFileIds,
+        updateKnowledgeBaseCounts: db.updateKnowledgeBaseCounts,
+        deleteKnowledgeBaseDocument: db.deleteKnowledgeBaseDocument,
+        deleteKnowledgeBaseWithDocuments: db.deleteKnowledgeBaseWithDocuments,
         grantPermission: PermissionService.grantPermission,
         findAccessibleResources: PermissionService.findAccessibleResources,
         checkPermission: PermissionService.checkPermission,
@@ -171,6 +278,157 @@ describe('knowledge base routes', () => {
         createKnowledgeBase: db.createKnowledgeBase,
         grantPermission: PermissionService.grantPermission,
       }),
+    );
+  });
+
+  it('gets a knowledge base by id and passes auth and deps', async () => {
+    const serviceResult = { id: 'kb_1', name: 'Support KB' };
+    mockGetKnowledgeBaseForUser.mockResolvedValue(serviceResult);
+
+    const response = await request(app).get('/knowledge-bases/kb_1');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(serviceResult);
+    expect(mockGetKnowledgeBaseForUser).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user_1' }),
+      'kb_1',
+      expect.objectContaining({ findKnowledgeBaseById: db.findKnowledgeBaseById }),
+    );
+  });
+
+  it('updates a knowledge base by id with PATCH body', async () => {
+    const requestBody = { name: 'Updated', description: 'Notes' };
+    const serviceResult = { id: 'kb_1', name: 'Updated', description: 'Notes' };
+    mockUpdateKnowledgeBaseForUser.mockResolvedValue(serviceResult);
+
+    const response = await request(app).patch('/knowledge-bases/kb_1').send(requestBody);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(serviceResult);
+    expect(mockUpdateKnowledgeBaseForUser).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user_1' }),
+      'kb_1',
+      requestBody,
+      expect.objectContaining({ updateKnowledgeBase: db.updateKnowledgeBase }),
+    );
+  });
+
+  it('deletes a knowledge base by id', async () => {
+    mockDeleteKnowledgeBaseForUser.mockResolvedValue({ acknowledged: true });
+
+    const response = await request(app).delete('/knowledge-bases/kb_1');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ acknowledged: true });
+    expect(mockDeleteKnowledgeBaseForUser).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user_1' }),
+      'kb_1',
+      expect.objectContaining({ deleteKnowledgeBaseWithDocuments: db.deleteKnowledgeBaseWithDocuments }),
+    );
+  });
+
+  it('lists documents for a knowledge base', async () => {
+    const serviceResult = { data: [{ id: 'kbdoc_1', filename: 'handbook.pdf' }] };
+    mockListKnowledgeBaseDocumentsForUser.mockResolvedValue(serviceResult);
+
+    const response = await request(app).get('/knowledge-bases/kb_1/documents');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(serviceResult);
+    expect(mockListKnowledgeBaseDocumentsForUser).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user_1' }),
+      'kb_1',
+      expect.objectContaining({ findKnowledgeBaseDocuments: db.findKnowledgeBaseDocuments }),
+    );
+  });
+
+  it('uploads and embeds a document before creating a ready document record', async () => {
+    const serviceResult = { id: 'kbdoc_1', file_id: 'file_route', status: 'ready' };
+    mockCreateKnowledgeBaseDocumentForUser.mockResolvedValue(serviceResult);
+
+    const response = await request(app)
+      .post('/knowledge-bases/kb_1/documents')
+      .attach('file', Buffer.from('hello'), 'handbook.pdf');
+
+    expect(response.status).toBe(201);
+    expect(response.body).toEqual(serviceResult);
+    expect(mockRequireKnowledgeBasePermission).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user_1' }),
+      'kb_1',
+      PermissionBits.EDIT,
+      expect.any(Object),
+    );
+    expect(mockHandleFileUpload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        file_id: 'file_route',
+        entity_id: 'kb_1',
+        basePath: 'uploads',
+      }),
+    );
+    expect(mockUploadVectors).toHaveBeenCalledWith({
+      req: expect.any(Object),
+      file: expect.objectContaining({ originalname: 'handbook.pdf' }),
+      file_id: 'file_route',
+      entity_id: 'kb_1',
+      storageMetadata: { storageKey: 'stored/key' },
+    });
+    expect(mockCreateKnowledgeBaseDocumentForUser).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user_1' }),
+      'kb_1',
+      {
+        file_id: 'file_route',
+        filename: 'handbook.pdf',
+        bytes: 1234,
+        mimeType: 'application/pdf',
+        status: 'ready',
+      },
+      expect.objectContaining({ createKnowledgeBaseDocument: db.createKnowledgeBaseDocument }),
+    );
+    expect(mockRequireKnowledgeBasePermission.mock.invocationCallOrder[0]).toBeLessThan(
+      mockHandleFileUpload.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('creates a failed document record and returns an error when embedding fails', async () => {
+    const vectorError = new Error('RAG failed');
+    const serviceError = new Error('Knowledge base document upload failed');
+    serviceError.statusCode = 500;
+    mockUploadVectors.mockRejectedValue(vectorError);
+    mockCreateKnowledgeBaseDocumentForUser.mockRejectedValue(serviceError);
+
+    const response = await request(app)
+      .post('/knowledge-bases/kb_1/documents')
+      .attach('file', Buffer.from('hello'), 'handbook.pdf');
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ message: 'Failed to process knowledge base request' });
+    expect(mockCreateKnowledgeBaseDocumentForUser).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user_1' }),
+      'kb_1',
+      expect.objectContaining({
+        file_id: 'file_route',
+        filename: 'handbook.pdf',
+        bytes: 1234,
+        mimeType: 'application/pdf',
+        status: 'failed',
+        error: 'RAG failed',
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it('deletes a document for a knowledge base', async () => {
+    mockDeleteKnowledgeBaseDocumentForUser.mockResolvedValue({ acknowledged: true });
+
+    const response = await request(app).delete('/knowledge-bases/kb_1/documents/kbdoc_1');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ acknowledged: true });
+    expect(mockDeleteKnowledgeBaseDocumentForUser).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user_1' }),
+      'kb_1',
+      'kbdoc_1',
+      expect.objectContaining({ deleteKnowledgeBaseDocument: db.deleteKnowledgeBaseDocument }),
     );
   });
 

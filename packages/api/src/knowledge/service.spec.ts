@@ -2,12 +2,23 @@ import { AccessRoleIds, PermissionBits, PrincipalType, ResourceType } from 'libr
 
 import {
   createKnowledgeBaseForUser,
+  createKnowledgeBaseDocumentForUser,
+  deleteKnowledgeBaseDocumentForUser,
+  deleteKnowledgeBaseForUser,
+  getKnowledgeBaseForUser,
+  listKnowledgeBaseDocumentsForUser,
   listKnowledgeBasesForUser,
   requireKnowledgeBasePermission,
   resolveKnowledgeBaseFileIdsForAgent,
+  updateKnowledgeBaseForUser,
   validateKnowledgeBaseBindings,
 } from './service';
-import type { KnowledgeAuthContext, KnowledgeBaseServiceDependencies } from './types';
+import type {
+  KnowledgeAuthContext,
+  KnowledgeBaseDocumentRecord,
+  KnowledgeBaseRecord,
+  KnowledgeBaseServiceDependencies,
+} from './types';
 
 type MongoId = {
   toString(): string;
@@ -33,10 +44,47 @@ function makeDeps(): jest.Mocked<KnowledgeBaseServiceDependencies> {
     createKnowledgeBase: jest.fn(),
     findKnowledgeBaseById: jest.fn(),
     findKnowledgeBasesByResourceIds: jest.fn(),
+    updateKnowledgeBase: jest.fn(),
+    createKnowledgeBaseDocument: jest.fn(),
+    findKnowledgeBaseDocuments: jest.fn(),
     findReadyKnowledgeBaseDocumentFileIds: jest.fn(),
+    updateKnowledgeBaseCounts: jest.fn(),
+    deleteKnowledgeBaseDocument: jest.fn(),
+    deleteKnowledgeBaseWithDocuments: jest.fn(),
     grantPermission: jest.fn(),
     findAccessibleResources: jest.fn(),
     checkPermission: jest.fn(),
+  };
+}
+
+function makeKnowledgeBase(auth = makeAuth()): KnowledgeBaseRecord {
+  return {
+    _id: mongoId('64f1f77bcf86cd799439011'),
+    id: 'kb_allowed',
+    name: 'Allowed',
+    description: '',
+    author: auth.userId,
+    authorName: auth.name,
+    tenantId: auth.tenantId,
+    documentCount: 0,
+    readyDocumentCount: 0,
+    failedDocumentCount: 0,
+  };
+}
+
+function makeDocument(auth = makeAuth()): KnowledgeBaseDocumentRecord {
+  return {
+    _id: mongoId('74f1f77bcf86cd799439011'),
+    id: 'kbdoc_1',
+    knowledgeBaseId: 'kb_allowed',
+    file_id: 'file_1',
+    filename: 'handbook.pdf',
+    bytes: 1234,
+    mimeType: 'application/pdf',
+    status: 'ready',
+    error: '',
+    createdBy: auth.userId,
+    tenantId: auth.tenantId,
   };
 }
 
@@ -148,6 +196,200 @@ describe('knowledge base service', () => {
 
     expect(result).toEqual({ data: [], nextCursor: undefined });
     expect(deps.findKnowledgeBasesByResourceIds).not.toHaveBeenCalled();
+  });
+
+  it('gets a knowledge base after VIEW permission succeeds', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+    const kb = makeKnowledgeBase(auth);
+
+    deps.findKnowledgeBaseById.mockResolvedValue(kb);
+    deps.checkPermission.mockResolvedValue(true);
+
+    const result = await getKnowledgeBaseForUser(auth, 'kb_allowed', deps);
+
+    expect(result).toBe(kb);
+    expect(deps.checkPermission).toHaveBeenCalledWith({
+      userId: auth.userId,
+      role: auth.role,
+      resourceType: ResourceType.KNOWLEDGE_BASE,
+      resourceId: '64f1f77bcf86cd799439011',
+      requiredPermission: PermissionBits.VIEW,
+    });
+  });
+
+  it('updates sanitized editable fields after EDIT permission succeeds', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+    const kb = makeKnowledgeBase(auth);
+    const updated = { ...kb, name: 'Updated', description: 'New description' };
+
+    deps.findKnowledgeBaseById.mockResolvedValue(kb);
+    deps.checkPermission.mockResolvedValue(true);
+    deps.updateKnowledgeBase.mockResolvedValue(updated);
+
+    const result = await updateKnowledgeBaseForUser(
+      auth,
+      'kb_allowed',
+      { name: ' Updated ', description: ' New description ' },
+      deps,
+    );
+
+    expect(result).toBe(updated);
+    expect(deps.checkPermission).toHaveBeenCalledWith(
+      expect.objectContaining({ requiredPermission: PermissionBits.EDIT }),
+    );
+    expect(deps.updateKnowledgeBase).toHaveBeenCalledWith('kb_allowed', auth.tenantId, {
+      name: 'Updated',
+      description: 'New description',
+    });
+  });
+
+  it('returns a 404-style error when an authorized update no longer finds the record', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+
+    deps.findKnowledgeBaseById.mockResolvedValue(makeKnowledgeBase(auth));
+    deps.checkPermission.mockResolvedValue(true);
+    deps.updateKnowledgeBase.mockResolvedValue(null);
+
+    await expect(
+      updateKnowledgeBaseForUser(auth, 'kb_allowed', { name: 'Renamed' }, deps),
+    ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it('deletes a knowledge base and documents after DELETE permission succeeds', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+
+    deps.findKnowledgeBaseById.mockResolvedValue(makeKnowledgeBase(auth));
+    deps.checkPermission.mockResolvedValue(true);
+    deps.deleteKnowledgeBaseWithDocuments.mockResolvedValue({
+      deletedCount: 1,
+      documentDeletedCount: 2,
+    });
+
+    const result = await deleteKnowledgeBaseForUser(auth, 'kb_allowed', deps);
+
+    expect(result).toEqual({ acknowledged: true });
+    expect(deps.checkPermission).toHaveBeenCalledWith(
+      expect.objectContaining({ requiredPermission: PermissionBits.DELETE }),
+    );
+    expect(deps.deleteKnowledgeBaseWithDocuments).toHaveBeenCalledWith(
+      'kb_allowed',
+      auth.tenantId,
+    );
+  });
+
+  it('lists documents after VIEW permission succeeds', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+    const document = makeDocument(auth);
+
+    deps.findKnowledgeBaseById.mockResolvedValue(makeKnowledgeBase(auth));
+    deps.checkPermission.mockResolvedValue(true);
+    deps.findKnowledgeBaseDocuments.mockResolvedValue([document]);
+
+    const result = await listKnowledgeBaseDocumentsForUser(auth, 'kb_allowed', deps);
+
+    expect(result).toEqual({ data: [document], nextCursor: undefined });
+    expect(deps.findKnowledgeBaseDocuments).toHaveBeenCalledWith('kb_allowed', auth.tenantId);
+  });
+
+  it('creates a ready document and refreshes counts after EDIT permission succeeds', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+    const document = makeDocument(auth);
+
+    deps.findKnowledgeBaseById.mockResolvedValue(makeKnowledgeBase(auth));
+    deps.checkPermission.mockResolvedValue(true);
+    deps.createKnowledgeBaseDocument.mockResolvedValue(document);
+    deps.updateKnowledgeBaseCounts.mockResolvedValue(makeKnowledgeBase(auth));
+
+    const result = await createKnowledgeBaseDocumentForUser(
+      auth,
+      'kb_allowed',
+      {
+        file_id: 'file_1',
+        filename: ' handbook.pdf ',
+        bytes: 1234,
+        mimeType: 'application/pdf',
+        status: 'ready',
+      },
+      deps,
+    );
+
+    expect(result).toBe(document);
+    expect(deps.createKnowledgeBaseDocument).toHaveBeenCalledWith({
+      id: expect.stringMatching(/^kbdoc_[0-9a-f-]+$/),
+      knowledgeBaseId: 'kb_allowed',
+      file_id: 'file_1',
+      filename: 'handbook.pdf',
+      bytes: 1234,
+      mimeType: 'application/pdf',
+      status: 'ready',
+      error: undefined,
+      createdBy: auth.userId,
+      tenantId: auth.tenantId,
+    });
+    expect(deps.updateKnowledgeBaseCounts).toHaveBeenCalledWith('kb_allowed', auth.tenantId);
+  });
+
+  it('creates a failed document, refreshes counts, and rejects failed uploads', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+    const failedDocument = { ...makeDocument(auth), status: 'failed' as const, error: 'RAG failed' };
+
+    deps.findKnowledgeBaseById.mockResolvedValue(makeKnowledgeBase(auth));
+    deps.checkPermission.mockResolvedValue(true);
+    deps.createKnowledgeBaseDocument.mockResolvedValue(failedDocument);
+    deps.updateKnowledgeBaseCounts.mockResolvedValue(makeKnowledgeBase(auth));
+
+    await expect(
+      createKnowledgeBaseDocumentForUser(
+        auth,
+        'kb_allowed',
+        {
+          file_id: 'file_1',
+          filename: 'handbook.pdf',
+          bytes: 1234,
+          mimeType: 'application/pdf',
+          status: 'failed',
+          error: 'RAG failed',
+        },
+        deps,
+      ),
+    ).rejects.toMatchObject({
+      statusCode: 500,
+      document: failedDocument,
+    });
+    expect(deps.createKnowledgeBaseDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'failed', error: 'RAG failed' }),
+    );
+    expect(deps.updateKnowledgeBaseCounts).toHaveBeenCalledWith('kb_allowed', auth.tenantId);
+  });
+
+  it('deletes a document after EDIT permission succeeds and refreshes counts', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+
+    deps.findKnowledgeBaseById.mockResolvedValue(makeKnowledgeBase(auth));
+    deps.checkPermission.mockResolvedValue(true);
+    deps.deleteKnowledgeBaseDocument.mockResolvedValue({ deletedCount: 1 });
+    deps.updateKnowledgeBaseCounts.mockResolvedValue(makeKnowledgeBase(auth));
+
+    const result = await deleteKnowledgeBaseDocumentForUser(auth, 'kb_allowed', 'kbdoc_1', deps);
+
+    expect(result).toEqual({ acknowledged: true });
+    expect(deps.checkPermission).toHaveBeenCalledWith(
+      expect.objectContaining({ requiredPermission: PermissionBits.EDIT }),
+    );
+    expect(deps.deleteKnowledgeBaseDocument).toHaveBeenCalledWith(
+      'kbdoc_1',
+      'kb_allowed',
+      auth.tenantId,
+    );
+    expect(deps.updateKnowledgeBaseCounts).toHaveBeenCalledWith('kb_allowed', auth.tenantId);
   });
 
   it('rejects bindings when the second knowledge base is denied', async () => {

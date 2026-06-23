@@ -6,9 +6,13 @@ import type {
 } from 'librechat-data-provider';
 import type {
   CreateKnowledgeBaseInput,
+  CreateKnowledgeBaseDocumentInput,
+  DeleteKnowledgeBaseWithDocumentsResult,
   IAclEntry,
   IKnowledgeBase,
+  IKnowledgeBaseDocument,
   ReadyKnowledgeBaseDocumentFileId,
+  UpdateKnowledgeBaseInput,
 } from '@librechat/data-schemas';
 
 export type MongoResourceId = {
@@ -18,6 +22,10 @@ export type MongoResourceId = {
 export type KnowledgeBaseRecord = Omit<IKnowledgeBase, '_id'> & {
   _id?: MongoResourceId;
   resourceId?: MongoResourceId;
+};
+
+export type KnowledgeBaseDocumentRecord = Omit<IKnowledgeBaseDocument, '_id'> & {
+  _id?: MongoResourceId;
 };
 
 export type KnowledgeBaseResourceReference = string | MongoResourceId;
@@ -41,6 +49,29 @@ export interface ListKnowledgeBasesForUserInput {
 export interface ListKnowledgeBasesForUserResult {
   data: KnowledgeBaseRecord[];
   nextCursor?: string;
+}
+
+export interface UpdateKnowledgeBaseForUserInput {
+  name?: string;
+  description?: string;
+}
+
+export interface KnowledgeBaseAckResult {
+  acknowledged: true;
+}
+
+export interface ListKnowledgeBaseDocumentsForUserResult {
+  data: KnowledgeBaseDocumentRecord[];
+  nextCursor?: string;
+}
+
+export interface CreateKnowledgeBaseDocumentForUserInput {
+  file_id: string;
+  filename: string;
+  bytes: number;
+  mimeType?: string;
+  status?: IKnowledgeBaseDocument['status'];
+  error?: string;
 }
 
 export interface KnowledgeBasePermissionGrant {
@@ -74,10 +105,32 @@ export interface KnowledgeBaseServiceDependencies {
     resourceIds: KnowledgeBaseResourceReference[],
     tenantId?: string,
   ): Promise<KnowledgeBaseRecord[]>;
+  updateKnowledgeBase(
+    id: string,
+    tenantId: string | undefined,
+    update: UpdateKnowledgeBaseInput,
+  ): Promise<KnowledgeBaseRecord | null>;
+  createKnowledgeBaseDocument(
+    input: CreateKnowledgeBaseDocumentInput,
+  ): Promise<KnowledgeBaseDocumentRecord>;
+  findKnowledgeBaseDocuments(
+    knowledgeBaseId: string,
+    tenantId?: string,
+  ): Promise<KnowledgeBaseDocumentRecord[]>;
   findReadyKnowledgeBaseDocumentFileIds(
     knowledgeBaseIds: string[],
     tenantId?: string,
   ): Promise<ReadyKnowledgeBaseDocumentFileId[]>;
+  updateKnowledgeBaseCounts(id: string, tenantId?: string): Promise<KnowledgeBaseRecord | null>;
+  deleteKnowledgeBaseDocument(
+    id: string,
+    knowledgeBaseId: string,
+    tenantId?: string,
+  ): Promise<{ deletedCount: number }>;
+  deleteKnowledgeBaseWithDocuments(
+    id: string,
+    tenantId?: string,
+  ): Promise<DeleteKnowledgeBaseWithDocumentsResult>;
   grantPermission(input: KnowledgeBasePermissionGrant): Promise<IAclEntry | null>;
   findAccessibleResources(
     input: KnowledgeBaseAccessibleResourcesInput,
@@ -87,4 +140,5 @@ export interface KnowledgeBaseServiceDependencies {
 
 export type KnowledgeBaseServiceError = Error & {
   statusCode: number;
+  document?: KnowledgeBaseDocumentRecord;
 };

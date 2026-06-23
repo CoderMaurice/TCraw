@@ -1,22 +1,44 @@
+const crypto = require('crypto');
 const express = require('express');
 const { logger } = require('@librechat/data-schemas');
 const {
+  getStorageMetadata,
+  sanitizeFilename,
   generateCheckAccess,
+  getKnowledgeBaseForUser,
+  updateKnowledgeBaseForUser,
+  deleteKnowledgeBaseForUser,
   createKnowledgeBaseForUser,
+  requireKnowledgeBasePermission,
+  listKnowledgeBaseDocumentsForUser,
+  createKnowledgeBaseDocumentForUser,
+  deleteKnowledgeBaseDocumentForUser,
   listKnowledgeBasesForUser,
 } = require('@librechat/api');
 const { Permissions, PermissionBits, PermissionTypes } = require('librechat-data-provider');
 const requireJwtAuth = require('~/server/middleware/requireJwtAuth');
+const configMiddleware = require('~/server/middleware/config/app');
 const PermissionService = require('~/server/services/PermissionService');
+const { getFileStrategy } = require('~/server/utils/getFileStrategy');
+const { getStrategyFunctions } = require('~/server/services/Files/strategies');
+const { uploadVectors } = require('~/server/services/Files/VectorDB/crud');
 const db = require('~/models');
+const { createMulterInstance } = require('./files/multer');
 
 const router = express.Router();
+let documentUpload;
 
 const deps = {
   createKnowledgeBase: db.createKnowledgeBase,
   findKnowledgeBaseById: db.findKnowledgeBaseById,
   findKnowledgeBasesByResourceIds: db.findKnowledgeBasesByResourceIds,
+  updateKnowledgeBase: db.updateKnowledgeBase,
+  createKnowledgeBaseDocument: db.createKnowledgeBaseDocument,
+  findKnowledgeBaseDocuments: db.findKnowledgeBaseDocuments,
   findReadyKnowledgeBaseDocumentFileIds: db.findReadyKnowledgeBaseDocumentFileIds,
+  updateKnowledgeBaseCounts: db.updateKnowledgeBaseCounts,
+  deleteKnowledgeBaseDocument: db.deleteKnowledgeBaseDocument,
+  deleteKnowledgeBaseWithDocuments: db.deleteKnowledgeBaseWithDocuments,
   grantPermission: PermissionService.grantPermission,
   findAccessibleResources: PermissionService.findAccessibleResources,
   checkPermission: PermissionService.checkPermission,
@@ -73,7 +95,79 @@ const sendServiceError = (res, error) => {
   return res.status(500).json({ message: 'Failed to process knowledge base request' });
 };
 
+const getDocumentUpload = async () => {
+  if (!documentUpload) {
+    const upload = await createMulterInstance();
+    documentUpload = upload.single('file');
+  }
+  return documentUpload;
+};
+
+const uploadDocumentMiddleware = async (req, res, next) => {
+  try {
+    const upload = await getDocumentUpload();
+    return upload(req, res, (error) => {
+      if (error) {
+        return sendServiceError(res, error);
+      }
+      return next();
+    });
+  } catch (error) {
+    return sendServiceError(res, error);
+  }
+};
+
+const getUploadFileId = (req) => req.file_id || crypto.randomUUID();
+
+const buildFailedDocumentInput = ({ req, fileId, error }) => ({
+  file_id: fileId,
+  filename: sanitizeFilename(req.file.originalname),
+  bytes: req.file.size ?? 0,
+  mimeType: req.file.mimetype,
+  status: 'failed',
+  error: error?.message || 'Knowledge base document upload failed',
+});
+
+const processKnowledgeBaseDocumentUpload = async ({ req, knowledgeBaseId, fileId }) => {
+  const isImage = req.file.mimetype.startsWith('image');
+  const source = getFileStrategy(req.config, { isImage });
+  const { handleFileUpload } = getStrategyFunctions(source);
+  const file = {
+    ...req.file,
+    originalname: sanitizeFilename(req.file.originalname),
+  };
+  const storageResult = await handleFileUpload({
+    req,
+    file,
+    file_id: fileId,
+    basePath: 'uploads',
+    entity_id: knowledgeBaseId,
+  });
+  const storageMetadata = getStorageMetadata({
+    filepath: storageResult.filepath,
+    source,
+    storageKey: storageResult.storageKey,
+    storageRegion: storageResult.storageRegion,
+  });
+  const embeddingResult = await uploadVectors({
+    req,
+    file,
+    file_id: fileId,
+    entity_id: knowledgeBaseId,
+    storageMetadata,
+  });
+
+  return {
+    file_id: fileId,
+    filename: embeddingResult.filename || storageResult.filename || file.originalname,
+    bytes: embeddingResult.bytes ?? storageResult.bytes ?? req.file.size ?? 0,
+    mimeType: req.file.mimetype,
+    status: 'ready',
+  };
+};
+
 router.use(requireJwtAuth);
+router.use(configMiddleware);
 router.use(checkKnowledgeBaseAccess);
 
 router.get('/', async (req, res) => {
@@ -106,6 +200,104 @@ router.post('/', checkKnowledgeBaseCreate, async (req, res) => {
   try {
     const result = await createKnowledgeBaseForUser(authFromRequest(req), req.body, deps);
     return res.status(201).json(result);
+  } catch (error) {
+    return sendServiceError(res, error);
+  }
+});
+
+router.get('/:id/documents', async (req, res) => {
+  try {
+    const result = await listKnowledgeBaseDocumentsForUser(authFromRequest(req), req.params.id, deps);
+    return res.json(result);
+  } catch (error) {
+    return sendServiceError(res, error);
+  }
+});
+
+router.post('/:id/documents', uploadDocumentMiddleware, async (req, res) => {
+  try {
+    if (!req.file) {
+      const error = new Error('No file provided');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const auth = authFromRequest(req);
+    const knowledgeBaseId = req.params.id;
+    const fileId = getUploadFileId(req);
+
+    await requireKnowledgeBasePermission(auth, knowledgeBaseId, PermissionBits.EDIT, deps);
+
+    let documentInput;
+    try {
+      documentInput = await processKnowledgeBaseDocumentUpload({
+        req,
+        knowledgeBaseId,
+        fileId,
+      });
+    } catch (error) {
+      await createKnowledgeBaseDocumentForUser(
+        auth,
+        knowledgeBaseId,
+        buildFailedDocumentInput({ req, fileId, error }),
+        deps,
+      );
+      throw error;
+    }
+
+    const result = await createKnowledgeBaseDocumentForUser(
+      auth,
+      knowledgeBaseId,
+      documentInput,
+      deps,
+    );
+    return res.status(201).json(result);
+  } catch (error) {
+    return sendServiceError(res, error);
+  }
+});
+
+router.delete('/:id/documents/:documentId', async (req, res) => {
+  try {
+    const result = await deleteKnowledgeBaseDocumentForUser(
+      authFromRequest(req),
+      req.params.id,
+      req.params.documentId,
+      deps,
+    );
+    return res.json(result);
+  } catch (error) {
+    return sendServiceError(res, error);
+  }
+});
+
+router.get('/:id', async (req, res) => {
+  try {
+    const result = await getKnowledgeBaseForUser(authFromRequest(req), req.params.id, deps);
+    return res.json(result);
+  } catch (error) {
+    return sendServiceError(res, error);
+  }
+});
+
+router.patch('/:id', async (req, res) => {
+  try {
+    const result = await updateKnowledgeBaseForUser(
+      authFromRequest(req),
+      req.params.id,
+      req.body,
+      deps,
+    );
+    return res.json(result);
+  } catch (error) {
+    return sendServiceError(res, error);
+  }
+});
+
+router.delete('/:id', async (req, res) => {
+  try {
+    const result = await deleteKnowledgeBaseForUser(authFromRequest(req), req.params.id, deps);
+    return res.json(result);
   } catch (error) {
     return sendServiceError(res, error);
   }

@@ -3,13 +3,18 @@ import { AccessRoleIds, PermissionBits, PrincipalType, ResourceType } from 'libr
 
 import type {
   KnowledgeAuthContext,
+  KnowledgeBaseAckResult,
+  KnowledgeBaseDocumentRecord,
   KnowledgeBaseRecord,
   KnowledgeBaseServiceDependencies,
   KnowledgeBaseServiceError,
+  CreateKnowledgeBaseDocumentForUserInput,
   CreateKnowledgeBaseForUserInput,
+  ListKnowledgeBaseDocumentsForUserResult,
   ListKnowledgeBasesForUserInput,
   ListKnowledgeBasesForUserResult,
   MongoResourceId,
+  UpdateKnowledgeBaseForUserInput,
 } from './types';
 
 function createServiceError(message: string, statusCode: number): KnowledgeBaseServiceError {
@@ -20,6 +25,10 @@ function createServiceError(message: string, statusCode: number): KnowledgeBaseS
 
 function normalizeOptionalDescription(description?: string): string | undefined {
   return typeof description === 'string' ? description.trim() : undefined;
+}
+
+function normalizeOptionalName(name?: string): string | undefined {
+  return typeof name === 'string' ? name.trim() : undefined;
 }
 
 function getMongoResourceId(kb: KnowledgeBaseRecord): string {
@@ -85,6 +94,111 @@ export async function listKnowledgeBasesForUser(
 
   const data = await deps.findKnowledgeBasesByResourceIds(resourceIds, auth.tenantId);
   return { data, nextCursor: undefined };
+}
+
+export async function getKnowledgeBaseForUser(
+  auth: KnowledgeAuthContext,
+  id: string,
+  deps: KnowledgeBaseServiceDependencies,
+): Promise<KnowledgeBaseRecord> {
+  return await requireKnowledgeBasePermission(auth, id, PermissionBits.VIEW, deps);
+}
+
+export async function updateKnowledgeBaseForUser(
+  auth: KnowledgeAuthContext,
+  id: string,
+  input: UpdateKnowledgeBaseForUserInput,
+  deps: KnowledgeBaseServiceDependencies,
+): Promise<KnowledgeBaseRecord> {
+  await requireKnowledgeBasePermission(auth, id, PermissionBits.EDIT, deps);
+
+  const update = {
+    name: normalizeOptionalName(input.name),
+    description: normalizeOptionalDescription(input.description),
+  };
+  const updated = await deps.updateKnowledgeBase(id, auth.tenantId, update);
+  if (!updated) {
+    throw createServiceError('Knowledge base not found', 404);
+  }
+
+  return updated;
+}
+
+export async function deleteKnowledgeBaseForUser(
+  auth: KnowledgeAuthContext,
+  id: string,
+  deps: KnowledgeBaseServiceDependencies,
+): Promise<KnowledgeBaseAckResult> {
+  await requireKnowledgeBasePermission(auth, id, PermissionBits.DELETE, deps);
+
+  const result = await deps.deleteKnowledgeBaseWithDocuments(id, auth.tenantId);
+  if (result.deletedCount === 0) {
+    throw createServiceError('Knowledge base not found', 404);
+  }
+
+  return { acknowledged: true };
+}
+
+export async function listKnowledgeBaseDocumentsForUser(
+  auth: KnowledgeAuthContext,
+  id: string,
+  deps: KnowledgeBaseServiceDependencies,
+): Promise<ListKnowledgeBaseDocumentsForUserResult> {
+  await requireKnowledgeBasePermission(auth, id, PermissionBits.VIEW, deps);
+  const data = await deps.findKnowledgeBaseDocuments(id, auth.tenantId);
+  return { data, nextCursor: undefined };
+}
+
+export async function createKnowledgeBaseDocumentForUser(
+  auth: KnowledgeAuthContext,
+  id: string,
+  input: CreateKnowledgeBaseDocumentForUserInput,
+  deps: KnowledgeBaseServiceDependencies,
+): Promise<KnowledgeBaseDocumentRecord> {
+  await requireKnowledgeBasePermission(auth, id, PermissionBits.EDIT, deps);
+
+  const status = input.status ?? 'ready';
+  const created = await deps.createKnowledgeBaseDocument({
+    id: `kbdoc_${randomUUID()}`,
+    knowledgeBaseId: id,
+    file_id: input.file_id.trim(),
+    filename: input.filename.trim(),
+    bytes: input.bytes,
+    mimeType: normalizeOptionalDescription(input.mimeType),
+    status,
+    error: normalizeOptionalDescription(input.error),
+    createdBy: auth.userId,
+    tenantId: auth.tenantId,
+  });
+  await deps.updateKnowledgeBaseCounts(id, auth.tenantId);
+
+  if (status === 'failed') {
+    const error = createServiceError(
+      input.error?.trim() || 'Knowledge base document upload failed',
+      500,
+    );
+    error.document = created;
+    throw error;
+  }
+
+  return created;
+}
+
+export async function deleteKnowledgeBaseDocumentForUser(
+  auth: KnowledgeAuthContext,
+  id: string,
+  documentId: string,
+  deps: KnowledgeBaseServiceDependencies,
+): Promise<KnowledgeBaseAckResult> {
+  await requireKnowledgeBasePermission(auth, id, PermissionBits.EDIT, deps);
+
+  const result = await deps.deleteKnowledgeBaseDocument(documentId, id, auth.tenantId);
+  if (result.deletedCount === 0) {
+    throw createServiceError('Knowledge base document not found', 404);
+  }
+
+  await deps.updateKnowledgeBaseCounts(id, auth.tenantId);
+  return { acknowledged: true };
 }
 
 export async function requireKnowledgeBasePermission(
