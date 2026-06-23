@@ -1196,7 +1196,7 @@ git commit -m "feat: add knowledge base service"
 - Create: `api/server/routes/knowledgeBases.test.js`
 - Modify: `api/server/index.js`
 
-- [ ] **Step 1: Write route tests**
+- [x] **Step 1: Write route tests**
 
 Create `api/server/routes/knowledgeBases.test.js`:
 
@@ -1237,7 +1237,7 @@ describe('knowledge base routes', () => {
 });
 ```
 
-- [ ] **Step 2: Run route tests to verify they fail**
+- [x] **Step 2: Run route tests to verify they fail**
 
 Run:
 
@@ -1247,7 +1247,7 @@ cd api && npx jest server/routes/knowledgeBases.test.js --runInBand
 
 Expected: FAIL because `server/routes/knowledgeBases.js` does not exist.
 
-- [ ] **Step 3: Add controller**
+- [x] **Step 3: Add controller**
 
 Create `api/server/controllers/KnowledgeBaseController.js`:
 
@@ -1286,7 +1286,7 @@ exports.createKnowledgeBase = async (req, res) => {
 };
 ```
 
-- [ ] **Step 4: Add router**
+- [x] **Step 4: Add router**
 
 Create `api/server/routes/knowledgeBases.js`:
 
@@ -1303,7 +1303,7 @@ router.get('/selector', controller.listKnowledgeBases);
 module.exports = router;
 ```
 
-- [ ] **Step 5: Mount routes**
+- [x] **Step 5: Mount routes**
 
 In `api/server/index.js`, add:
 
@@ -1313,7 +1313,7 @@ app.use('/api/knowledge-bases', require('./routes/knowledgeBases'));
 
 Place this beside other authenticated API routes.
 
-- [ ] **Step 6: Run route tests**
+- [x] **Step 6: Run route tests**
 
 Run:
 
@@ -1323,7 +1323,7 @@ cd api && npx jest server/routes/knowledgeBases.test.js --runInBand
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add api/server/controllers/KnowledgeBaseController.js api/server/routes/knowledgeBases.js api/server/routes/knowledgeBases.test.js api/server/index.js
