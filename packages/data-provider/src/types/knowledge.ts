@@ -65,3 +65,8 @@ export type KnowledgeBaseSelectorItem = Pick<
   KnowledgeBase,
   'id' | 'name' | 'description' | 'documentCount' | 'readyDocumentCount' | 'failedDocumentCount'
 >;
+
+export type KnowledgeBaseSelectorResponse = {
+  data: KnowledgeBaseSelectorItem[];
+  nextCursor?: string;
+};

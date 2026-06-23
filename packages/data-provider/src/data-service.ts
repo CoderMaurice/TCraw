@@ -870,7 +870,7 @@ export function deleteKnowledgeBaseDocument(
 
 export function listKnowledgeBaseSelector(
   params?: Pick<kb.ListKnowledgeBasesRequest, 'search' | 'limit'>,
-): Promise<kb.ListKnowledgeBasesResponse> {
+): Promise<kb.KnowledgeBaseSelectorResponse> {
   return request.get(endpoints.knowledgeBaseSelector(), { params });
 }
 
