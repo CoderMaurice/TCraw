@@ -35,6 +35,8 @@ export * from './mcp/oauth/OAuthReconnectionManager';
 export * from './crypto';
 /* Flow */
 export * from './flow/manager';
+/* Knowledge */
+export * from './knowledge';
 /* Middleware */
 export * from './middleware';
 /* Memory */
