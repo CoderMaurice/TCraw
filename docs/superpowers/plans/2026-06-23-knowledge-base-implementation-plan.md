@@ -1341,7 +1341,7 @@ git commit -m "feat: add knowledge base routes"
   - `api/server/services/Files/process.js`
   - `api/server/services/Files/VectorDB/crud.js`
 
-- [ ] **Step 1: Add service tests for edit/delete/documents**
+- [x] **Step 1: Add service tests for edit/delete/documents**
 
 Extend `packages/api/src/knowledge/service.spec.ts` with:
 
@@ -1373,7 +1373,7 @@ test('allows a shared Agent runtime to resolve ready documents without direct us
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run:
 
@@ -1383,7 +1383,7 @@ cd packages/api && npx jest src/knowledge/service.spec.ts --runInBand
 
 Expected: FAIL because `resolveKnowledgeBaseFileIdsForAgent` is not exported.
 
-- [ ] **Step 3: Add runtime document resolver**
+- [x] **Step 3: Add runtime document resolver**
 
 Add to `packages/api/src/knowledge/types.ts`:
 
@@ -1414,7 +1414,7 @@ export const resolveKnowledgeBaseFileIdsForAgent = async (
 };
 ```
 
-- [ ] **Step 4: Add full controller handlers and routes**
+- [x] **Step 4: Add full controller handlers and routes**
 
 In `api/server/controllers/KnowledgeBaseController.js`, each handler must:
 
@@ -1446,7 +1446,7 @@ router.post('/:id/documents', controller.uploadKnowledgeBaseDocuments);
 router.delete('/:id/documents/:documentId', controller.deleteKnowledgeBaseDocument);
 ```
 
-- [ ] **Step 5: Run backend tests**
+- [x] **Step 5: Run backend tests**
 
 Run:
 
@@ -1457,7 +1457,7 @@ cd api && npx jest server/routes/knowledgeBases.test.js --runInBand
 
 Expected: both commands PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/api/src/knowledge/service.ts packages/api/src/knowledge/types.ts packages/api/src/knowledge/service.spec.ts api/server/controllers/KnowledgeBaseController.js
