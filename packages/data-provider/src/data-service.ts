@@ -10,6 +10,7 @@ import * as ag from './types/agents';
 import * as q from './types/queries';
 import * as sk from './types/skills';
 import * as f from './types/files';
+import type * as kb from './types/knowledge';
 import * as config from './config';
 import request from './request';
 import * as s from './schemas';
@@ -818,6 +819,59 @@ export function updateProject(payload: t.TUpdateChatProjectRequest): Promise<t.T
 
 export function deleteProject(projectId: string): Promise<t.TDeleteChatProjectResponse> {
   return request.delete(endpoints.projectById(projectId));
+}
+
+export function listKnowledgeBases(
+  params?: kb.ListKnowledgeBasesRequest,
+): Promise<kb.ListKnowledgeBasesResponse> {
+  return request.get(endpoints.knowledgeBases(), { params });
+}
+
+export function getKnowledgeBase(id: string): Promise<kb.KnowledgeBase> {
+  return request.get(endpoints.knowledgeBase(id));
+}
+
+export function createKnowledgeBase(
+  data: kb.CreateKnowledgeBaseRequest,
+): Promise<kb.KnowledgeBase> {
+  return request.post(endpoints.knowledgeBases(), data);
+}
+
+export function updateKnowledgeBase(
+  id: string,
+  data: kb.UpdateKnowledgeBaseRequest,
+): Promise<kb.KnowledgeBase> {
+  return request.patch(endpoints.knowledgeBase(id), data);
+}
+
+export function deleteKnowledgeBase(id: string): Promise<{ acknowledged: true }> {
+  return request.delete(endpoints.knowledgeBase(id));
+}
+
+export function listKnowledgeBaseDocuments(
+  id: string,
+): Promise<kb.ListKnowledgeBaseDocumentsResponse> {
+  return request.get(endpoints.knowledgeBaseDocuments(id));
+}
+
+export function uploadKnowledgeBaseDocuments(
+  id: string,
+  formData: FormData,
+): Promise<kb.ListKnowledgeBaseDocumentsResponse> {
+  return request.postMultiPart(endpoints.knowledgeBaseDocuments(id), formData);
+}
+
+export function deleteKnowledgeBaseDocument(
+  id: string,
+  documentId: string,
+): Promise<{ acknowledged: true }> {
+  return request.delete(endpoints.knowledgeBaseDocument(id, documentId));
+}
+
+export function listKnowledgeBaseSelector(
+  params?: Pick<kb.ListKnowledgeBasesRequest, 'search' | 'limit'>,
+): Promise<kb.ListKnowledgeBasesResponse> {
+  return request.get(endpoints.knowledgeBaseSelector(), { params });
 }
 
 export function assignConversationToProject(

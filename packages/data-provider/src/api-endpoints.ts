@@ -137,6 +137,20 @@ export const projectById = (id: string) => `${projectsRoot}/${encodeURIComponent
 export const projectConversation = (conversationId: string) =>
   `${projectsRoot}/conversations/${encodeURIComponent(conversationId)}`;
 
+const knowledgeBasesRoot = `${BASE_URL}/api/knowledge-bases`;
+
+export const knowledgeBases = () => knowledgeBasesRoot;
+
+export const knowledgeBase = (id: string) => `${knowledgeBasesRoot}/${encodeURIComponent(id)}`;
+
+export const knowledgeBaseDocuments = (id: string) =>
+  `${knowledgeBase(id)}/documents`;
+
+export const knowledgeBaseDocument = (id: string, documentId: string) =>
+  `${knowledgeBaseDocuments(id)}/${encodeURIComponent(documentId)}`;
+
+export const knowledgeBaseSelector = () => `${knowledgeBasesRoot}/selector`;
+
 export const search = (q: string, cursor?: string | null) =>
   `${BASE_URL}/api/search?q=${q}${cursor ? `&cursor=${cursor}` : ''}`;
 
