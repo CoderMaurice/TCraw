@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const { nanoid } = require('nanoid');
 const { v4: uuidv4 } = require('uuid');
 const { agentSchema, fileSchema } = require('@librechat/data-schemas');
-const { FileSources, PermissionBits, ResourceType } = require('librechat-data-provider');
+const { FileSources, PermissionBits, ResourceType, Tools } = require('librechat-data-provider');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 
 // Only mock the dependencies that are not database-related
@@ -33,6 +33,7 @@ jest.mock('sharp', () =>
 jest.mock('@librechat/api', () => ({
   ...jest.requireActual('@librechat/api'),
   refreshS3Url: jest.fn(),
+  validateKnowledgeBaseBindings: jest.fn(),
 }));
 
 jest.mock('~/server/services/Files/process', () => ({
@@ -40,6 +41,7 @@ jest.mock('~/server/services/Files/process', () => ({
 }));
 
 jest.mock('~/server/services/PermissionService', () => ({
+  checkPermission: jest.fn().mockResolvedValue(false),
   findAccessibleResources: jest.fn().mockResolvedValue([]),
   findPubliclyAccessibleResources: jest.fn().mockResolvedValue([]),
   getResourcePermissionsMap: jest.fn().mockResolvedValue(new Map()),
@@ -85,7 +87,7 @@ const {
   getResourcePermissionsMap,
 } = require('~/server/services/PermissionService');
 
-const { refreshS3Url } = require('@librechat/api');
+const { refreshS3Url, validateKnowledgeBaseBindings } = require('@librechat/api');
 
 /**
  * @type {import('mongoose').Model<import('@librechat/data-schemas').IAgent>}
@@ -101,6 +103,14 @@ describe('Agent Controllers - Mass Assignment Protection', () => {
     mongoServer = await MongoMemoryServer.create();
     const mongoUri = mongoServer.getUri();
     await mongoose.connect(mongoUri);
+    if (!agentSchema.path('knowledge_base_ids')) {
+      agentSchema.add({
+        knowledge_base_ids: {
+          type: [String],
+          default: [],
+        },
+      });
+    }
     Agent = mongoose.models.Agent || mongoose.model('Agent', agentSchema);
     // Register File so orphan-pruning tests (and the tool_resources validation
     // test, which now needs real File docs for its ids) have a working model.
@@ -118,6 +128,7 @@ describe('Agent Controllers - Mass Assignment Protection', () => {
 
     // Reset all mocks
     jest.clearAllMocks();
+    validateKnowledgeBaseBindings.mockResolvedValue([]);
 
     // Setup mock request and response objects
     mockReq = {
@@ -322,6 +333,68 @@ describe('Agent Controllers - Mass Assignment Protection', () => {
       expect(mockRes.status).toHaveBeenCalledWith(201);
       const createdAgent = mockRes.json.mock.calls[0][0];
       expect(createdAgent.tool_resources.file_search.file_ids).toEqual([ownedFileId]);
+    });
+
+    test('should reject knowledge bases the creator cannot view', async () => {
+      const error = new Error('Knowledge base access denied');
+      error.statusCode = 403;
+      validateKnowledgeBaseBindings.mockRejectedValueOnce(error);
+
+      mockReq.body = {
+        provider: 'openai',
+        model: 'gpt-4',
+        name: 'Agent with Denied KB',
+        knowledge_base_ids: ['kb_denied'],
+      };
+
+      await createAgentHandler(mockReq, mockRes);
+
+      expect(validateKnowledgeBaseBindings).toHaveBeenCalledWith(
+        {
+          userId: mockReq.user.id,
+          role: mockReq.user.role,
+          tenantId: undefined,
+        },
+        ['kb_denied'],
+        expect.any(Object),
+      );
+      expect(mockRes.status).toHaveBeenCalledWith(403);
+      expect(await Agent.countDocuments()).toBe(0);
+    });
+
+    test('should auto-enable file_search and persist validated knowledge base ids', async () => {
+      mockReq.user.tenantId = 'tenant-a';
+      mockReq.app.locals.knowledgeDeps = { source: 'test-deps' };
+      validateKnowledgeBaseBindings.mockResolvedValueOnce(['kb_alpha', 'kb_beta']);
+
+      mockReq.body = {
+        provider: 'openai',
+        model: 'gpt-4',
+        name: 'Agent with KB',
+        tools: ['web_search'],
+        knowledge_base_ids: ['kb_alpha', 'kb_alpha', 'kb_beta'],
+      };
+
+      await createAgentHandler(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(201);
+      expect(validateKnowledgeBaseBindings).toHaveBeenCalledWith(
+        {
+          userId: mockReq.user.id,
+          role: mockReq.user.role,
+          tenantId: 'tenant-a',
+        },
+        ['kb_alpha', 'kb_alpha', 'kb_beta'],
+        mockReq.app.locals.knowledgeDeps,
+      );
+
+      const createdAgent = mockRes.json.mock.calls[0][0];
+      expect(createdAgent.knowledge_base_ids).toEqual(['kb_alpha', 'kb_beta']);
+      expect(createdAgent.tools).toEqual(expect.arrayContaining(['web_search', Tools.file_search]));
+
+      const agentInDb = await Agent.findOne({ id: createdAgent.id }).lean();
+      expect(agentInDb.knowledge_base_ids).toEqual(['kb_alpha', 'kb_beta']);
+      expect(agentInDb.tools).toEqual(expect.arrayContaining(['web_search', Tools.file_search]));
     });
 
     test('should handle support_contact with empty strings', async () => {
@@ -616,6 +689,64 @@ describe('Agent Controllers - Mass Assignment Protection', () => {
 
       const updatedAgent = mockRes.json.mock.calls[0][0];
       expect(updatedAgent.name).toBe('Admin Update');
+    });
+
+    test('should validate updated knowledge bases and auto-enable file_search when tools are omitted', async () => {
+      validateKnowledgeBaseBindings.mockResolvedValueOnce(['kb_one', 'kb_two']);
+      mockReq.app.locals.knowledgeDeps = { source: 'update-test-deps' };
+
+      await Agent.updateOne(
+        { id: existingAgentId },
+        { $set: { tools: ['web_search'], knowledge_base_ids: [] } },
+      );
+
+      mockReq.user.id = existingAgentAuthorId.toString();
+      mockReq.params.id = existingAgentId;
+      mockReq.body = {
+        knowledge_base_ids: ['kb_one', 'kb_one', 'kb_two'],
+      };
+
+      await updateAgentHandler(mockReq, mockRes);
+
+      expect(validateKnowledgeBaseBindings).toHaveBeenCalledWith(
+        {
+          userId: mockReq.user.id,
+          role: mockReq.user.role,
+          tenantId: undefined,
+        },
+        ['kb_one', 'kb_one', 'kb_two'],
+        mockReq.app.locals.knowledgeDeps,
+      );
+      expect(mockRes.json).toHaveBeenCalled();
+
+      const agentInDb = await Agent.findOne({ id: existingAgentId }).lean();
+      expect(agentInDb.knowledge_base_ids).toEqual(['kb_one', 'kb_two']);
+      expect(agentInDb.tools).toEqual(expect.arrayContaining(['web_search', Tools.file_search]));
+    });
+
+    test('should preserve existing knowledge bases when update omits knowledge_base_ids', async () => {
+      await Agent.updateOne(
+        { id: existingAgentId },
+        {
+          $set: {
+            knowledge_base_ids: ['kb_existing'],
+            tools: [Tools.file_search],
+          },
+        },
+      );
+
+      mockReq.user.id = existingAgentAuthorId.toString();
+      mockReq.params.id = existingAgentId;
+      mockReq.body = {
+        name: 'Rename Only',
+      };
+
+      await updateAgentHandler(mockReq, mockRes);
+
+      expect(validateKnowledgeBaseBindings).not.toHaveBeenCalled();
+      const agentInDb = await Agent.findOne({ id: existingAgentId }).lean();
+      expect(agentInDb.name).toBe('Rename Only');
+      expect(agentInDb.knowledge_base_ids).toEqual(['kb_existing']);
     });
 
     test('should prune admin-supplied file_ids against the agent author', async () => {
@@ -1011,6 +1142,84 @@ describe('Agent Controllers - Mass Assignment Protection', () => {
       const { agent } = mockRes.json.mock.calls[0][0];
       expect(agent.author.toString()).toBe(cloneAuthorId.toString());
       expect(agent.tool_resources.context.file_ids).toEqual([cloneAuthorFileId]);
+    });
+
+    test('duplicateAgentHandler should revalidate and persist source knowledge bases for the clone author', async () => {
+      const sourceAuthorId = new mongoose.Types.ObjectId();
+      const cloneAuthorId = new mongoose.Types.ObjectId();
+      validateKnowledgeBaseBindings.mockResolvedValueOnce(['kb_one', 'kb_two']);
+
+      const sourceAgent = await Agent.create({
+        id: `agent_${uuidv4()}`,
+        name: 'Source KB Agent',
+        provider: 'openai',
+        model: 'gpt-4',
+        author: sourceAuthorId,
+        tools: ['web_search'],
+        knowledge_base_ids: ['kb_one', 'kb_one', 'kb_two'],
+      });
+
+      const db = require('~/models');
+      jest.spyOn(db, 'getActions').mockResolvedValueOnce([]);
+
+      mockReq.user.id = cloneAuthorId.toString();
+      mockReq.params.id = sourceAgent.id;
+
+      await duplicateAgentHandler(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(201);
+      expect(validateKnowledgeBaseBindings).toHaveBeenCalledWith(
+        {
+          userId: cloneAuthorId.toString(),
+          role: mockReq.user.role,
+          tenantId: undefined,
+        },
+        ['kb_one', 'kb_one', 'kb_two'],
+        expect.any(Object),
+      );
+      const { agent } = mockRes.json.mock.calls[0][0];
+      expect(agent.knowledge_base_ids).toEqual(['kb_one', 'kb_two']);
+      expect(agent.tools).toEqual(expect.arrayContaining(['web_search', Tools.file_search]));
+
+      const agentInDb = await Agent.findOne({ id: agent.id }).lean();
+      expect(agentInDb.knowledge_base_ids).toEqual(['kb_one', 'kb_two']);
+      expect(agentInDb.tools).toEqual(expect.arrayContaining(['web_search', Tools.file_search]));
+    });
+
+    test('duplicateAgentHandler should reject when the clone author cannot view source knowledge bases', async () => {
+      const error = new Error('Knowledge base access denied');
+      error.statusCode = 403;
+      validateKnowledgeBaseBindings.mockRejectedValueOnce(error);
+
+      const sourceAgent = await Agent.create({
+        id: `agent_${uuidv4()}`,
+        name: 'Denied Source KB Agent',
+        provider: 'openai',
+        model: 'gpt-4',
+        author: new mongoose.Types.ObjectId(),
+        tools: [Tools.file_search],
+        knowledge_base_ids: ['kb_denied'],
+      });
+
+      const db = require('~/models');
+      jest.spyOn(db, 'getActions').mockResolvedValueOnce([]);
+
+      mockReq.user.id = new mongoose.Types.ObjectId().toString();
+      mockReq.params.id = sourceAgent.id;
+
+      await duplicateAgentHandler(mockReq, mockRes);
+
+      expect(validateKnowledgeBaseBindings).toHaveBeenCalledWith(
+        {
+          userId: mockReq.user.id,
+          role: mockReq.user.role,
+          tenantId: undefined,
+        },
+        ['kb_denied'],
+        expect.any(Object),
+      );
+      expect(mockRes.status).toHaveBeenCalledWith(403);
+      expect(await Agent.countDocuments()).toBe(1);
     });
 
     test('revertAgentVersionHandler should prune restored file_ids not owned by the agent author', async () => {

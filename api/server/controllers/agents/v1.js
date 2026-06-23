@@ -9,6 +9,7 @@ const {
   refreshListAvatars,
   collectEdgeAgentIds,
   mergeAgentOcrConversion,
+  validateKnowledgeBaseBindings,
   MAX_AVATAR_REFRESH_AGENTS,
   collectToolResourceFileIds,
   convertOcrToContextInPlace,
@@ -37,6 +38,7 @@ const {
   findAccessibleResources,
   hasPublicPermission,
   grantPermission,
+  checkPermission,
 } = require('~/server/services/PermissionService');
 const { getStrategyFunctions } = require('~/server/services/Files/strategies');
 const { resizeAvatar } = require('~/server/services/Files/images/avatar');
@@ -60,6 +62,9 @@ const systemTools = {
 
 const MAX_SEARCH_LEN = 100;
 const escapeRegex = (str = '') => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const knowledgeBaseIdsRequestSchema = z.object({
+  knowledge_base_ids: z.array(z.string().min(1)),
+});
 const getSafeModelParameters = (modelParameters) => {
   const { useResponsesApi } = modelParameters ?? {};
   return typeof useResponsesApi === 'boolean' ? { useResponsesApi } : {};
@@ -328,6 +333,67 @@ const pruneToolResourceFileIdsForOwner = async ({ tool_resources, ownerId, logPr
   }
 };
 
+const getKnowledgeBaseDeps = (req) =>
+  req.app?.locals?.knowledgeDeps ?? {
+    createKnowledgeBase: db.createKnowledgeBase,
+    findKnowledgeBaseById: db.findKnowledgeBaseById,
+    findKnowledgeBasesByResourceIds: db.findKnowledgeBasesByResourceIds,
+    updateKnowledgeBase: db.updateKnowledgeBase,
+    createKnowledgeBaseDocument: db.createKnowledgeBaseDocument,
+    findKnowledgeBaseDocuments: db.findKnowledgeBaseDocuments,
+    findReadyKnowledgeBaseDocumentFileIds: db.findReadyKnowledgeBaseDocumentFileIds,
+    updateKnowledgeBaseCounts: db.updateKnowledgeBaseCounts,
+    deleteKnowledgeBaseDocument: db.deleteKnowledgeBaseDocument,
+    deleteKnowledgeBaseWithDocuments: db.deleteKnowledgeBaseWithDocuments,
+    grantPermission,
+    findAccessibleResources,
+    checkPermission,
+  };
+
+const ensureFileSearchTool = (tools = []) => {
+  const nextTools = Array.isArray(tools) ? [...tools] : [];
+  if (!nextTools.includes(Tools.file_search)) {
+    nextTools.push(Tools.file_search);
+  }
+  return nextTools;
+};
+
+const validateAgentKnowledgeBaseBindings = async (req, payload) => {
+  const requestedIds = Array.isArray(payload.knowledge_base_ids) ? payload.knowledge_base_ids : [];
+  const knowledgeBaseIds = await validateKnowledgeBaseBindings(
+    {
+      userId: req.user.id,
+      role: req.user.role,
+      tenantId: req.user.tenantId,
+    },
+    requestedIds,
+    getKnowledgeBaseDeps(req),
+  );
+
+  payload.knowledge_base_ids = knowledgeBaseIds;
+  if (knowledgeBaseIds.length > 0) {
+    payload.tools = ensureFileSearchTool(payload.tools);
+  }
+
+  return knowledgeBaseIds;
+};
+
+const isClientServiceError = (error) =>
+  Number.isInteger(error?.statusCode) && error.statusCode >= 400 && error.statusCode < 500;
+
+const restoreKnowledgeBaseIdsFromRequest = (validatedData, rawData) => {
+  if (
+    Object.hasOwn(validatedData, 'knowledge_base_ids') ||
+    !Object.hasOwn(rawData ?? {}, 'knowledge_base_ids')
+  ) {
+    return;
+  }
+
+  validatedData.knowledge_base_ids = knowledgeBaseIdsRequestSchema.parse({
+    knowledge_base_ids: rawData.knowledge_base_ids,
+  }).knowledge_base_ids;
+};
+
 /**
  * Creates an Agent.
  * @route POST /Agents
@@ -339,6 +405,7 @@ const pruneToolResourceFileIdsForOwner = async ({ tool_resources, ownerId, logPr
 const createAgentHandler = async (req, res) => {
   try {
     const validatedData = agentCreateSchema.parse(req.body);
+    restoreKnowledgeBaseIdsFromRequest(validatedData, req.body);
     const { tools = [], ...agentData } = removeNullishValues(validatedData);
 
     if (agentData.model_parameters && typeof agentData.model_parameters === 'object') {
@@ -407,14 +474,21 @@ const createAgentHandler = async (req, res) => {
     agentData.author = userId;
     agentData.tools = [];
 
-    const hasMCPTools = tools.some((t) => t?.includes(Constants.mcp_delimiter));
+    const knowledgePayload = {
+      tools,
+      knowledge_base_ids: agentData.knowledge_base_ids,
+    };
+    await validateAgentKnowledgeBaseBindings(req, knowledgePayload);
+    agentData.knowledge_base_ids = knowledgePayload.knowledge_base_ids;
+
+    const hasMCPTools = knowledgePayload.tools.some((t) => t?.includes(Constants.mcp_delimiter));
     const [availableTools, configServers] = await Promise.all([
       getCachedTools().then((t) => t ?? {}),
       hasMCPTools ? resolveConfigServers(req) : Promise.resolve(undefined),
     ]);
     const mcpPermissionContext = createMCPPermissionContext(req);
     agentData.tools = await filterAuthorizedTools({
-      tools,
+      tools: knowledgePayload.tools,
       userId,
       role: req.user.role,
       user: req.user,
@@ -459,6 +533,9 @@ const createAgentHandler = async (req, res) => {
     if (error instanceof z.ZodError) {
       logger.error('[/Agents] Validation error', error.errors);
       return res.status(400).json({ error: 'Invalid request data', details: error.errors });
+    }
+    if (isClientServiceError(error)) {
+      return res.status(error.statusCode).json({ error: error.message });
     }
     logger.error('[/Agents] Error creating agent', error);
     res.status(500).json({ error: error.message });
@@ -557,6 +634,7 @@ const updateAgentHandler = async (req, res) => {
   try {
     const id = req.params.id;
     const validatedData = agentUpdateSchema.parse(req.body);
+    restoreKnowledgeBaseIdsFromRequest(validatedData, req.body);
     // Preserve explicit null for avatar to allow resetting the avatar
     const { avatar: avatarField, _id, ...rest } = validatedData;
     const updateData = removeNullishValues(rest);
@@ -636,6 +714,18 @@ const updateAgentHandler = async (req, res) => {
         ownerId: existingAgent.author,
         logPrefix: `[/Agents/:id] Agent ${id}`,
       });
+    }
+
+    if (Object.hasOwn(updateData, 'knowledge_base_ids')) {
+      const knowledgePayload = {
+        tools: updateData.tools ?? existingAgent.tools ?? [],
+        knowledge_base_ids: updateData.knowledge_base_ids,
+      };
+      const knowledgeBaseIds = await validateAgentKnowledgeBaseBindings(req, knowledgePayload);
+      updateData.knowledge_base_ids = knowledgeBaseIds;
+      if (knowledgeBaseIds.length > 0) {
+        updateData.tools = knowledgePayload.tools;
+      }
     }
 
     const isMCPTool = (t) =>
@@ -724,6 +814,9 @@ const updateAgentHandler = async (req, res) => {
         details: error.details,
       });
     }
+    if (isClientServiceError(error)) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
 
     res.status(500).json({ error: error.message });
   }
@@ -789,6 +882,8 @@ const duplicateAgentHandler = async (req, res) => {
       id: newAgentId,
       author: userId,
     });
+
+    await validateAgentKnowledgeBaseBindings(req, newAgentData);
 
     const newActionsList = [];
     const originalActions = (await db.getActions({ agent_id: id }, true)) ?? [];
@@ -897,6 +992,10 @@ const duplicateAgentHandler = async (req, res) => {
     });
   } catch (error) {
     logger.error('[/Agents/:id/duplicate] Error duplicating Agent:', error);
+
+    if (isClientServiceError(error)) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
 
     res.status(500).json({ error: error.message });
   }
