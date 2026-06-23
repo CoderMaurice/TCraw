@@ -146,6 +146,27 @@ export function createAccessRoleMethods(mongoose: typeof import('mongoose')): {
         permBits: RoleBits.OWNER,
       },
       {
+        accessRoleId: AccessRoleIds.KNOWLEDGE_BASE_VIEWER,
+        name: 'com_ui_role_viewer',
+        description: 'com_ui_role_viewer_desc',
+        resourceType: ResourceType.KNOWLEDGE_BASE,
+        permBits: RoleBits.VIEWER,
+      },
+      {
+        accessRoleId: AccessRoleIds.KNOWLEDGE_BASE_EDITOR,
+        name: 'com_ui_role_editor',
+        description: 'com_ui_role_editor_desc',
+        resourceType: ResourceType.KNOWLEDGE_BASE,
+        permBits: RoleBits.EDITOR,
+      },
+      {
+        accessRoleId: AccessRoleIds.KNOWLEDGE_BASE_OWNER,
+        name: 'com_ui_role_owner',
+        description: 'com_ui_role_owner_desc',
+        resourceType: ResourceType.KNOWLEDGE_BASE,
+        permBits: RoleBits.OWNER,
+      },
+      {
         accessRoleId: AccessRoleIds.PROMPTGROUP_VIEWER,
         name: 'com_ui_role_viewer',
         description: 'com_ui_role_viewer_desc',

@@ -19,6 +19,7 @@ const accessRoleSchema: Schema<IAccessRole> = new Schema<IAccessRole>(
         'agent',
         'project',
         'file',
+        'knowledgeBase',
         'promptGroup',
         'mcpServer',
         'remoteAgent',

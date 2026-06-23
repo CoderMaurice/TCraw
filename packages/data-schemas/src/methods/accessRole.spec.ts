@@ -197,6 +197,9 @@ describe('AccessRole Model Tests', () => {
           AccessRoleIds.AGENT_EDITOR,
           AccessRoleIds.AGENT_OWNER,
           AccessRoleIds.AGENT_VIEWER,
+          AccessRoleIds.KNOWLEDGE_BASE_EDITOR,
+          AccessRoleIds.KNOWLEDGE_BASE_OWNER,
+          AccessRoleIds.KNOWLEDGE_BASE_VIEWER,
           AccessRoleIds.PROMPTGROUP_EDITOR,
           AccessRoleIds.PROMPTGROUP_OWNER,
           AccessRoleIds.PROMPTGROUP_VIEWER,
@@ -226,6 +229,36 @@ describe('AccessRole Model Tests', () => {
       const agentOwnerRole = await methods.findRoleByIdentifier(AccessRoleIds.AGENT_OWNER);
       expect(agentOwnerRole).toBeDefined();
       expect(agentOwnerRole?.permBits).toBe(RoleBits.OWNER);
+    });
+
+    test('should seed knowledge base roles with expected permissions', async () => {
+      await methods.seedDefaultRoles();
+
+      const knowledgeBaseRoles = await methods.findRolesByResourceType(ResourceType.KNOWLEDGE_BASE);
+      expect(knowledgeBaseRoles).toHaveLength(3);
+      expect(
+        knowledgeBaseRoles
+          .map((role) => ({
+            accessRoleId: role.accessRoleId,
+            permBits: role.permBits,
+          }))
+          .sort((left, right) => left.accessRoleId.localeCompare(right.accessRoleId)),
+      ).toEqual(
+        [
+          {
+            accessRoleId: AccessRoleIds.KNOWLEDGE_BASE_EDITOR,
+            permBits: RoleBits.EDITOR,
+          },
+          {
+            accessRoleId: AccessRoleIds.KNOWLEDGE_BASE_OWNER,
+            permBits: RoleBits.OWNER,
+          },
+          {
+            accessRoleId: AccessRoleIds.KNOWLEDGE_BASE_VIEWER,
+            permBits: RoleBits.VIEWER,
+          },
+        ].sort((left, right) => left.accessRoleId.localeCompare(right.accessRoleId)),
+      );
     });
 
     test('should not modify existing roles when seeding', async () => {
