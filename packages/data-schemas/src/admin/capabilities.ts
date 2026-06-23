@@ -32,6 +32,8 @@ export const SystemCapabilities = {
   READ_USAGE: 'read:usage',
   READ_AGENTS: 'read:agents',
   MANAGE_AGENTS: 'manage:agents',
+  READ_KNOWLEDGE_BASES: 'read:knowledgebases',
+  MANAGE_KNOWLEDGE_BASES: 'manage:knowledgebases',
   MANAGE_MCP_SERVERS: 'manage:mcpservers',
   READ_PROMPTS: 'read:prompts',
   MANAGE_PROMPTS: 'manage:prompts',
@@ -55,6 +57,7 @@ export const CapabilityImplications: Partial<Record<BaseSystemCapability, BaseSy
     [SystemCapabilities.MANAGE_ROLES]: [SystemCapabilities.READ_ROLES],
     [SystemCapabilities.MANAGE_CONFIGS]: [SystemCapabilities.READ_CONFIGS],
     [SystemCapabilities.MANAGE_AGENTS]: [SystemCapabilities.READ_AGENTS],
+    [SystemCapabilities.MANAGE_KNOWLEDGE_BASES]: [SystemCapabilities.READ_KNOWLEDGE_BASES],
     [SystemCapabilities.MANAGE_PROMPTS]: [SystemCapabilities.READ_PROMPTS],
     [SystemCapabilities.MANAGE_SKILLS]: [SystemCapabilities.READ_SKILLS],
     [SystemCapabilities.MANAGE_SHARED_LINKS]: [SystemCapabilities.READ_SHARED_LINKS],
@@ -142,6 +145,7 @@ export function expandImplications(directCaps: string[]): string[] {
  */
 export const ResourceCapabilityMap: Record<ResourceType, SystemCapability> = {
   [ResourceType.AGENT]: SystemCapabilities.MANAGE_AGENTS,
+  [ResourceType.KNOWLEDGE_BASE]: SystemCapabilities.MANAGE_KNOWLEDGE_BASES,
   [ResourceType.PROMPTGROUP]: SystemCapabilities.MANAGE_PROMPTS,
   [ResourceType.MCPSERVER]: SystemCapabilities.MANAGE_MCP_SERVERS,
   [ResourceType.REMOTE_AGENT]: SystemCapabilities.MANAGE_AGENTS,
@@ -210,6 +214,8 @@ export const CAPABILITY_CATEGORIES: CapabilityCategory[] = [
     capabilities: [
       SystemCapabilities.MANAGE_AGENTS,
       SystemCapabilities.READ_AGENTS,
+      SystemCapabilities.MANAGE_KNOWLEDGE_BASES,
+      SystemCapabilities.READ_KNOWLEDGE_BASES,
       SystemCapabilities.MANAGE_PROMPTS,
       SystemCapabilities.READ_PROMPTS,
       SystemCapabilities.MANAGE_SKILLS,
