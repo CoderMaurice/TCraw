@@ -25,6 +25,9 @@ type ShareTestRequest = ServerRequest & {
   };
 };
 
+type ShareResourcePermissions = Partial<Record<Permissions, boolean>>;
+type ShareRolePermissions = Partial<Record<PermissionTypes, ShareResourcePermissions>>;
+
 const createResponse = (): Response => {
   const res = {
     status: jest.fn().mockReturnThis(),
@@ -42,7 +45,7 @@ const createRequest = (overrides: Partial<ShareTestRequest> = {}): ShareTestRequ
     ...overrides,
   }) as ShareTestRequest;
 
-const createRole = (permissions: IRole['permissions']): IRole =>
+const createRole = (permissions: ShareRolePermissions): IRole =>
   ({
     permissions,
   }) as IRole;
@@ -121,6 +124,36 @@ describe('createSharePolicyMiddleware', () => {
       { id: 'user123', role: 'USER', tenantId: undefined },
       'manage:skills',
     );
+    expect(next).toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('uses KNOWLEDGE_BASES permissions for knowledge base sharing', async () => {
+    const { checkShareAccess } = createSharePolicyMiddleware({
+      getRoleByName,
+      hasCapability,
+    });
+    getRoleByName.mockResolvedValue(
+      createRole({
+        [PermissionTypes.KNOWLEDGE_BASES]: {
+          [Permissions.SHARE]: true,
+          [Permissions.SHARE_PUBLIC]: false,
+        },
+        [PermissionTypes.AGENTS]: {
+          [Permissions.SHARE]: false,
+          [Permissions.SHARE_PUBLIC]: false,
+        },
+        [PermissionTypes.PROMPTS]: {
+          [Permissions.SHARE]: false,
+          [Permissions.SHARE_PUBLIC]: false,
+        },
+      }),
+    );
+    const req = createRequest({ params: { resourceType: ResourceType.KNOWLEDGE_BASE } });
+    const res = createResponse();
+
+    await checkShareAccess(req, res, next);
+
     expect(next).toHaveBeenCalled();
     expect(res.status).not.toHaveBeenCalled();
   });

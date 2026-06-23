@@ -17,6 +17,10 @@ export enum PermissionTypes {
    */
   AGENTS = 'AGENTS',
   /**
+   * Type for Knowledge Base Permissions
+   */
+  KNOWLEDGE_BASES = 'KNOWLEDGE_BASES',
+  /**
    * Type for Memory Permissions
    */
   MEMORIES = 'MEMORIES',
@@ -78,6 +82,7 @@ export enum PermissionTypes {
 export const PERMISSION_TYPE_INTERFACE_FIELDS: Record<PermissionTypes, string> = {
   [PermissionTypes.PROMPTS]: 'prompts',
   [PermissionTypes.AGENTS]: 'agents',
+  [PermissionTypes.KNOWLEDGE_BASES]: 'knowledgeBases',
   [PermissionTypes.BOOKMARKS]: 'bookmarks',
   [PermissionTypes.MEMORIES]: 'memories',
   [PermissionTypes.MULTI_CONVO]: 'multiConvo',
@@ -178,6 +183,14 @@ export const agentPermissionsSchema = z.object({
 });
 export type TAgentPermissions = z.infer<typeof agentPermissionsSchema>;
 
+export const knowledgeBasePermissionsSchema = z.object({
+  [Permissions.USE]: z.boolean().default(true),
+  [Permissions.CREATE]: z.boolean().default(true),
+  [Permissions.SHARE]: z.boolean().default(false),
+  [Permissions.SHARE_PUBLIC]: z.boolean().default(false),
+});
+export type TKnowledgeBasePermissions = z.infer<typeof knowledgeBasePermissionsSchema>;
+
 export const multiConvoPermissionsSchema = z.object({
   [Permissions.USE]: z.boolean().default(true),
 });
@@ -258,6 +271,7 @@ export const permissionsSchema = z.object({
   [PermissionTypes.BOOKMARKS]: bookmarkPermissionsSchema,
   [PermissionTypes.MEMORIES]: memoryPermissionsSchema,
   [PermissionTypes.AGENTS]: agentPermissionsSchema,
+  [PermissionTypes.KNOWLEDGE_BASES]: knowledgeBasePermissionsSchema,
   [PermissionTypes.MULTI_CONVO]: multiConvoPermissionsSchema,
   [PermissionTypes.TEMPORARY_CHAT]: temporaryChatPermissionsSchema,
   [PermissionTypes.RUN_CODE]: runCodePermissionsSchema,

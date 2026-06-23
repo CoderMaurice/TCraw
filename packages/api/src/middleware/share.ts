@@ -6,6 +6,7 @@ import type { CapabilityUser, HasCapabilityFn } from './capabilities';
 import type { RequestBody, ServerRequest } from '~/types/http';
 
 type ShareResourcePermissions = Partial<Record<Permissions, boolean>>;
+type ShareRolePermissions = Partial<Record<PermissionTypes, ShareResourcePermissions>>;
 
 interface SharePermissionCache {
   cacheKey: string;
@@ -44,6 +45,7 @@ type ShareMiddleware = (
 
 const resourceToPermissionType: Record<ResourceType, PermissionTypes> = {
   [ResourceType.AGENT]: PermissionTypes.AGENTS,
+  [ResourceType.KNOWLEDGE_BASE]: PermissionTypes.KNOWLEDGE_BASES,
   [ResourceType.PROMPTGROUP]: PermissionTypes.PROMPTS,
   [ResourceType.MCPSERVER]: PermissionTypes.MCP_SERVERS,
   [ResourceType.REMOTE_AGENT]: PermissionTypes.REMOTE_AGENTS,
@@ -129,7 +131,8 @@ export function createSharePolicyMiddleware({ getRoleByName, hasCapability }: Sh
       return null;
     }
 
-    const resourcePerms = role.permissions[permissionType] ?? {};
+    const rolePermissions = role.permissions as ShareRolePermissions;
+    const resourcePerms = rolePermissions[permissionType] ?? {};
     req.sharePermissionContext = {
       cacheKey,
       resourcePerms,

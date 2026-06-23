@@ -89,6 +89,7 @@ describe('roleDefaults', () => {
           permType === PermissionTypes.MEMORIES ||
           permType === PermissionTypes.PROMPTS ||
           permType === PermissionTypes.AGENTS ||
+          permType === PermissionTypes.KNOWLEDGE_BASES ||
           permType === PermissionTypes.SKILLS ||
           permType === PermissionTypes.SHARED_LINKS;
 
@@ -150,6 +151,42 @@ describe('roleDefaults', () => {
         PermissionTypes.SKILLS
       ] as Record<string, boolean>;
       expect(userSkills).toEqual({
+        [Permissions.USE]: true,
+        [Permissions.CREATE]: true,
+        [Permissions.SHARE]: false,
+        [Permissions.SHARE_PUBLIC]: false,
+      });
+    });
+  });
+
+  describe('KNOWLEDGE_BASES permission defaults', () => {
+    it('defines knowledge base permissions as resource-like permissions', () => {
+      expect(PermissionTypes.KNOWLEDGE_BASES).toBe('KNOWLEDGE_BASES');
+      expect(Object.keys(permissionsSchema.shape[PermissionTypes.KNOWLEDGE_BASES].shape)).toEqual([
+        Permissions.USE,
+        Permissions.CREATE,
+        Permissions.SHARE,
+        Permissions.SHARE_PUBLIC,
+      ]);
+    });
+
+    it('grants ADMIN all four knowledge base permissions by default', () => {
+      const adminKnowledgeBases = roleDefaults[SystemRoles.ADMIN].permissions[
+        PermissionTypes.KNOWLEDGE_BASES
+      ] as Record<string, boolean>;
+      expect(adminKnowledgeBases).toEqual({
+        [Permissions.USE]: true,
+        [Permissions.CREATE]: true,
+        [Permissions.SHARE]: true,
+        [Permissions.SHARE_PUBLIC]: true,
+      });
+    });
+
+    it('grants USER USE+CREATE but no sharing by default', () => {
+      const userKnowledgeBases = roleDefaults[SystemRoles.USER].permissions[
+        PermissionTypes.KNOWLEDGE_BASES
+      ] as Record<string, boolean>;
+      expect(userKnowledgeBases).toEqual({
         [Permissions.USE]: true,
         [Permissions.CREATE]: true,
         [Permissions.SHARE]: false,
