@@ -70,6 +70,10 @@ export interface KnowledgeBasePermissionCheckInput {
 export interface KnowledgeBaseServiceDependencies {
   createKnowledgeBase(input: CreateKnowledgeBaseInput): Promise<KnowledgeBaseRecord>;
   findKnowledgeBaseById(id: string, tenantId?: string): Promise<KnowledgeBaseRecord | null>;
+  findKnowledgeBasesByResourceIds(
+    resourceIds: KnowledgeBaseResourceReference[],
+    tenantId?: string,
+  ): Promise<KnowledgeBaseRecord[]>;
   findReadyKnowledgeBaseDocumentFileIds(
     knowledgeBaseIds: string[],
     tenantId?: string,

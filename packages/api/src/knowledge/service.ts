@@ -72,14 +72,19 @@ export async function listKnowledgeBasesForUser(
   input: ListKnowledgeBasesForUserInput,
   deps: KnowledgeBaseServiceDependencies,
 ): Promise<ListKnowledgeBasesForUserResult> {
-  await deps.findAccessibleResources({
+  const resourceIds = await deps.findAccessibleResources({
     userId: auth.userId,
     role: auth.role,
     resourceType: ResourceType.KNOWLEDGE_BASE,
     requiredPermissions: input.requiredPermission ?? PermissionBits.VIEW,
   });
 
-  return { data: [], nextCursor: undefined };
+  if (resourceIds.length === 0) {
+    return { data: [], nextCursor: undefined };
+  }
+
+  const data = await deps.findKnowledgeBasesByResourceIds(resourceIds, auth.tenantId);
+  return { data, nextCursor: undefined };
 }
 
 export async function requireKnowledgeBasePermission(

@@ -32,6 +32,7 @@ function makeDeps(): jest.Mocked<KnowledgeBaseServiceDependencies> {
   return {
     createKnowledgeBase: jest.fn(),
     findKnowledgeBaseById: jest.fn(),
+    findKnowledgeBasesByResourceIds: jest.fn(),
     findReadyKnowledgeBaseDocumentFileIds: jest.fn(),
     grantPermission: jest.fn(),
     findAccessibleResources: jest.fn(),
@@ -87,21 +88,66 @@ describe('knowledge base service', () => {
     );
   });
 
-  it('lists accessible knowledge base resources with VIEW by default', async () => {
+  it('lists accessible knowledge base records with VIEW by default', async () => {
     const auth = makeAuth();
     const deps = makeDeps();
+    const firstResourceId = mongoId('64f1f77bcf86cd799439011');
+    const secondResourceId = mongoId('64f1f77bcf86cd799439012');
+    const records = [
+      {
+        _id: firstResourceId,
+        id: 'kb_first',
+        name: 'First',
+        description: '',
+        author: auth.userId,
+        authorName: auth.name,
+        tenantId: auth.tenantId,
+        documentCount: 0,
+        readyDocumentCount: 0,
+        failedDocumentCount: 0,
+      },
+      {
+        _id: secondResourceId,
+        id: 'kb_second',
+        name: 'Second',
+        description: '',
+        author: auth.userId,
+        authorName: auth.name,
+        tenantId: auth.tenantId,
+        documentCount: 1,
+        readyDocumentCount: 1,
+        failedDocumentCount: 0,
+      },
+    ];
 
-    deps.findAccessibleResources.mockResolvedValue(['64f1f77bcf86cd799439011']);
+    deps.findAccessibleResources.mockResolvedValue([firstResourceId, secondResourceId]);
+    deps.findKnowledgeBasesByResourceIds.mockResolvedValue(records);
 
     const result = await listKnowledgeBasesForUser(auth, {}, deps);
 
-    expect(result).toEqual({ data: [], nextCursor: undefined });
+    expect(result).toEqual({ data: records, nextCursor: undefined });
     expect(deps.findAccessibleResources).toHaveBeenCalledWith({
       userId: auth.userId,
       role: auth.role,
       resourceType: ResourceType.KNOWLEDGE_BASE,
       requiredPermissions: PermissionBits.VIEW,
     });
+    expect(deps.findKnowledgeBasesByResourceIds).toHaveBeenCalledWith(
+      [firstResourceId, secondResourceId],
+      auth.tenantId,
+    );
+  });
+
+  it('does not query knowledge base records when no accessible resources exist', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+
+    deps.findAccessibleResources.mockResolvedValue([]);
+
+    const result = await listKnowledgeBasesForUser(auth, {}, deps);
+
+    expect(result).toEqual({ data: [], nextCursor: undefined });
+    expect(deps.findKnowledgeBasesByResourceIds).not.toHaveBeenCalled();
   });
 
   it('rejects bindings when the second knowledge base is denied', async () => {

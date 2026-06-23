@@ -144,6 +144,34 @@ describe('KnowledgeBase methods', () => {
     expect(fileIds).toEqual([{ file_id: 'file-ready-1' }]);
   });
 
+  it('finds knowledge bases by Mongo resource ids with tenant filtering in input order', async () => {
+    const tenantAFirst = await methods.createKnowledgeBase({
+      id: 'kb-tenant-a-first',
+      name: 'Tenant A First',
+      author: 'user-1',
+      tenantId: 'tenant-a',
+    });
+    const tenantASecond = await methods.createKnowledgeBase({
+      id: 'kb-tenant-a-second',
+      name: 'Tenant A Second',
+      author: 'user-1',
+      tenantId: 'tenant-a',
+    });
+    const tenantB = await methods.createKnowledgeBase({
+      id: 'kb-tenant-b',
+      name: 'Tenant B',
+      author: 'user-2',
+      tenantId: 'tenant-b',
+    });
+
+    const results = await methods.findKnowledgeBasesByResourceIds(
+      [tenantASecond._id!, tenantB._id!.toString(), tenantAFirst._id!.toString()],
+      'tenant-a',
+    );
+
+    expect(results.map((kb) => kb.id)).toEqual(['kb-tenant-a-second', 'kb-tenant-a-first']);
+  });
+
   it('deletes a knowledge base and all contained document records', async () => {
     await methods.createKnowledgeBase({
       id: 'kb-delete',
