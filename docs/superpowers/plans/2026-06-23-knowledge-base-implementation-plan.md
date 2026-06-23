@@ -1472,7 +1472,7 @@ git commit -m "feat: complete knowledge base backend operations"
 - Modify: `packages/data-provider/src/types/assistants.ts`
 - Modify: `packages/api/src/agents/validation.ts`
 
-- [ ] **Step 1: Add Agent schema field**
+- [x] **Step 1: Add Agent schema field**
 
 In `packages/data-schemas/src/schema/agent.ts`, add:
 
@@ -1483,7 +1483,7 @@ knowledge_base_ids: {
 },
 ```
 
-- [ ] **Step 2: Add shared Agent types**
+- [x] **Step 2: Add shared Agent types**
 
 In `packages/data-provider/src/types/agents.ts`, add:
 
@@ -1495,7 +1495,7 @@ to Agent create/update/read types that already contain `tools` or `tool_resource
 
 In `packages/data-provider/src/types/assistants.ts`, add the same field to shared Agent-compatible payload types that are used by Agent forms and API requests.
 
-- [ ] **Step 3: Add API validation**
+- [x] **Step 3: Add API validation**
 
 In `packages/api/src/agents/validation.ts`, add the field to base/create/update schemas:
 
@@ -1503,7 +1503,7 @@ In `packages/api/src/agents/validation.ts`, add the field to base/create/update 
 knowledge_base_ids: z.array(z.string().min(1)).default([]),
 ```
 
-- [ ] **Step 4: Run focused validation/build commands**
+- [x] **Step 4: Run focused validation/build commands**
 
 Run:
 
@@ -1514,7 +1514,7 @@ cd packages/api && npx jest src/agents/validation.spec.ts --runInBand
 
 Expected: data-provider build exits `0`; validation tests PASS or Jest reports no matching validation spec if this workspace has no validation spec.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/data-schemas/src/schema/agent.ts packages/data-provider/src/types/agents.ts packages/data-provider/src/types/assistants.ts packages/api/src/agents/validation.ts
