@@ -33,6 +33,7 @@ import { createConversationTagMethods, type ConversationTagMethods } from './con
 import { createMessageMethods, type MessageMethods } from './message';
 import { createConversationMethods, type ConversationMethods } from './conversation';
 import { createChatProjectMethods, type ChatProjectMethods } from './chatProject';
+import { createKnowledgeBaseMethods, type KnowledgeBaseMethods } from './knowledgeBase';
 export type {
   AssignConversationToProjectResult,
   ChatProjectSortBy,
@@ -43,6 +44,11 @@ export type {
   ListChatProjectsResult,
   UpdateChatProjectInput,
 } from './chatProject';
+export type {
+  DeleteKnowledgeBaseWithDocumentsResult,
+  ReadyKnowledgeBaseDocumentFileId,
+  UpdateKnowledgeBaseInput,
+} from './knowledgeBase';
 /* Tier 3 — Complex (heavier injection) */
 import {
   createTxMethods,
@@ -128,6 +134,7 @@ export type AllMethods = UserMethods &
   MessageMethods &
   ConversationMethods &
   ChatProjectMethods &
+  KnowledgeBaseMethods &
   TxMethods &
   TransactionMethods &
   SpendTokensMethods &
@@ -256,6 +263,7 @@ export function createMethods(
     ...messageMethods,
     ...conversationMethods,
     ...createChatProjectMethods(mongoose),
+    ...createKnowledgeBaseMethods(mongoose),
     /* Tier 3 */
     ...txMethods,
     ...transactionMethods,
@@ -297,6 +305,7 @@ export type {
   MessageMethods,
   ConversationMethods,
   ChatProjectMethods,
+  KnowledgeBaseMethods,
   TxMethods,
   TransactionMethods,
   SpendTokensMethods,

@@ -1,0 +1,61 @@
+import { Schema } from 'mongoose';
+import type { IKnowledgeBaseMongoDocument } from '~/types';
+
+const knowledgeBaseSchema: Schema<IKnowledgeBaseMongoDocument> =
+  new Schema<IKnowledgeBaseMongoDocument>(
+    {
+      id: {
+        type: String,
+        required: true,
+        unique: true,
+        index: true,
+      },
+      name: {
+        type: String,
+        required: true,
+        trim: true,
+        index: true,
+      },
+      description: {
+        type: String,
+        default: '',
+      },
+      author: {
+        type: String,
+        required: true,
+        index: true,
+      },
+      authorName: {
+        type: String,
+        default: '',
+      },
+      documentCount: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      readyDocumentCount: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      failedDocumentCount: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      lastIndexedAt: {
+        type: Date,
+      },
+      tenantId: {
+        type: String,
+        index: true,
+      },
+    },
+    { timestamps: true },
+  );
+
+knowledgeBaseSchema.index({ tenantId: 1, name: 1 });
+knowledgeBaseSchema.index({ tenantId: 1, updatedAt: -1 });
+
+export default knowledgeBaseSchema;

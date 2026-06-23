@@ -1,0 +1,230 @@
+import mongoose from 'mongoose';
+import { MongoMemoryServer } from 'mongodb-memory-server';
+import { createModels } from '~/models';
+import type { IKnowledgeBase, IKnowledgeBaseDocument } from '~/types';
+import { createKnowledgeBaseMethods, type KnowledgeBaseMethods } from './knowledgeBase';
+
+jest.mock('~/config/winston', () => ({
+  error: jest.fn(),
+  warn: jest.fn(),
+  info: jest.fn(),
+  debug: jest.fn(),
+}));
+
+let mongoServer: InstanceType<typeof MongoMemoryServer>;
+let KnowledgeBase: mongoose.Model<IKnowledgeBase>;
+let KnowledgeBaseDocument: mongoose.Model<IKnowledgeBaseDocument>;
+let methods: KnowledgeBaseMethods;
+let modelsToCleanup: string[] = [];
+
+beforeAll(async () => {
+  mongoServer = await MongoMemoryServer.create();
+  const mongoUri = mongoServer.getUri();
+
+  const models = createModels(mongoose);
+  modelsToCleanup = Object.keys(models);
+  Object.assign(mongoose.models, models);
+
+  KnowledgeBase = mongoose.models.KnowledgeBase as mongoose.Model<IKnowledgeBase>;
+  KnowledgeBaseDocument = mongoose.models
+    .KnowledgeBaseDocument as mongoose.Model<IKnowledgeBaseDocument>;
+  methods = createKnowledgeBaseMethods(mongoose);
+
+  await mongoose.connect(mongoUri);
+  await Promise.all([KnowledgeBase.init(), KnowledgeBaseDocument.init()]);
+});
+
+afterAll(async () => {
+  await mongoose.disconnect();
+  await mongoServer.stop();
+
+  for (const modelName of modelsToCleanup) {
+    if (mongoose.models[modelName]) {
+      delete mongoose.models[modelName];
+    }
+  }
+});
+
+afterEach(async () => {
+  await KnowledgeBase.deleteMany({});
+  await KnowledgeBaseDocument.deleteMany({});
+});
+
+describe('KnowledgeBase methods', () => {
+  it('creates and reads a knowledge base by id with default counts', async () => {
+    const kb = await methods.createKnowledgeBase({
+      id: 'kb-1',
+      name: 'Support Docs',
+      author: 'user-1',
+    });
+
+    expect(kb.name).toBe('Support Docs');
+    expect(kb.description).toBe('');
+    expect(kb.documentCount).toBe(0);
+    expect(kb.readyDocumentCount).toBe(0);
+    expect(kb.failedDocumentCount).toBe(0);
+
+    const readKb = await methods.findKnowledgeBaseById('kb-1');
+    expect(readKb?.id).toBe('kb-1');
+    expect(readKb?.author).toBe('user-1');
+  });
+
+  it('updates total, ready, and failed document counts', async () => {
+    await methods.createKnowledgeBase({
+      id: 'kb-counts',
+      name: 'Counts',
+      author: 'user-1',
+    });
+    await methods.createKnowledgeBaseDocument({
+      id: 'doc-processing',
+      knowledgeBaseId: 'kb-counts',
+      file_id: 'file-processing',
+      filename: 'processing.txt',
+      bytes: 100,
+      createdBy: 'user-1',
+    });
+    await methods.createKnowledgeBaseDocument({
+      id: 'doc-ready',
+      knowledgeBaseId: 'kb-counts',
+      file_id: 'file-ready',
+      filename: 'ready.txt',
+      bytes: 200,
+      status: 'ready',
+      createdBy: 'user-1',
+    });
+    await methods.createKnowledgeBaseDocument({
+      id: 'doc-failed',
+      knowledgeBaseId: 'kb-counts',
+      file_id: 'file-failed',
+      filename: 'failed.txt',
+      bytes: 300,
+      status: 'failed',
+      error: 'Parse failed',
+      createdBy: 'user-1',
+    });
+
+    const updated = await methods.updateKnowledgeBaseCounts('kb-counts');
+
+    expect(updated?.documentCount).toBe(3);
+    expect(updated?.readyDocumentCount).toBe(1);
+    expect(updated?.failedDocumentCount).toBe(1);
+    expect(updated?.lastIndexedAt).toBeInstanceOf(Date);
+  });
+
+  it('returns only ready document file ids for the requested knowledge bases', async () => {
+    await methods.createKnowledgeBaseDocument({
+      id: 'doc-ready-1',
+      knowledgeBaseId: 'kb-ready-1',
+      file_id: 'file-ready-1',
+      filename: 'ready-1.txt',
+      bytes: 100,
+      status: 'ready',
+      createdBy: 'user-1',
+    });
+    await methods.createKnowledgeBaseDocument({
+      id: 'doc-processing-1',
+      knowledgeBaseId: 'kb-ready-1',
+      file_id: 'file-processing-1',
+      filename: 'processing-1.txt',
+      bytes: 100,
+      createdBy: 'user-1',
+    });
+    await methods.createKnowledgeBaseDocument({
+      id: 'doc-ready-2',
+      knowledgeBaseId: 'kb-ready-2',
+      file_id: 'file-ready-2',
+      filename: 'ready-2.txt',
+      bytes: 100,
+      status: 'ready',
+      createdBy: 'user-1',
+    });
+
+    const fileIds = await methods.findReadyKnowledgeBaseDocumentFileIds(['kb-ready-1']);
+
+    expect(fileIds).toEqual([{ file_id: 'file-ready-1' }]);
+  });
+
+  it('deletes a knowledge base and all contained document records', async () => {
+    await methods.createKnowledgeBase({
+      id: 'kb-delete',
+      name: 'Delete me',
+      author: 'user-1',
+    });
+    await methods.createKnowledgeBaseDocument({
+      id: 'doc-delete-1',
+      knowledgeBaseId: 'kb-delete',
+      file_id: 'file-delete-1',
+      filename: 'delete-1.txt',
+      bytes: 100,
+      createdBy: 'user-1',
+    });
+    await methods.createKnowledgeBaseDocument({
+      id: 'doc-delete-2',
+      knowledgeBaseId: 'kb-delete',
+      file_id: 'file-delete-2',
+      filename: 'delete-2.txt',
+      bytes: 100,
+      createdBy: 'user-1',
+    });
+
+    const result = await methods.deleteKnowledgeBaseWithDocuments('kb-delete');
+    const documents = await KnowledgeBaseDocument.find({ knowledgeBaseId: 'kb-delete' });
+    const kb = await methods.findKnowledgeBaseById('kb-delete');
+
+    expect(result.deletedCount).toBe(1);
+    expect(result.documentDeletedCount).toBe(2);
+    expect(documents).toHaveLength(0);
+    expect(kb).toBeNull();
+  });
+
+  it('uses globally unique ids and explicit tenant filters do not leak documents', async () => {
+    await methods.createKnowledgeBase({
+      id: 'kb-tenant',
+      name: 'Tenant A',
+      author: 'user-1',
+      tenantId: 'tenant-a',
+    });
+
+    await expect(
+      methods.createKnowledgeBase({
+        id: 'kb-tenant',
+        name: 'Tenant B',
+        author: 'user-2',
+        tenantId: 'tenant-b',
+      }),
+    ).rejects.toMatchObject({ code: 11000 });
+
+    await methods.createKnowledgeBaseDocument({
+      id: 'doc-tenant-a',
+      knowledgeBaseId: 'kb-shared-name',
+      file_id: 'file-tenant-a',
+      filename: 'tenant-a.txt',
+      bytes: 100,
+      status: 'ready',
+      createdBy: 'user-1',
+      tenantId: 'tenant-a',
+    });
+    await methods.createKnowledgeBaseDocument({
+      id: 'doc-tenant-b',
+      knowledgeBaseId: 'kb-shared-name',
+      file_id: 'file-tenant-b',
+      filename: 'tenant-b.txt',
+      bytes: 100,
+      status: 'ready',
+      createdBy: 'user-2',
+      tenantId: 'tenant-b',
+    });
+
+    const tenantAFileIds = await methods.findReadyKnowledgeBaseDocumentFileIds(
+      ['kb-shared-name'],
+      'tenant-a',
+    );
+    const tenantBDocuments = await methods.findKnowledgeBaseDocuments(
+      'kb-shared-name',
+      'tenant-b',
+    );
+
+    expect(tenantAFileIds).toEqual([{ file_id: 'file-tenant-a' }]);
+    expect(tenantBDocuments.map((document) => document.file_id)).toEqual(['file-tenant-b']);
+  });
+});
