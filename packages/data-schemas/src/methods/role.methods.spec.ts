@@ -500,6 +500,8 @@ describe('initializeRoles', () => {
     expect(adminRole.permissions[PermissionTypes.PROMPTS]?.SHARE).toBe(true);
     expect(adminRole.permissions[PermissionTypes.BOOKMARKS]?.USE).toBe(true);
     expect(adminRole.permissions[PermissionTypes.AGENTS]?.CREATE).toBe(true);
+    expect(adminRole.permissions[PermissionTypes.KNOWLEDGE_BASES]?.CREATE).toBe(true);
+    expect(userRole.permissions[PermissionTypes.KNOWLEDGE_BASES]?.SHARE).toBe(false);
   });
 
   it('should not modify existing permissions for existing roles', async () => {
