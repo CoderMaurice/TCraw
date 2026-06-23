@@ -65,6 +65,35 @@ describe('agentCreateSchema with subagents', () => {
   });
 });
 
+describe('agentCreateSchema with knowledge_base_ids', () => {
+  const base = {
+    provider: 'openAI',
+    model: 'gpt-4o-mini',
+    tools: [],
+  };
+
+  it('defaults knowledge_base_ids to an empty list', () => {
+    const result = agentCreateSchema.parse(base);
+    expect(result.knowledge_base_ids).toEqual([]);
+  });
+
+  it('accepts non-empty knowledge base IDs', () => {
+    const result = agentCreateSchema.safeParse({
+      ...base,
+      knowledge_base_ids: ['kb_1', 'kb_2'],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects empty knowledge base IDs', () => {
+    const result = agentCreateSchema.safeParse({
+      ...base,
+      knowledge_base_ids: ['kb_1', ''],
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
 describe('agentUpdateSchema with subagents', () => {
   it('accepts a partial update with only the disabled flag set', () => {
     const result = agentUpdateSchema.safeParse({
@@ -77,6 +106,29 @@ describe('agentUpdateSchema with subagents', () => {
     const oversized = Array.from({ length: MAX_SUBAGENTS + 3 }, (_, i) => `agent_${i}`);
     const result = agentUpdateSchema.safeParse({
       subagents: { enabled: true, agent_ids: oversized },
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('agentUpdateSchema with knowledge_base_ids', () => {
+  it('does not default knowledge_base_ids on partial updates', () => {
+    const result = agentUpdateSchema.parse({
+      name: 'Updated agent',
+    });
+    expect(result).not.toHaveProperty('knowledge_base_ids');
+  });
+
+  it('accepts non-empty knowledge base IDs', () => {
+    const result = agentUpdateSchema.safeParse({
+      knowledge_base_ids: ['kb_1'],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects empty knowledge base IDs', () => {
+    const result = agentUpdateSchema.safeParse({
+      knowledge_base_ids: [''],
     });
     expect(result.success).toBe(false);
   });

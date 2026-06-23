@@ -268,6 +268,7 @@ export type Agent = {
   instructions?: string | null;
   additional_instructions?: string | null;
   tools?: string[];
+  knowledge_base_ids?: string[];
   tool_kwargs?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
   provider: AgentProvider;
@@ -306,6 +307,7 @@ export type AgentCreateParams = {
   file_ids?: string[];
   instructions?: string | null;
   tools?: Array<FunctionTool | string>;
+  knowledge_base_ids?: string[];
   provider: AgentProvider;
   model: string | null;
   model_parameters: AgentModelParameters;
@@ -332,6 +334,7 @@ export type AgentUpdateParams = {
   file_ids?: string[];
   instructions?: string | null;
   tools?: Array<FunctionTool | string>;
+  knowledge_base_ids?: string[];
   tool_resources?: ToolResources;
   provider?: AgentProvider;
   model?: string | null;

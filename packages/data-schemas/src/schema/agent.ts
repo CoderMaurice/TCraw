@@ -44,6 +44,10 @@ const agentSchema: Schema<IAgent> = new Schema<IAgent>(
       type: [String],
       default: undefined,
     },
+    knowledge_base_ids: {
+      type: [String],
+      default: [],
+    },
     skills: {
       type: [String],
       default: undefined,

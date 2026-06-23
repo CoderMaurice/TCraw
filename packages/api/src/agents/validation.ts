@@ -386,6 +386,7 @@ export const agentBaseSchema: z.ZodObject<
     >;
     model_parameters: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     tools: z.ZodOptional<z.ZodArray<z.ZodString, 'many'>>;
+    knowledge_base_ids: z.ZodOptional<z.ZodArray<z.ZodString, 'many'>>;
     skills: z.ZodOptional<z.ZodArray<z.ZodString, 'many'>>;
     skills_enabled: z.ZodOptional<z.ZodBoolean>;
     /** @deprecated Use edges instead */
@@ -686,6 +687,7 @@ export const agentBaseSchema: z.ZodObject<
   avatar: agentAvatarSchema.nullable().optional(),
   model_parameters: z.record(z.unknown()).optional(),
   tools: z.array(z.string()).optional(),
+  knowledge_base_ids: z.array(z.string().min(1)).optional(),
   skills: z.array(z.string()).optional(),
   skills_enabled: z.boolean().optional(),
   /** @deprecated Use edges instead */
@@ -1024,12 +1026,14 @@ export const agentCreateSchema: z.ZodObject<
     provider: z.ZodString;
     model: z.ZodNullable<z.ZodString>;
     tools: z.ZodDefault<z.ZodOptional<z.ZodArray<z.ZodString, 'many'>>>;
+    knowledge_base_ids: z.ZodDefault<z.ZodArray<z.ZodString, 'many'>>;
   },
   'strip'
 > = agentBaseSchema.extend({
   provider: z.string(),
   model: z.string().nullable(),
   tools: z.array(z.string()).optional().default([]),
+  knowledge_base_ids: z.array(z.string().min(1)).default([]),
 });
 
 /** Update schema extends base with all fields optional and additional update-only fields */
@@ -1040,6 +1044,7 @@ export const agentUpdateSchema: z.ZodObject<
     instructions: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     model_parameters: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     tools: z.ZodOptional<z.ZodArray<z.ZodString, 'many'>>;
+    knowledge_base_ids: z.ZodOptional<z.ZodArray<z.ZodString, 'many'>>;
     skills: z.ZodOptional<z.ZodArray<z.ZodString, 'many'>>;
     skills_enabled: z.ZodOptional<z.ZodBoolean>;
     agent_ids: z.ZodOptional<z.ZodArray<z.ZodString, 'many'>>;

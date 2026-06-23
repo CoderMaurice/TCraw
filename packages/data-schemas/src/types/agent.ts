@@ -27,6 +27,7 @@ export interface IAgent extends Omit<Document, 'model'> {
   access_level?: number;
   recursion_limit?: number;
   tools?: string[];
+  knowledge_base_ids?: string[];
   skills?: string[];
   skills_enabled?: boolean;
   tool_kwargs?: Array<unknown>;
