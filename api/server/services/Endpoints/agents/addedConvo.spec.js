@@ -125,6 +125,23 @@ describe('processAddedConvo', () => {
     );
   });
 
+  it('uses an injected initializer for added-convo agent initialization', async () => {
+    const injectedInitializeAgent = jest.fn().mockResolvedValue({
+      id: 'added-agent',
+      userMCPAuthMap: undefined,
+    });
+
+    await processAddedConvo(baseParams({ initializeAgent: injectedInitializeAgent }));
+
+    expect(injectedInitializeAgent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agent: expect.objectContaining({ id: 'added-agent' }),
+      }),
+      expect.anything(),
+    );
+    expect(mockInitializeAgent).not.toHaveBeenCalled();
+  });
+
   it('resolves and forwards model-spec skill scope for added ephemeral agents', async () => {
     const accessibleSkillId = { toString: () => 'accessible-skill' };
     const editableSkillId = { toString: () => 'editable-skill' };

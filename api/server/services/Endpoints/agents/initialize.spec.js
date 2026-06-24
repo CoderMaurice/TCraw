@@ -15,6 +15,7 @@ const mockValidateAgentModel = jest.fn();
 const mockResolveKnowledgeBaseFileIdsForAgent = jest.fn();
 const mockCheckPermission = jest.fn();
 const mockFindAccessibleResources = jest.fn();
+const mockProcessAddedConvo = jest.fn().mockResolvedValue({ userMCPAuthMap: undefined });
 
 jest.mock('@librechat/agents', () => ({
   ...jest.requireActual('@librechat/agents'),
@@ -72,7 +73,7 @@ jest.mock('~/server/controllers/agents/client', () => {
 });
 
 jest.mock('./addedConvo', () => ({
-  processAddedConvo: jest.fn().mockResolvedValue({ userMCPAuthMap: undefined }),
+  processAddedConvo: (...args) => mockProcessAddedConvo(...args),
 }));
 
 jest.mock('~/cache', () => ({
@@ -118,6 +119,7 @@ describe('initializeClient — processAgent ACL gate', () => {
       actualPermissionService.findAccessibleResources(...args),
     );
     mockResolveKnowledgeBaseFileIdsForAgent.mockResolvedValue([]);
+    mockProcessAddedConvo.mockResolvedValue({ userMCPAuthMap: undefined });
 
     testUser = await User.create({
       email: 'test@example.com',
@@ -261,6 +263,69 @@ describe('initializeClient — processAgent ACL gate', () => {
     expect(agentClientArgs.agent.tool_resources.file_search.file_ids).toEqual(['file_shared']);
     expect(mockCheckPermission).not.toHaveBeenCalledWith(
       expect.objectContaining({ resourceType: ResourceType.KNOWLEDGE_BASE }),
+    );
+  });
+
+  it('merges added parallel agent knowledge base files through the injected initializer', async () => {
+    const addedAgentId = 'agent_added_parallel';
+    const addedConfig = {
+      id: addedAgentId,
+      endpoint: 'agents',
+      edges: [],
+      tools: [],
+      toolDefinitions: [],
+      toolRegistry: new Map(),
+      userMCPAuthMap: null,
+      tool_resources: { file_search: { file_ids: ['file_existing'] } },
+    };
+    mockInitializeAgent.mockImplementation(({ agent }) =>
+      Promise.resolve(agent.id === PRIMARY_ID ? makePrimaryConfig([]) : addedConfig),
+    );
+    mockResolveKnowledgeBaseFileIdsForAgent.mockResolvedValue(['file_added', 'file_existing']);
+    mockProcessAddedConvo.mockImplementationOnce(async (params) => {
+      const config = await params.initializeAgent(
+        {
+          req: params.req,
+          res: params.res,
+          loadTools: params.loadTools,
+          requestFiles: params.requestFiles,
+          conversationId: params.conversationId,
+          parentMessageId: params.parentMessageId,
+          agent: {
+            id: addedAgentId,
+            name: 'Added Parallel',
+            provider: 'openai',
+            model: 'gpt-4',
+            tools: [],
+            knowledge_base_ids: ['kb_added'],
+          },
+          endpointOption: params.endpointOption,
+          allowedProviders: params.allowedProviders,
+        },
+        {},
+      );
+      params.agentConfigs.set(config.id, config);
+      return { userMCPAuthMap: params.userMCPAuthMap };
+    });
+
+    const endpointOption = makeEndpointOption();
+    endpointOption.addedConvo = { model: 'gpt-4', agent_id: addedAgentId };
+
+    await initializeClient({
+      req: makeReq(),
+      res: {},
+      signal: new AbortController().signal,
+      endpointOption,
+    });
+
+    expect(mockResolveKnowledgeBaseFileIdsForAgent).toHaveBeenCalledWith(
+      ['kb_added'],
+      { findReadyKnowledgeBaseDocumentFileIds: expect.any(Function) },
+      undefined,
+    );
+    expect(agentClientArgs.agentConfigs.get(addedAgentId).tools).toContain('file_search');
+    expect(agentClientArgs.agentConfigs.get(addedAgentId).tool_resources.file_search.file_ids).toEqual(
+      ['file_existing', 'file_added'],
     );
   });
 

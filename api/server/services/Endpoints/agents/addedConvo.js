@@ -1,7 +1,7 @@
 const { logger } = require('@librechat/data-schemas');
 const {
   ADDED_AGENT_ID,
-  initializeAgent,
+  initializeAgent: defaultInitializeAgent,
   validateAgentModel,
   resolveAgentScopedSkillIds,
   resolveModelSpecSkillIds,
@@ -54,6 +54,7 @@ const loadAddedAgent = (params) =>
  * @param {boolean} [params.codeEnvAvailable] - `execute_code` capability flag;
  *   forwarded verbatim to the added agent's `initializeAgent`. @see
  *   InitializeAgentParams.codeEnvAvailable for full semantics.
+ * @param {Function} [params.initializeAgent] - Optional initializer override.
  * @returns {Promise<{userMCPAuthMap: Object|undefined}>} The updated userMCPAuthMap
  */
 const processAddedConvo = async ({
@@ -79,6 +80,7 @@ const processAddedConvo = async ({
   skillStates,
   defaultActiveOnShare,
   codeEnvAvailable,
+  initializeAgent = defaultInitializeAgent,
 }) => {
   const addedConvo = endpointOption.addedConvo;
   if (addedConvo == null) {

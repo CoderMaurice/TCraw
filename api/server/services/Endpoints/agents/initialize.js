@@ -626,6 +626,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
     skillStates,
     defaultActiveOnShare,
     codeEnvAvailable,
+    initializeAgent: initializeAgentWithKnowledgeBases,
   });
 
   if (updatedMCPAuthMap) {
