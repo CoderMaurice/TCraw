@@ -1883,7 +1883,7 @@ git commit -m "feat: add knowledge base frontend data hooks"
 - Modify: `client/src/hooks/Nav/useSideNavLinks.ts`
 - Modify: `client/src/locales/en/translation.json`
 
-- [ ] **Step 1: Add UI tests**
+- [x] **Step 1: Add UI tests**
 
 Create `client/src/components/KnowledgeBases/__tests__/KnowledgeBasePage.spec.tsx`:
 
@@ -1958,7 +1958,7 @@ test('renders detail and documents', () => {
 });
 ```
 
-- [ ] **Step 2: Run UI tests to verify they fail**
+- [x] **Step 2: Run UI tests to verify they fail**
 
 Run:
 
@@ -1968,7 +1968,7 @@ cd client && npx jest src/components/KnowledgeBases --runInBand
 
 Expected: FAIL because components do not exist.
 
-- [ ] **Step 3: Add localized strings**
+- [x] **Step 3: Add localized strings**
 
 Add English keys to `client/src/locales/en/translation.json`:
 
@@ -1986,7 +1986,7 @@ Add English keys to `client/src/locales/en/translation.json`:
 }
 ```
 
-- [ ] **Step 4: Implement list page**
+- [x] **Step 4: Implement list page**
 
 Create `client/src/components/KnowledgeBases/KnowledgeBasePage.tsx`:
 
@@ -2051,11 +2051,11 @@ export function KnowledgeBasePage() {
 }
 ```
 
-- [ ] **Step 5: Implement detail components**
+- [x] **Step 5: Implement detail components**
 
 Create the detail, documents, access, settings, and create dialog components using the same localize and hook pattern. The Access component must call existing permission UI/data flows with `ResourceType.KNOWLEDGE_BASE`; it must not create document-level access controls.
 
-- [ ] **Step 6: Add routes and navigation**
+- [x] **Step 6: Add routes and navigation**
 
 In `client/src/routes/index.tsx`, add lazy routes for:
 
@@ -2079,7 +2079,7 @@ Add route entries:
 
 In `client/src/hooks/Nav/useSideNavLinks.ts`, add a `Knowledge` item using the same shape as existing side nav links.
 
-- [ ] **Step 7: Run UI tests**
+- [x] **Step 7: Run UI tests**
 
 Run:
 
@@ -2089,7 +2089,7 @@ cd client && npx jest src/components/KnowledgeBases --runInBand
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add client/src/components/KnowledgeBases client/src/routes/index.tsx client/src/hooks/Nav/useSideNavLinks.ts client/src/locales/en/translation.json
