@@ -1528,7 +1528,7 @@ git commit -m "feat: add agent knowledge base bindings"
 - Modify: `api/server/controllers/agents/v1.spec.js`
 - Use service function from `packages/api/src/knowledge/service.ts`
 
-- [ ] **Step 1: Add controller tests**
+- [x] **Step 1: Add controller tests**
 
 In `api/server/controllers/agents/v1.spec.js`, add tests:
 
@@ -1567,7 +1567,7 @@ test('duplicate revalidates knowledge base bindings for the copier', async () =>
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run:
 
@@ -1577,7 +1577,7 @@ cd api && npx jest server/controllers/agents/v1.spec.js --runInBand
 
 Expected: FAIL because Agent controller does not validate `knowledge_base_ids`.
 
-- [ ] **Step 3: Add payload normalization helper**
+- [x] **Step 3: Add payload normalization helper**
 
 In `api/server/controllers/agents/v1.js`, add:
 
@@ -1608,7 +1608,7 @@ const normalizeKnowledgeBaseAgentPayload = async ({ req, payload }) => {
 
 Call this helper in Agent create, update, and duplicate before the Agent is saved.
 
-- [ ] **Step 4: Run Agent controller tests**
+- [x] **Step 4: Run Agent controller tests**
 
 Run:
 
@@ -1618,7 +1618,7 @@ cd api && npx jest server/controllers/agents/v1.spec.js --runInBand
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add api/server/controllers/agents/v1.js api/server/controllers/agents/v1.spec.js
