@@ -2309,7 +2309,7 @@ git commit -m "feat: bind knowledge bases to agents in UI"
 **Files:**
 - No new files unless a failing verification exposes a defect in files from earlier tasks.
 
-- [ ] **Step 1: Build shared packages**
+- [x] **Step 1: Build shared packages**
 
 Run:
 
@@ -2319,7 +2319,7 @@ npm run build:data-provider
 
 Expected: exits `0`.
 
-- [ ] **Step 2: Run backend schema/service tests**
+- [x] **Step 2: Run backend schema/service tests**
 
 Run:
 
@@ -2331,7 +2331,7 @@ cd api && npx jest server/routes/knowledgeBases.test.js server/controllers/agent
 
 Expected: each command exits `0`.
 
-- [ ] **Step 3: Run frontend tests**
+- [x] **Step 3: Run frontend tests**
 
 Run:
 
@@ -2342,6 +2342,8 @@ cd client && npx jest src/components/KnowledgeBases src/components/SidePanel/Age
 Expected: exits `0`.
 
 - [ ] **Step 4: Run app smoke test locally**
+
+Partial smoke completed against local frontend/backend with remote `zt` Docker-backed Mongo, Meili, and RAG tunneled to local ports: backend responded at `http://localhost:3080/`, frontend responded at `http://localhost:3090/knowledge`, and `/knowledge` rendered without a Vite error before redirecting unauthenticated users to `/login?redirect_to=%2Fknowledge`. The real create/upload/Agent execution smoke was not run against the shared remote database; those flows are covered by the automated tests above.
 
 Use the already configured local app and remote `zt` Docker-backed infrastructure. If local services are not running, start backend and frontend with:
 
