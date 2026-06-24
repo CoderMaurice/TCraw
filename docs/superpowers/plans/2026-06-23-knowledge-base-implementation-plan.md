@@ -2108,7 +2108,7 @@ git commit -m "feat: add knowledge base management UI"
 - Modify: `client/src/components/SidePanel/Agents/AgentPanel.test.tsx`
 - Modify: `client/src/locales/en/translation.json`
 
-- [ ] **Step 1: Add Agent config tests**
+- [x] **Step 1: Add Agent config tests**
 
 Create `client/src/components/SidePanel/Agents/__tests__/KnowledgeBases.spec.tsx`:
 
@@ -2142,7 +2142,7 @@ test('adds a knowledge base and enables file search', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -2152,7 +2152,7 @@ cd client && npx jest src/components/SidePanel/Agents/__tests__/KnowledgeBases.s
 
 Expected: FAIL because `KnowledgeBases.tsx` does not exist.
 
-- [ ] **Step 3: Add localization**
+- [x] **Step 3: Add localization**
 
 Add keys to `client/src/locales/en/translation.json`:
 
@@ -2164,7 +2164,7 @@ Add keys to `client/src/locales/en/translation.json`:
 }
 ```
 
-- [ ] **Step 4: Implement Agent knowledge base selector**
+- [x] **Step 4: Implement Agent knowledge base selector**
 
 Create `client/src/components/SidePanel/Agents/KnowledgeBases.tsx`:
 
@@ -2253,7 +2253,7 @@ export const enableKnowledgeBaseFileSearch = (tools: string[]) =>
 
 Adapt styling to match existing Agent panel primitives during implementation, keeping the behavior above.
 
-- [ ] **Step 5: Wire Agent form state**
+- [x] **Step 5: Wire Agent form state**
 
 In `client/src/common/agents-types.ts`, add:
 
@@ -2277,7 +2277,7 @@ In `client/src/components/SidePanel/Agents/AgentConfig.tsx`, render:
 />
 ```
 
-- [ ] **Step 6: Include field in save payload**
+- [x] **Step 6: Include field in save payload**
 
 In `client/src/components/SidePanel/Agents/AgentPanel.tsx`, include:
 
@@ -2287,7 +2287,7 @@ knowledge_base_ids: values.knowledge_base_ids ?? [],
 
 in create and update payload composition.
 
-- [ ] **Step 7: Run Agent UI tests**
+- [x] **Step 7: Run Agent UI tests**
 
 Run:
 
@@ -2297,7 +2297,7 @@ cd client && npx jest src/components/SidePanel/Agents/__tests__/KnowledgeBases.s
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add client/src/components/SidePanel/Agents/KnowledgeBases.tsx client/src/components/SidePanel/Agents/__tests__/KnowledgeBases.spec.tsx client/src/components/SidePanel/Agents/AgentConfig.tsx client/src/components/SidePanel/Agents/AgentPanel.tsx client/src/common/agents-types.ts client/src/components/SidePanel/Agents/config.ts client/src/components/SidePanel/Agents/AgentPanel.test.tsx client/src/locales/en/translation.json
