@@ -1,5 +1,14 @@
 import { useEffect, useId, useState, type FormEvent } from 'react';
-import { Button, Input, Label, Spinner, TextareaAutosize, useToastContext } from '@librechat/client';
+import {
+  Button,
+  Input,
+  Label,
+  OGDialog,
+  OGDialogTemplate,
+  Spinner,
+  TextareaAutosize,
+  useToastContext,
+} from '@librechat/client';
 import type { KnowledgeBase } from 'librechat-data-provider';
 import { useDeleteKnowledgeBaseMutation, useUpdateKnowledgeBaseMutation } from '~/data-provider';
 import { useLocalize } from '~/hooks';
@@ -17,6 +26,7 @@ export default function KnowledgeBaseSettings({
   const formId = useId();
   const [name, setName] = useState(knowledgeBase.name);
   const [description, setDescription] = useState(knowledgeBase.description ?? '');
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const updateKnowledgeBase = useUpdateKnowledgeBaseMutation(knowledgeBase.id);
   const deleteKnowledgeBase = useDeleteKnowledgeBaseMutation();
   const { showToast } = useToastContext();
@@ -52,6 +62,7 @@ export default function KnowledgeBaseSettings({
     }
     try {
       await deleteKnowledgeBase.mutateAsync(knowledgeBase.id);
+      setDeleteOpen(false);
       onDeleted();
     } catch {
       showToast({
@@ -112,15 +123,44 @@ export default function KnowledgeBaseSettings({
           type="button"
           variant="destructive"
           disabled={deleteKnowledgeBase.isLoading}
-          onClick={handleDelete}
+          onClick={() => setDeleteOpen(true)}
         >
-          {deleteKnowledgeBase.isLoading ? (
-            <Spinner className="size-4" />
-          ) : (
-            localize('com_ui_delete_knowledge_base')
-          )}
+          {localize('com_ui_delete_knowledge_base')}
         </Button>
       </div>
+
+      <OGDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <OGDialogTemplate
+          showCloseButton={false}
+          title={localize('com_ui_delete_knowledge_base')}
+          className="w-11/12 max-w-md"
+          main={
+            <p className="text-left text-sm text-text-secondary">
+              {localize('com_ui_knowledge_base_delete_confirm')}
+            </p>
+          }
+          buttons={
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="outline" onClick={() => setDeleteOpen(false)}>
+                {localize('com_ui_cancel')}
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={deleteKnowledgeBase.isLoading}
+                aria-label={localize('com_ui_confirm_delete_knowledge_base')}
+                onClick={handleDelete}
+              >
+                {deleteKnowledgeBase.isLoading ? (
+                  <Spinner className="size-4" />
+                ) : (
+                  localize('com_ui_confirm_delete_knowledge_base')
+                )}
+              </Button>
+            </div>
+          }
+        />
+      </OGDialog>
     </section>
   );
 }

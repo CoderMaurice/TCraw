@@ -5,12 +5,16 @@ import { GenericGrantAccessDialog } from '~/components/Sharing';
 import { useLocalize } from '~/hooks';
 
 type KnowledgeBaseAccessProps = {
-  id: string;
+  resourceDbId?: string;
   name: string;
 };
 
-export default function KnowledgeBaseAccess({ id, name }: KnowledgeBaseAccessProps) {
+export default function KnowledgeBaseAccess({ resourceDbId, name }: KnowledgeBaseAccessProps) {
   const localize = useLocalize();
+
+  if (!resourceDbId) {
+    return null;
+  }
 
   return (
     <section className="flex flex-col gap-4">
@@ -19,7 +23,7 @@ export default function KnowledgeBaseAccess({ id, name }: KnowledgeBaseAccessPro
           {localize('com_ui_knowledge_base_access')}
         </h2>
         <GenericGrantAccessDialog
-          resourceDbId={id}
+          resourceDbId={resourceDbId}
           resourceType={ResourceType.KNOWLEDGE_BASE}
           resourceName={name}
         >

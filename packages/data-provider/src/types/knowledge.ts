@@ -5,6 +5,7 @@ export type KnowledgeBaseStatusCounts = {
 };
 
 export type KnowledgeBase = KnowledgeBaseStatusCounts & {
+  _id?: string;
   id: string;
   name: string;
   description?: string;

@@ -111,6 +111,17 @@ describe('Access permissions share policy', () => {
         idResolver: expect.any(Function),
       },
     },
+    {
+      label: 'knowledge base',
+      resourceType: ResourceType.KNOWLEDGE_BASE,
+      permissionType: PermissionTypes.KNOWLEDGE_BASES,
+      accessRoleId: AccessRoleIds.KNOWLEDGE_BASE_VIEWER,
+      middlewareOptions: {
+        resourceType: ResourceType.KNOWLEDGE_BASE,
+        requiredPermission: PermissionBits.SHARE,
+        resourceIdParam: 'resourceId',
+      },
+    },
   ];
 
   const createUpdatedPrincipal = (accessRoleId) => ({

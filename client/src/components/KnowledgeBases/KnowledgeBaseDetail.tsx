@@ -105,7 +105,7 @@ export function KnowledgeBaseDetail() {
             />
           ) : null}
           {activeTab === 'access' ? (
-            <KnowledgeBaseAccess id={knowledgeBase.id} name={knowledgeBase.name} />
+            <KnowledgeBaseAccess resourceDbId={knowledgeBase._id} name={knowledgeBase.name} />
           ) : null}
           {activeTab === 'settings' ? (
             <KnowledgeBaseSettings
