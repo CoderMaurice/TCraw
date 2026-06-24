@@ -317,6 +317,7 @@ export const defaultAgentFormValues = {
   model_parameters: {},
   tools: [],
   tool_options: {},
+  knowledge_base_ids: [] as string[],
   provider: {},
   edges: [],
   artifacts: '',

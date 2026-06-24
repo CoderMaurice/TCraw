@@ -115,6 +115,15 @@ function AgentSelect({
           return;
         }
 
+        if (
+          name === 'knowledge_base_ids' &&
+          Array.isArray(value) &&
+          value.every((item) => typeof item === 'string')
+        ) {
+          formValues[name] = value;
+          return;
+        }
+
         if (name === 'skills_enabled' && typeof value === 'boolean') {
           formValues[name] = value;
           return;

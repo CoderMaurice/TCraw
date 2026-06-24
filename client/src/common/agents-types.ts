@@ -39,6 +39,7 @@ export type AgentForm = {
   tools?: string[];
   /** Per-tool configuration options (deferred loading, allowed callers, etc.) */
   tool_options?: AgentToolOptions;
+  knowledge_base_ids?: string[];
   skills?: string[];
   skills_enabled?: boolean;
   provider?: AgentProvider | OptionWithIcon;

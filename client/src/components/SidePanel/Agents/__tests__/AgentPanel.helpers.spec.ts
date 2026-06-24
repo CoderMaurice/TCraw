@@ -39,6 +39,7 @@ const createForm = (): AgentForm => ({
   execute_code: false,
   file_search: false,
   web_search: false,
+  knowledge_base_ids: [],
   avatar_file: null,
   avatar_preview: '',
   avatar_action: null,
@@ -70,6 +71,15 @@ describe('composeAgentUpdatePayload', () => {
     const { payload } = composeAgentUpdatePayload(form, 'agent_123');
 
     expect(payload.avatar).toBeUndefined();
+  });
+
+  it('includes knowledge base ids in the agent payload', () => {
+    const form = createForm();
+    form.knowledge_base_ids = ['kb_1', 'kb_2'];
+
+    const { payload } = composeAgentUpdatePayload(form, 'agent_123');
+
+    expect(payload.knowledge_base_ids).toEqual(['kb_1', 'kb_2']);
   });
 });
 
