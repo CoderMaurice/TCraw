@@ -1,0 +1,79 @@
+import { useQuery } from '@tanstack/react-query';
+import { dataService, QueryKeys } from 'librechat-data-provider';
+import type { QueryObserverResult, UseQueryOptions } from '@tanstack/react-query';
+import type {
+  KnowledgeBase,
+  ListKnowledgeBasesRequest,
+  ListKnowledgeBasesResponse,
+  KnowledgeBaseSelectorResponse,
+  ListKnowledgeBaseDocumentsResponse,
+} from 'librechat-data-provider';
+
+export const useKnowledgeBasesQuery = <TData = ListKnowledgeBasesResponse>(
+  params?: ListKnowledgeBasesRequest,
+  config?: UseQueryOptions<ListKnowledgeBasesResponse, unknown, TData>,
+): QueryObserverResult<TData> => {
+  return useQuery<ListKnowledgeBasesResponse, unknown, TData>(
+    [QueryKeys.knowledgeBases, params],
+    () => dataService.listKnowledgeBases(params),
+    {
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMount: false,
+      ...config,
+    },
+  );
+};
+
+export const useKnowledgeBaseQuery = (
+  id?: string | null,
+  config?: UseQueryOptions<KnowledgeBase>,
+): QueryObserverResult<KnowledgeBase> => {
+  return useQuery<KnowledgeBase>(
+    [QueryKeys.knowledgeBase, id],
+    () => dataService.getKnowledgeBase(id as string),
+    {
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMount: false,
+      retry: false,
+      ...config,
+      enabled: Boolean(id) && (config?.enabled ?? true),
+    },
+  );
+};
+
+export const useKnowledgeBaseDocumentsQuery = (
+  id?: string | null,
+  config?: UseQueryOptions<ListKnowledgeBaseDocumentsResponse>,
+): QueryObserverResult<ListKnowledgeBaseDocumentsResponse> => {
+  return useQuery<ListKnowledgeBaseDocumentsResponse>(
+    [QueryKeys.knowledgeBaseDocuments, id],
+    () => dataService.listKnowledgeBaseDocuments(id as string),
+    {
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMount: false,
+      retry: false,
+      ...config,
+      enabled: Boolean(id) && (config?.enabled ?? true),
+    },
+  );
+};
+
+export const useKnowledgeBaseSelectorQuery = (
+  search?: string,
+  config?: UseQueryOptions<KnowledgeBaseSelectorResponse>,
+): QueryObserverResult<KnowledgeBaseSelectorResponse> => {
+  return useQuery<KnowledgeBaseSelectorResponse>(
+    [QueryKeys.knowledgeBaseSelector, search],
+    () => dataService.listKnowledgeBaseSelector({ search, limit: 25 }),
+    {
+      keepPreviousData: true,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMount: false,
+      ...config,
+    },
+  );
+};
