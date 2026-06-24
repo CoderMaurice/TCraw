@@ -1751,7 +1751,7 @@ git commit -m "feat: resolve agent knowledge bases at runtime"
 - Create: `client/src/data-provider/KnowledgeBases/index.ts`
 - Modify: `client/src/data-provider/index.ts`
 
-- [ ] **Step 1: Add query hooks**
+- [x] **Step 1: Add query hooks**
 
 Create `client/src/data-provider/KnowledgeBases/queries.ts`:
 
@@ -1781,7 +1781,7 @@ export const useKnowledgeBaseSelectorQuery = (search: string) =>
   );
 ```
 
-- [ ] **Step 2: Add mutation hooks**
+- [x] **Step 2: Add mutation hooks**
 
 Create `client/src/data-provider/KnowledgeBases/mutations.ts`:
 
@@ -1835,7 +1835,7 @@ export const useDeleteKnowledgeBaseDocumentMutation = (id: string) => {
 };
 ```
 
-- [ ] **Step 3: Export hooks**
+- [x] **Step 3: Export hooks**
 
 Create `client/src/data-provider/KnowledgeBases/index.ts`:
 
@@ -1850,7 +1850,7 @@ Add to `client/src/data-provider/index.ts`:
 export * from './KnowledgeBases';
 ```
 
-- [ ] **Step 4: Run client type check through build**
+- [x] **Step 4: Run client type check through build**
 
 Run:
 
@@ -1860,7 +1860,7 @@ npm run build:data-provider
 
 Expected: exits `0`. Client compilation will be covered after UI tasks.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add client/src/data-provider/KnowledgeBases/queries.ts client/src/data-provider/KnowledgeBases/mutations.ts client/src/data-provider/KnowledgeBases/index.ts client/src/data-provider/index.ts
