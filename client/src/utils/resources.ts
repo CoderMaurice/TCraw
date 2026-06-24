@@ -81,6 +81,17 @@ export const RESOURCE_CONFIGS: Record<ResourceType, ResourceConfig> = {
     getManageMessage: (name?: string) => `Manage access for ${name || 'shared link'}`,
     getCopyUrlMessage: () => 'Share link copied',
   },
+  [ResourceType.KNOWLEDGE_BASE]: {
+    resourceType: ResourceType.KNOWLEDGE_BASE,
+    defaultViewerRoleId: AccessRoleIds.KNOWLEDGE_BASE_VIEWER,
+    defaultEditorRoleId: AccessRoleIds.KNOWLEDGE_BASE_EDITOR,
+    defaultOwnerRoleId: AccessRoleIds.KNOWLEDGE_BASE_OWNER,
+    getResourceName: (name?: string) => (name && name !== '' ? name : 'knowledge base'),
+    getShareMessage: (name?: string) => (name && name !== '' ? name : 'knowledge base'),
+    getManageMessage: (name?: string) =>
+      `Manage permissions for ${name && name !== '' ? name : 'knowledge base'}`,
+    getCopyUrlMessage: () => 'Knowledge base URL copied',
+  },
 };
 
 export const getResourceConfig = (resourceType: ResourceType): ResourceConfig | undefined => {
