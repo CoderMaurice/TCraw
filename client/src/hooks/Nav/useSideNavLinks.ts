@@ -1,9 +1,11 @@
 import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MCPIcon, AttachmentIcon, OpenAIMinimalIcon } from '@librechat/client';
 import {
   Bot,
   Brain,
   Bookmark,
+  Library,
   NotebookPen,
   ScrollText,
   ArrowRightToLine,
@@ -52,12 +54,17 @@ export default function useSideNavLinks({
   endpointsConfig: TEndpointsConfig;
   includeHidePanel?: boolean;
 }) {
+  const navigate = useNavigate();
   const hasAccessToPrompts = useHasAccess({
     permissionType: PermissionTypes.PROMPTS,
     permission: Permissions.USE,
   });
   const hasAccessToSkills = useHasAccess({
     permissionType: PermissionTypes.SKILLS,
+    permission: Permissions.USE,
+  });
+  const hasAccessToKnowledgeBases = useHasAccess({
+    permissionType: PermissionTypes.KNOWLEDGE_BASES,
     permission: Permissions.USE,
   });
   const hasAccessToBookmarks = useHasAccess({
@@ -150,6 +157,16 @@ export default function useSideNavLinks({
       });
     }
 
+    if (hasAccessToKnowledgeBases) {
+      links.push({
+        title: 'com_ui_knowledge_bases',
+        label: '',
+        icon: Library,
+        id: 'knowledge',
+        onClick: () => navigate('/knowledge'),
+      });
+    }
+
     if (hasAccessToMemories && hasAccessToReadMemories) {
       links.push({
         title: 'com_ui_memories',
@@ -221,10 +238,12 @@ export default function useSideNavLinks({
     endpoint,
     endpointsConfig,
     keyProvided,
+    navigate,
     hasAccessToAgents,
     hasAccessToCreateAgents,
     hasAccessToPrompts,
     hasAccessToSkills,
+    hasAccessToKnowledgeBases,
     skillsEnabled,
     hasAccessToMemories,
     hasAccessToReadMemories,
