@@ -1631,7 +1631,7 @@ git commit -m "feat: validate agent knowledge base bindings"
 - Modify: `api/server/services/Endpoints/agents/initialize.js`
 - Modify: `api/server/services/Endpoints/agents/initialize.spec.js`
 
-- [ ] **Step 1: Add runtime tests**
+- [x] **Step 1: Add runtime tests**
 
 In `api/server/services/Endpoints/agents/initialize.spec.js`, add:
 
@@ -1673,7 +1673,7 @@ test('does not check direct knowledge base ACL for a user running a shared Agent
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run:
 
@@ -1683,7 +1683,7 @@ cd api && npx jest server/services/Endpoints/agents/initialize.spec.js --runInBa
 
 Expected: FAIL because runtime does not expand `knowledge_base_ids`.
 
-- [ ] **Step 3: Merge resolved file IDs into tool resources**
+- [x] **Step 3: Merge resolved file IDs into tool resources**
 
 In `api/server/services/Endpoints/agents/initialize.js`, import:
 
@@ -1726,7 +1726,7 @@ const mergeKnowledgeBaseFileSearch = async ({ agent, tenantId }) => {
 
 Call `mergeKnowledgeBaseFileSearch` inside Agent initialization after the Agent record is loaded and before tool resolution. Do not call `checkPermission` for `ResourceType.KNOWLEDGE_BASE` in this runtime path.
 
-- [ ] **Step 4: Run runtime tests**
+- [x] **Step 4: Run runtime tests**
 
 Run:
 
@@ -1736,7 +1736,7 @@ cd api && npx jest server/services/Endpoints/agents/initialize.spec.js --runInBa
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add api/server/services/Endpoints/agents/initialize.js api/server/services/Endpoints/agents/initialize.spec.js
