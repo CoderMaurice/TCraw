@@ -12,6 +12,9 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 
 const mockInitializeAgent = jest.fn();
 const mockValidateAgentModel = jest.fn();
+const mockResolveKnowledgeBaseFileIdsForAgent = jest.fn();
+const mockCheckPermission = jest.fn();
+const mockFindAccessibleResources = jest.fn();
 
 jest.mock('@librechat/agents', () => ({
   ...jest.requireActual('@librechat/agents'),
@@ -25,9 +28,17 @@ jest.mock('@librechat/api', () => ({
   ...jest.requireActual('@librechat/api'),
   initializeAgent: (...args) => mockInitializeAgent(...args),
   validateAgentModel: (...args) => mockValidateAgentModel(...args),
+  resolveKnowledgeBaseFileIdsForAgent: (...args) =>
+    mockResolveKnowledgeBaseFileIdsForAgent(...args),
   GenerationJobManager: { setCollectedUsage: jest.fn() },
   getCustomEndpointConfig: jest.fn(),
   createSequentialChainEdges: jest.fn(),
+}));
+
+jest.mock('~/server/services/PermissionService', () => ({
+  ...jest.requireActual('~/server/services/PermissionService'),
+  checkPermission: (...args) => mockCheckPermission(...args),
+  findAccessibleResources: (...args) => mockFindAccessibleResources(...args),
 }));
 
 /** Captured by the `getDefaultHandlers` mock so tests can drive the
@@ -72,7 +83,9 @@ const { initializeClient } = require('./initialize');
 const { getSkillToolDeps } = require('./skillDeps');
 const { logger } = require('@librechat/data-schemas');
 const { User, AclEntry } = require('~/db/models');
-const { createAgent, createSkill } = require('~/models');
+const models = require('~/models');
+const { createAgent, createSkill } = models;
+const actualPermissionService = jest.requireActual('~/server/services/PermissionService');
 
 jest.spyOn(logger, 'warn').mockImplementation(() => {});
 
@@ -98,6 +111,13 @@ describe('initializeClient — processAgent ACL gate', () => {
     await mongoose.connection.dropDatabase();
     jest.clearAllMocks();
     agentClientArgs = undefined;
+    mockCheckPermission.mockImplementation((...args) =>
+      actualPermissionService.checkPermission(...args),
+    );
+    mockFindAccessibleResources.mockImplementation((...args) =>
+      actualPermissionService.findAccessibleResources(...args),
+    );
+    mockResolveKnowledgeBaseFileIdsForAgent.mockResolvedValue([]);
 
     testUser = await User.create({
       email: 'test@example.com',
@@ -162,6 +182,86 @@ describe('initializeClient — processAgent ACL gate', () => {
 
     expect(mockInitializeAgent).toHaveBeenCalledTimes(1);
     expect(agentClientArgs.agent.edges).toEqual([]);
+  });
+
+  it('merges primary agent knowledge base files into file search resources', async () => {
+    const endpointOption = makeEndpointOption();
+    endpointOption.agent = Promise.resolve({
+      id: PRIMARY_ID,
+      name: 'Primary',
+      provider: 'openai',
+      model: 'gpt-4',
+      tools: [],
+      knowledge_base_ids: ['kb_1'],
+      tool_resources: { file_search: { file_ids: ['file_existing'] } },
+    });
+    const primaryConfig = {
+      ...makePrimaryConfig([]),
+      tools: [],
+      tool_resources: { file_search: { file_ids: ['file_existing'] } },
+    };
+    mockInitializeAgent.mockResolvedValue(primaryConfig);
+    mockResolveKnowledgeBaseFileIdsForAgent.mockResolvedValue([
+      'file_kb_1',
+      'file_kb_2',
+      'file_existing',
+    ]);
+
+    await initializeClient({
+      req: makeReq(),
+      res: {},
+      signal: new AbortController().signal,
+      endpointOption,
+    });
+
+    expect(mockResolveKnowledgeBaseFileIdsForAgent).toHaveBeenCalledWith(
+      ['kb_1'],
+      { findReadyKnowledgeBaseDocumentFileIds: expect.any(Function) },
+      undefined,
+    );
+    expect(mockInitializeAgent.mock.calls[0][0].agent.tools).toContain('file_search');
+    expect(mockInitializeAgent.mock.calls[0][0].agent.tool_resources.file_search.file_ids).toEqual([
+      'file_existing',
+      'file_kb_1',
+      'file_kb_2',
+    ]);
+    expect(agentClientArgs.agent.tools).toContain('file_search');
+    expect(agentClientArgs.agent.tool_resources.file_search.file_ids).toEqual([
+      'file_existing',
+      'file_kb_1',
+      'file_kb_2',
+    ]);
+  });
+
+  it('resolves shared agent knowledge bases without checking direct knowledge base ACL', async () => {
+    const endpointOption = makeEndpointOption();
+    endpointOption.agent = Promise.resolve({
+      id: PRIMARY_ID,
+      name: 'Primary',
+      provider: 'openai',
+      model: 'gpt-4',
+      tools: [],
+      knowledge_base_ids: ['kb_shared'],
+    });
+    mockInitializeAgent.mockResolvedValue(makePrimaryConfig([]));
+    mockResolveKnowledgeBaseFileIdsForAgent.mockResolvedValue(['file_shared']);
+
+    await initializeClient({
+      req: makeReq(),
+      res: {},
+      signal: new AbortController().signal,
+      endpointOption,
+    });
+
+    expect(mockResolveKnowledgeBaseFileIdsForAgent).toHaveBeenCalledWith(
+      ['kb_shared'],
+      { findReadyKnowledgeBaseDocumentFileIds: expect.any(Function) },
+      undefined,
+    );
+    expect(agentClientArgs.agent.tool_resources.file_search.file_ids).toEqual(['file_shared']);
+    expect(mockCheckPermission).not.toHaveBeenCalledWith(
+      expect.objectContaining({ resourceType: ResourceType.KNOWLEDGE_BASE }),
+    );
   });
 
   it('should initialize handoff agent and keep its edge when user has VIEW access', async () => {
@@ -341,6 +441,13 @@ describe('initializeClient — subagent loading', () => {
     capturedToolExecuteOptions = undefined;
     mockLoadToolsForExecution.mockReset();
     mockLoadToolsForExecution.mockResolvedValue({ loadedTools: [] });
+    mockCheckPermission.mockImplementation((...args) =>
+      actualPermissionService.checkPermission(...args),
+    );
+    mockFindAccessibleResources.mockImplementation((...args) =>
+      actualPermissionService.findAccessibleResources(...args),
+    );
+    mockResolveKnowledgeBaseFileIdsForAgent.mockResolvedValue([]);
 
     testUser = await User.create({
       email: 'subagent@example.com',
@@ -537,6 +644,69 @@ describe('initializeClient — subagent loading', () => {
     expect(arg.toolRegistry).toBeInstanceOf(Map);
     expect(arg.tool_resources).toEqual({ file_search: { file_ids: ['file_1'] } });
     expect(arg.actionsEnabled).toBe(true);
+  });
+
+  it('merges knowledge base files into subagent tool execution context', async () => {
+    const subAgent = await createAgent({
+      id: SUBAGENT_ID,
+      name: 'Explicit KB Subagent',
+      provider: 'openai',
+      model: 'gpt-4',
+      author: new mongoose.Types.ObjectId(),
+      tools: [],
+      knowledge_base_ids: ['kb_sub'],
+    });
+    await grantView(subAgent);
+
+    const primaryConfig = makePrimaryConfig({
+      subagents: { enabled: true, allowSelf: false, agent_ids: [SUBAGENT_ID] },
+    });
+    const subagentConfig = {
+      ...makeSubagentConfig(SUBAGENT_ID),
+      tools: [],
+      tool_resources: { file_search: { file_ids: ['file_existing'] } },
+    };
+
+    let call = 0;
+    mockInitializeAgent.mockImplementation(() =>
+      Promise.resolve(++call === 1 ? primaryConfig : subagentConfig),
+    );
+    mockResolveKnowledgeBaseFileIdsForAgent.mockResolvedValue(['file_kb_sub', 'file_existing']);
+    const getAgent = models.getAgent;
+    jest.spyOn(models, 'getAgent').mockImplementation((filter) => {
+      if (filter.id === SUBAGENT_ID) {
+        return Promise.resolve({ ...subAgent, knowledge_base_ids: ['kb_sub'] });
+      }
+      return getAgent(filter);
+    });
+
+    try {
+      await initializeClient({
+        req: makeSubagentReq(),
+        res: {},
+        signal: new AbortController().signal,
+        endpointOption: makeEndpointOption(),
+      });
+    } finally {
+      models.getAgent.mockRestore();
+    }
+
+    expect(mockInitializeAgent.mock.calls[1][0].agent.knowledge_base_ids).toEqual(['kb_sub']);
+    expect(mockResolveKnowledgeBaseFileIdsForAgent).toHaveBeenCalledWith(
+      ['kb_sub'],
+      { findReadyKnowledgeBaseDocumentFileIds: expect.any(Function) },
+      undefined,
+    );
+    expect(agentClientArgs.agent.subagentAgentConfigs[0].tools).toContain('file_search');
+    expect(
+      agentClientArgs.agent.subagentAgentConfigs[0].tool_resources.file_search.file_ids,
+    ).toEqual(['file_existing', 'file_kb_sub']);
+
+    await capturedToolExecuteOptions.loadTools(['file_search'], SUBAGENT_ID);
+
+    const arg = mockLoadToolsForExecution.mock.calls[0][0];
+    expect(arg.agent.tools).toContain('file_search');
+    expect(arg.tool_resources.file_search.file_ids).toEqual(['file_existing', 'file_kb_sub']);
   });
 
   it('threads run-scoped MCP tool definitions into ON_TOOL_EXECUTE loading', async () => {

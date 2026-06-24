@@ -10,11 +10,13 @@ const {
   getCustomEndpointConfig,
   discoverConnectedAgents,
   resolveAgentTokenConfig,
+  resolveKnowledgeBaseFileIdsForAgent,
   resolveAgentScopedSkillIds,
   resolveModelSpecSkillIds,
   buildAgentContextAttachmentsByAgentId,
 } = require('@librechat/api');
 const {
+  Tools,
   ResourceType,
   EModelEndpoint,
   PermissionBits,
@@ -45,6 +47,84 @@ const AgentClient = require('~/server/controllers/agents/client');
 const { processAddedConvo } = require('./addedConvo');
 const { logViolation } = require('~/cache');
 const db = require('~/models');
+
+const getKnowledgeBaseIds = (agent) => {
+  if (!Array.isArray(agent?.knowledge_base_ids)) {
+    return [];
+  }
+  const ids = new Set();
+  for (const id of agent.knowledge_base_ids) {
+    if (typeof id !== 'string') {
+      continue;
+    }
+    const trimmed = id.trim();
+    if (trimmed) {
+      ids.add(trimmed);
+    }
+  }
+  return Array.from(ids);
+};
+
+const mergeFileIds = (existing = [], additional = []) => {
+  const seen = new Set();
+  const fileIds = [];
+  for (const fileId of [
+    ...(Array.isArray(existing) ? existing : []),
+    ...(Array.isArray(additional) ? additional : []),
+  ]) {
+    if (typeof fileId !== 'string' || !fileId || seen.has(fileId)) {
+      continue;
+    }
+    seen.add(fileId);
+    fileIds.push(fileId);
+  }
+  return fileIds;
+};
+
+const ensureFileSearchTool = (target) => {
+  if (!target) {
+    return;
+  }
+  const tools = Array.isArray(target.tools) ? target.tools : [];
+  if (!tools.includes(Tools.file_search)) {
+    target.tools = [...tools, Tools.file_search];
+  }
+};
+
+const applyFileSearchResources = (target, fileIds) => {
+  if (!target) {
+    return;
+  }
+  const toolResources = target.tool_resources ?? {};
+  const fileSearch = toolResources.file_search ?? {};
+  target.tool_resources = {
+    ...toolResources,
+    file_search: {
+      ...fileSearch,
+      file_ids: mergeFileIds(fileSearch.file_ids, fileIds),
+    },
+  };
+  ensureFileSearchTool(target);
+};
+
+const mergeKnowledgeBaseFileSearch = async ({ agent, config, tenantId, resolvedFileIds }) => {
+  const knowledgeBaseIds = getKnowledgeBaseIds(agent);
+  if (knowledgeBaseIds.length === 0) {
+    return null;
+  }
+
+  const fileIds =
+    resolvedFileIds ??
+    (await resolveKnowledgeBaseFileIdsForAgent(
+      knowledgeBaseIds,
+      { findReadyKnowledgeBaseDocumentFileIds: db.findReadyKnowledgeBaseDocumentFileIds },
+      tenantId,
+    ));
+
+  applyFileSearchResources(agent, fileIds);
+  applyFileSearchResources(config, fileIds);
+  return { knowledgeBaseIds, fileIds };
+};
 
 /**
  * Creates a tool loader function for the agent.
@@ -310,6 +390,23 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
   const conversationId = req.body.conversationId;
   /** @type {string | undefined} */
   const parentMessageId = req.body.parentMessageId;
+
+  const initializeAgentWithKnowledgeBases = async (params, dbMethods) => {
+    const agentTenantId = params.agent?.tenantId ?? req.user?.tenantId;
+    const knowledgeBaseFileSearch = await mergeKnowledgeBaseFileSearch({
+      agent: params.agent,
+      tenantId: agentTenantId,
+    });
+    const config = await initializeAgent(params, dbMethods);
+    await mergeKnowledgeBaseFileSearch({
+      agent: params.agent,
+      config,
+      tenantId: agentTenantId,
+      resolvedFileIds: knowledgeBaseFileSearch?.fileIds,
+    });
+    return config;
+  };
+
   /**
    * Skill names the user invoked via the `$` popover for this turn. Only flows
    * to the primary agent — handoff agents are follow-up turns that don't see
@@ -368,7 +465,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
     ephemeralSkillsToggle,
   });
 
-  const primaryConfig = await initializeAgent(
+  const primaryConfig = await initializeAgentWithKnowledgeBases(
     {
       req,
       res,
@@ -489,7 +586,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
       },
       // Pass through the `@librechat/api` exports so that tests which
       // `jest.mock('@librechat/api')` can override the initializer/validator.
-      initializeAgent,
+      initializeAgent: initializeAgentWithKnowledgeBases,
       validateAgentModel,
     },
   );
@@ -639,7 +736,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
         skillsCapabilityEnabled,
         ephemeralSkillsToggle,
       });
-      const config = await initializeAgent(
+      const config = await initializeAgentWithKnowledgeBases(
         {
           req,
           res,
