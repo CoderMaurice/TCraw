@@ -70,6 +70,7 @@ export * from './cache';
 /* Shared Links */
 export * from './shared-links/access';
 export * from './shared-links/service';
+export * from './shared-links/config';
 /* Stream */
 export * from './stream';
 /* Diagnostics */
