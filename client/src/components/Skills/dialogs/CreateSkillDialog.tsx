@@ -10,6 +10,7 @@ import {
 import {
   SKILL_NAME_PATTERN,
   SKILL_NAME_MAX_LENGTH,
+  SKILL_DISPLAY_TITLE_MAX_LENGTH,
   SKILL_DESCRIPTION_MAX_LENGTH,
 } from 'librechat-data-provider';
 import { useCreateSkillMutation } from '~/data-provider';
@@ -26,6 +27,7 @@ interface CreateSkillDialogProps {
 
 interface FormValues {
   name: string;
+  displayTitle: string;
   description: string;
   body: string;
 }
@@ -51,7 +53,12 @@ export default function CreateSkillDialog({
     reset,
     formState: { isValid, isSubmitting, errors },
   } = useForm<FormValues>({
-    defaultValues: { name: defaultName, description: defaultDescription, body: defaultBody },
+    defaultValues: {
+      name: defaultName,
+      displayTitle: '',
+      description: defaultDescription,
+      body: defaultBody,
+    },
     mode: 'onChange',
   });
 
@@ -76,6 +83,7 @@ export default function CreateSkillDialog({
     }
     createSkill.mutate({
       name: data.name.trim(),
+      displayTitle: data.displayTitle.trim() || undefined,
       description: data.description.trim(),
       body: data.body,
     });
@@ -125,6 +133,34 @@ export default function CreateSkillDialog({
               })}
             />
             {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
+          </div>
+
+          {/* Display name */}
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor="create-skill-display-title"
+              className="text-sm font-medium text-text-secondary"
+            >
+              {localize('com_ui_skill_display_name')}
+            </label>
+            <input
+              id="create-skill-display-title"
+              placeholder={localize('com_ui_skill_display_name_placeholder')}
+              aria-invalid={errors.displayTitle ? 'true' : 'false'}
+              autoComplete="off"
+              className="flex h-10 w-full rounded-xl border border-border-medium bg-transparent px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring-primary disabled:cursor-not-allowed disabled:opacity-50"
+              {...register('displayTitle', {
+                maxLength: {
+                  value: SKILL_DISPLAY_TITLE_MAX_LENGTH,
+                  message: localize('com_ui_skill_display_name_too_long', {
+                    0: String(SKILL_DISPLAY_TITLE_MAX_LENGTH),
+                  }),
+                },
+              })}
+            />
+            {errors.displayTitle && (
+              <p className="text-xs text-red-500">{errors.displayTitle.message}</p>
+            )}
           </div>
 
           {/* Description */}

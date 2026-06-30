@@ -16,6 +16,7 @@ import {
 import { useListSkillsQuery } from '~/data-provider';
 import { CategoryIcon } from '~/components/Prompts';
 import { cn } from '~/utils';
+import { getSkillDisplayName } from '../utils';
 
 interface SkillSelectDialogProps {
   isOpen: boolean;
@@ -80,6 +81,8 @@ function SkillCard({
   onToggleFavorite,
   localize,
 }: SkillCardProps) {
+  const skillLabel = getSkillDisplayName(skill);
+
   return (
     <button
       type="button"
@@ -95,8 +98,11 @@ function SkillCard({
       )}
     >
       <div className="flex w-full items-start gap-2">
-        <p className="min-w-0 flex-1 truncate pr-1 text-sm font-semibold text-text-primary">
-          {skill.name}
+        <p
+          className="min-w-0 flex-1 truncate pr-1 text-sm font-semibold text-text-primary"
+          title={skill.name}
+        >
+          {skillLabel}
         </p>
         <span
           role="button"
@@ -234,7 +240,8 @@ function SkillSelectDialog({ isOpen, setIsOpen }: SkillSelectDialogProps) {
       } else if (activeFilter !== SystemCategories.ALL) {
         if (skill.category !== activeFilter) continue;
       }
-      if (term && !skill.name.toLowerCase().includes(term)) continue;
+      const searchableName = `${skill.name} ${skill.displayTitle ?? ''}`.toLowerCase();
+      if (term && !searchableName.includes(term)) continue;
       result.push(skill);
     }
     return result;

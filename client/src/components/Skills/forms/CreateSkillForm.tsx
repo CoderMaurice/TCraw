@@ -7,13 +7,13 @@ import {
   InvocationMode,
   SKILL_NAME_PATTERN,
   SKILL_NAME_MAX_LENGTH,
+  SKILL_DISPLAY_TITLE_MAX_LENGTH,
   SKILL_DESCRIPTION_MAX_LENGTH,
 } from 'librechat-data-provider';
 import type { TSkill, TCreateSkill, TSkillWarning } from 'librechat-data-provider';
 import { useCreateSkillMutation } from '~/data-provider';
 import { useLocalize } from '~/hooks';
 import SkillContentEditor from './SkillContentEditor';
-import InvocationModePicker from './InvocationModePicker';
 import CategorySelector from './CategorySelector';
 import { cn } from '~/utils';
 
@@ -33,6 +33,7 @@ Walk through the steps the agent should take.
 
 interface CreateSkillFormValues {
   name: string;
+  displayTitle: string;
   description: string;
   body: string;
   category: string;
@@ -41,6 +42,7 @@ interface CreateSkillFormValues {
 
 const DEFAULT_VALUES: CreateSkillFormValues = {
   name: '',
+  displayTitle: '',
   description: '',
   body: DEFAULT_BODY,
   category: '',
@@ -112,6 +114,7 @@ export default function CreateSkillForm({
     }
     const payload: TCreateSkill = {
       name: values.name.trim(),
+      displayTitle: values.displayTitle.trim() || undefined,
       description: values.description.trim(),
       body: values.body,
       category: values.category || undefined,
@@ -204,6 +207,48 @@ export default function CreateSkillForm({
         </div>
 
         <div className="flex w-full flex-col gap-4 md:mt-[1.075rem]">
+          <Controller
+            name="displayTitle"
+            control={control}
+            rules={{
+              maxLength: {
+                value: SKILL_DISPLAY_TITLE_MAX_LENGTH,
+                message: localize('com_ui_skill_display_name_too_long', {
+                  0: String(SKILL_DISPLAY_TITLE_MAX_LENGTH),
+                }),
+              },
+            }}
+            render={({ field }) => (
+              <div className="flex flex-col">
+                <label
+                  htmlFor="skill-display-title"
+                  className="mb-1 text-sm font-medium text-text-secondary"
+                >
+                  {localize('com_ui_skill_display_name')}
+                </label>
+                <Input
+                  {...field}
+                  id="skill-display-title"
+                  type="text"
+                  placeholder={localize('com_ui_skill_display_name_placeholder')}
+                  aria-label={localize('com_ui_skill_display_name')}
+                  aria-invalid={errors.displayTitle ? 'true' : 'false'}
+                  aria-describedby={errors.displayTitle ? 'skill-display-title-error' : undefined}
+                  className="w-full border border-border-medium p-3 text-sm text-text-primary"
+                />
+                {errors.displayTitle && (
+                  <p
+                    id="skill-display-title-error"
+                    className="mt-1 text-sm text-red-500"
+                    role="alert"
+                  >
+                    {errors.displayTitle.message}
+                  </p>
+                )}
+              </div>
+            )}
+          />
+
           <Controller
             name="description"
             control={control}

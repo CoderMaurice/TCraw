@@ -6,7 +6,7 @@ import type { TSkill } from 'librechat-data-provider';
 import { useLocalize, useAuthContext, useSkillPermissions, useSkillActiveState } from '~/hooks';
 import { ShareSkill, SkillToggle } from '../buttons';
 import SkillMarkdownRenderer from './SkillMarkdownRenderer';
-import { parseFrontmatter } from '../utils';
+import { getSkillDisplayName, parseFrontmatter } from '../utils';
 import DeleteSkill from '../dialogs/DeleteSkill';
 import { cn } from '~/utils';
 
@@ -83,6 +83,7 @@ export default function SkillDetail({ skill, onEdit, onDelete }: SkillDetailProp
     () => parseFrontmatter(skill.body ?? '', SKIP_KEYS),
     [skill.body],
   );
+  const skillLabel = getSkillDisplayName(skill);
 
   return (
     <article
@@ -99,7 +100,7 @@ export default function SkillDetail({ skill, onEdit, onDelete }: SkillDetailProp
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-2">
                 <h2 className="truncate text-xl font-bold text-text-primary" title={skill.name}>
-                  {skill.name}
+                  {skillLabel}
                 </h2>
                 {isPublic && (
                   <TooltipAnchor

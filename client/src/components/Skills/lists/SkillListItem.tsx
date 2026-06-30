@@ -7,6 +7,7 @@ import type { TSkill, TSkillFile } from 'librechat-data-provider';
 import { useListSkillFilesQuery } from '~/data-provider';
 import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
+import { getSkillDisplayName } from '../utils';
 
 interface SkillListItemProps {
   skill: TSkill;
@@ -272,6 +273,7 @@ function SkillListItem({
   const files = useMemo(() => filesQuery.data?.files ?? [], [filesQuery.data]);
   const hasFiles = files.length > 0 || skill.fileCount > 0;
   const expanded = hasFiles && isExpanded;
+  const skillLabel = getSkillDisplayName(skill);
 
   const handleSkillClick = useCallback(() => {
     navigate(`/skills/${skill._id}`);
@@ -323,7 +325,9 @@ function SkillListItem({
         </span>
 
         <span className="flex min-w-0 flex-1 items-center gap-1.5">
-          <span className={cn('truncate', isActive && 'font-semibold')}>{skill.name}</span>
+          <span className={cn('truncate', isActive && 'font-semibold')} title={skill.name}>
+            {skillLabel}
+          </span>
           {skill.alwaysApply === true && (
             <Pin
               className="size-3 shrink-0 text-cyan-500"

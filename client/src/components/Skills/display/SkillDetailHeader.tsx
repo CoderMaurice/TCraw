@@ -8,6 +8,7 @@ import type { TranslationKeys } from '~/hooks';
 import { useLocalize, useAuthContext } from '~/hooks';
 import DeleteSkill from '../dialogs/DeleteSkill';
 import { ShareSkill } from '../buttons';
+import { getSkillDisplayName } from '../utils';
 
 const invocationLabelMap: Record<InvocationMode, TranslationKeys> = {
   [InvocationMode.auto]: 'com_ui_invocation_auto',
@@ -28,13 +29,14 @@ const SkillDetailHeader = ({ skill, showActions = true }: SkillDetailHeaderProps
   const isOwner = skill.author === user?.id;
   const isShared = !isOwner && Boolean(skill.authorName);
   const isPublic = skill.isPublic === true;
+  const skillLabel = getSkillDisplayName(skill);
 
   return (
     <div className="flex flex-col gap-3 py-2 sm:flex-row sm:items-center sm:gap-4">
       <div className="min-w-0 flex-1 overflow-hidden">
         <div className="flex min-w-0 items-center gap-2">
           <h2 className="truncate text-xl font-bold text-text-primary" title={skill.name}>
-            {skill.name}
+            {skillLabel}
           </h2>
           {isPublic && (
             <TooltipAnchor
