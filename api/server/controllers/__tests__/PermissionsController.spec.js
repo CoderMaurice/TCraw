@@ -251,6 +251,131 @@ describe('PermissionsController', () => {
     });
   });
 
+  describe('updateResourcePermissions — agent public sync', () => {
+    const agentObjectId = new mongoose.Types.ObjectId().toString();
+
+    beforeEach(() => {
+      mockBulkUpdateResourcePermissions.mockResolvedValue({
+        granted: [],
+        updated: [],
+        revoked: [],
+        errors: [],
+      });
+    });
+
+    it('syncs REMOTE_AGENT public access to AGENT public access for marketplace visibility', async () => {
+      const req = createMockReq({
+        params: { resourceType: ResourceType.REMOTE_AGENT, resourceId: agentObjectId },
+        body: {
+          updated: [],
+          removed: [],
+          public: true,
+          publicAccessRoleId: AccessRoleIds.REMOTE_AGENT_VIEWER,
+        },
+      });
+      const res = createMockRes();
+
+      await updateResourcePermissions(req, res);
+
+      expect(mockBulkUpdateResourcePermissions).toHaveBeenCalledTimes(2);
+      expect(mockBulkUpdateResourcePermissions).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          resourceType: ResourceType.REMOTE_AGENT,
+          resourceId: agentObjectId,
+          updatedPrincipals: [
+            {
+              type: PrincipalType.PUBLIC,
+              id: null,
+              accessRoleId: AccessRoleIds.REMOTE_AGENT_VIEWER,
+            },
+          ],
+          revokedPrincipals: [],
+        }),
+      );
+      expect(mockBulkUpdateResourcePermissions).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          resourceType: ResourceType.AGENT,
+          resourceId: agentObjectId,
+          updatedPrincipals: [
+            {
+              type: PrincipalType.PUBLIC,
+              id: null,
+              accessRoleId: AccessRoleIds.AGENT_VIEWER,
+            },
+          ],
+          revokedPrincipals: [],
+        }),
+      );
+      expect(res.status).toHaveBeenCalledWith(200);
+    });
+
+    it('syncs AGENT public access to REMOTE_AGENT public access', async () => {
+      const req = createMockReq({
+        params: { resourceType: ResourceType.AGENT, resourceId: agentObjectId },
+        body: {
+          updated: [],
+          removed: [],
+          public: true,
+          publicAccessRoleId: AccessRoleIds.AGENT_VIEWER,
+        },
+      });
+      const res = createMockRes();
+
+      await updateResourcePermissions(req, res);
+
+      expect(mockBulkUpdateResourcePermissions).toHaveBeenCalledTimes(2);
+      expect(mockBulkUpdateResourcePermissions).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          resourceType: ResourceType.REMOTE_AGENT,
+          resourceId: agentObjectId,
+          updatedPrincipals: [
+            {
+              type: PrincipalType.PUBLIC,
+              id: null,
+              accessRoleId: AccessRoleIds.REMOTE_AGENT_VIEWER,
+            },
+          ],
+          revokedPrincipals: [],
+        }),
+      );
+      expect(res.status).toHaveBeenCalledWith(200);
+    });
+
+    it('syncs disabling public access between AGENT and REMOTE_AGENT', async () => {
+      const req = createMockReq({
+        params: { resourceType: ResourceType.REMOTE_AGENT, resourceId: agentObjectId },
+        body: {
+          updated: [],
+          removed: [],
+          public: false,
+        },
+      });
+      const res = createMockRes();
+
+      await updateResourcePermissions(req, res);
+
+      expect(mockBulkUpdateResourcePermissions).toHaveBeenCalledTimes(2);
+      expect(mockBulkUpdateResourcePermissions).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          resourceType: ResourceType.REMOTE_AGENT,
+          revokedPrincipals: [{ type: PrincipalType.PUBLIC, id: null }],
+        }),
+      );
+      expect(mockBulkUpdateResourcePermissions).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          resourceType: ResourceType.AGENT,
+          revokedPrincipals: [{ type: PrincipalType.PUBLIC, id: null }],
+        }),
+      );
+      expect(res.status).toHaveBeenCalledWith(200);
+    });
+  });
+
   describe('updateResourcePermissions — favorites cleanup', () => {
     const agentObjectId = new mongoose.Types.ObjectId().toString();
     const revokedUserId = new mongoose.Types.ObjectId().toString();
