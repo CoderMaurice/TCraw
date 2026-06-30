@@ -1378,6 +1378,7 @@ export type TStartupConfig = {
   githubLoginEnabled: boolean;
   googleLoginEnabled: boolean;
   dingtalkLoginEnabled: boolean;
+  dingtalkClientId?: string;
   openidLoginEnabled: boolean;
   appleLoginEnabled: boolean;
   samlLoginEnabled: boolean;

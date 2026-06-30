@@ -7,7 +7,6 @@ import {
   AppleIcon,
   SamlIcon,
 } from '@librechat/client';
-import { MessageCircle } from 'lucide-react';
 
 import SocialButton from './SocialButton';
 
@@ -27,17 +26,6 @@ function SocialLoginRender({
   }
 
   const providerComponents = {
-    dingtalk: startupConfig.dingtalkLoginEnabled && (
-      <SocialButton
-        key="dingtalk"
-        enabled={startupConfig.dingtalkLoginEnabled}
-        serverDomain={startupConfig.serverDomain}
-        oauthPath="dingtalk"
-        Icon={() => <MessageCircle className="h-5 w-5" aria-hidden="true" />}
-        label={localize('com_auth_dingtalk_login')}
-        id="dingtalk"
-      />
-    ),
     discord: startupConfig.discordLoginEnabled && (
       <SocialButton
         key="discord"
@@ -128,25 +116,29 @@ function SocialLoginRender({
       />
     ),
   };
+  const renderedProviders = startupConfig.socialLogins
+    ?.filter((provider) => provider !== 'dingtalk')
+    .map((provider) => providerComponents[provider] || null)
+    .filter(Boolean);
+
+  if (!startupConfig.socialLoginEnabled || !renderedProviders?.length) {
+    return null;
+  }
 
   return (
-    startupConfig.socialLoginEnabled && (
-      <>
-        {startupConfig.emailLoginEnabled && (
-          <>
-            <div className="relative mt-6 flex w-full items-center justify-center border border-t border-gray-300 uppercase dark:border-gray-600">
-              <div className="absolute bg-white px-3 text-xs text-black dark:bg-gray-900 dark:text-white">
-                {localize('com_auth_or')}
-              </div>
+    <>
+      {startupConfig.emailLoginEnabled && (
+        <>
+          <div className="relative mt-6 flex w-full items-center justify-center border border-t border-gray-300 uppercase dark:border-gray-600">
+            <div className="absolute bg-white px-3 text-xs text-black dark:bg-gray-900 dark:text-white">
+              {localize('com_auth_or')}
             </div>
-            <div className="mt-8" />
-          </>
-        )}
-        <div className="mt-2">
-          {startupConfig.socialLogins?.map((provider) => providerComponents[provider] || null)}
-        </div>
-      </>
-    )
+          </div>
+          <div className="mt-8" />
+        </>
+      )}
+      <div className="mt-2">{renderedProviders}</div>
+    </>
   );
 }
 

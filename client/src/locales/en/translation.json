@@ -158,6 +158,7 @@
   "com_auth_continue": "Continue",
   "com_auth_create_account": "Create your account",
   "com_auth_dingtalk_login": "钉钉扫码登录",
+  "com_auth_dingtalk_load_failed": "钉钉扫码登录加载失败",
   "com_auth_discord_login": "Continue with Discord",
   "com_auth_email": "Email",
   "com_auth_email_address": "Email address",

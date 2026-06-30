@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ErrorTypes } from 'librechat-data-provider';
 import { OpenIDIcon, useToastContext } from '@librechat/client';
-import { KeyRound } from 'lucide-react';
 import { useOutletContext, useSearchParams, useLocation } from 'react-router-dom';
 import type { TLoginLayoutContext } from '~/common';
 import { getLoginError, persistRedirectToSession } from '~/utils';
@@ -10,6 +9,7 @@ import SocialButton from '~/components/Auth/SocialButton';
 import { useAuthContext } from '~/hooks/AuthContext';
 import { useLocalize } from '~/hooks';
 import LoginForm from './LoginForm';
+import DingTalkFrameLogin from './DingTalkFrameLogin';
 
 interface LoginLocationState {
   redirect_to?: string;
@@ -111,14 +111,16 @@ function Login() {
   return (
     <>
       {error != null && <ErrorMessage>{localize(getLoginError(error))}</ErrorMessage>}
+      {startsWithDingTalkLogin && showEmailLogin === false && startupConfig.dingtalkClientId && (
+        <DingTalkFrameLogin clientId={startupConfig.dingtalkClientId} />
+      )}
       {startupConfig?.emailLoginEnabled === true && showEmailLogin === false && (
         <button
           type="button"
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-border-light bg-surface-primary px-5 py-3 text-text-primary transition-colors duration-200 hover:bg-surface-tertiary"
+          className="mx-auto mt-5 block text-sm text-text-secondary underline-offset-4 transition-colors hover:text-text-primary hover:underline"
           onClick={() => setShowEmailLogin(true)}
         >
-          <KeyRound className="h-5 w-5" aria-hidden="true" />
-          <span>{localize('com_auth_email_password_login')}</span>
+          {localize('com_auth_email_password_login')}
         </button>
       )}
       {startupConfig?.emailLoginEnabled === true && showEmailLogin === true && (

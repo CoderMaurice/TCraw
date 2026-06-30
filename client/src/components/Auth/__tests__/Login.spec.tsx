@@ -18,6 +18,7 @@ const mockStartupConfig = {
   data: {
     socialLogins: ['google', 'facebook', 'openid', 'github', 'discord', 'saml'],
     dingtalkLoginEnabled: true,
+    dingtalkClientId: 'ding-client',
     discordLoginEnabled: true,
     facebookLoginEnabled: true,
     githubLoginEnabled: true,
@@ -120,8 +121,23 @@ jest.mock('react-router-dom', () => ({
   }),
 }));
 
+beforeEach(() => {
+  window.DTFrameLogin = jest.fn();
+});
+
+afterEach(() => {
+  delete window.DTFrameLogin;
+});
+
 test('renders DingTalk login by default and keeps email login behind an admin entry', async () => {
-  const { getByLabelText, getByRole, queryByLabelText, queryByRole } = setup({
+  const dingtalkFrameLogin = window.DTFrameLogin as jest.Mock;
+  const {
+    getByLabelText,
+    getByRole,
+    getByTestId: getRenderedByTestId,
+    queryByLabelText,
+    queryByRole,
+  } = setup({
     useGetStartupConfigReturnValue: {
       ...mockStartupConfig,
       data: {
@@ -130,10 +146,18 @@ test('renders DingTalk login by default and keeps email login behind an admin en
       },
     },
   });
-  expect(getByRole('link', { name: /钉钉扫码登录/i })).toBeInTheDocument();
-  expect(getByRole('link', { name: /钉钉扫码登录/i })).toHaveAttribute(
-    'href',
-    'mock-server/oauth/dingtalk',
+  expect(getRenderedByTestId('dingtalk-frame-login')).toBeInTheDocument();
+  expect(queryByRole('link', { name: /钉钉扫码登录/i })).not.toBeInTheDocument();
+  await waitFor(() => expect(dingtalkFrameLogin).toHaveBeenCalled());
+  expect(dingtalkFrameLogin).toHaveBeenCalledWith(
+    expect.objectContaining({ id: expect.stringMatching(/^dingtalk-frame-login-/) }),
+    expect.objectContaining({
+      client_id: 'ding-client',
+      response_type: 'code',
+      scope: 'openid',
+    }),
+    expect.any(Function),
+    expect.any(Function),
   );
   expect(queryByLabelText(/email/i)).not.toBeInTheDocument();
   expect(queryByLabelText(/password/i)).not.toBeInTheDocument();

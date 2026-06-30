@@ -6,6 +6,7 @@ import {
   ResetPassword,
   ApiErrorWatcher,
   TwoFactorScreen,
+  DingTalkOAuthBridge,
   RequestPasswordReset,
 } from '~/components/Auth';
 import { MarketplaceProvider } from '~/components/Agents/MarketplaceContext';
@@ -82,6 +83,10 @@ export const router = createBrowserRouter(
         {
           path: 'error',
           element: <OAuthError />,
+        },
+        {
+          path: 'dingtalk/callback',
+          element: <DingTalkOAuthBridge />,
         },
       ],
     },

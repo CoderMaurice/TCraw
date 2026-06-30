@@ -226,6 +226,8 @@ describe('GET /api/config', () => {
       const response = await request(app).get('/api/config');
 
       expect(response.body.dingtalkLoginEnabled).toBe(true);
+      expect(response.body.dingtalkClientId).toBe('ding-client');
+      expect(response.body).not.toHaveProperty('dingtalkClientSecret');
       expect(response.body.socialLogins).toEqual(['dingtalk', 'google', 'github']);
     });
 

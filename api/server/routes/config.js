@@ -72,6 +72,7 @@ function buildPreLoginPayload() {
     googleLoginEnabled: !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET,
     dingtalkLoginEnabled:
       !!process.env.DINGTALK_CLIENT_ID && !!process.env.DINGTALK_CLIENT_SECRET,
+    dingtalkClientId: process.env.DINGTALK_CLIENT_ID,
     appleLoginEnabled:
       !!process.env.APPLE_CLIENT_ID &&
       !!process.env.APPLE_TEAM_ID &&
