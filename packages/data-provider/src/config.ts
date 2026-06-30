@@ -17,7 +17,15 @@ import { FileSources } from './types/files';
 import { MCPServersSchema } from './mcp';
 export { MAX_SUBAGENTS } from './limits';
 
-export const defaultSocialLogins = ['google', 'facebook', 'openid', 'github', 'discord', 'saml'];
+export const defaultSocialLogins = [
+  'dingtalk',
+  'google',
+  'facebook',
+  'openid',
+  'github',
+  'discord',
+  'saml',
+];
 
 export const BASE_ONLY_CONFIG_SECTIONS = [] as const;
 
@@ -1369,6 +1377,7 @@ export type TStartupConfig = {
   facebookLoginEnabled: boolean;
   githubLoginEnabled: boolean;
   googleLoginEnabled: boolean;
+  dingtalkLoginEnabled: boolean;
   openidLoginEnabled: boolean;
   appleLoginEnabled: boolean;
   samlLoginEnabled: boolean;

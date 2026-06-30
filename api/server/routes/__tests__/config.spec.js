@@ -96,6 +96,8 @@ afterEach(() => {
   delete process.env.GITHUB_CLIENT_SECRET;
   delete process.env.DISCORD_CLIENT_ID;
   delete process.env.DISCORD_CLIENT_SECRET;
+  delete process.env.DINGTALK_CLIENT_ID;
+  delete process.env.DINGTALK_CLIENT_SECRET;
   delete process.env.SAML_ENTRY_POINT;
   delete process.env.SAML_ISSUER;
   delete process.env.SAML_CERT;
@@ -213,6 +215,18 @@ describe('GET /api/config', () => {
 
       expect(response.body.socialLogins).toEqual(['google', 'github']);
       expect(response.body.turnstile).toEqual({ siteKey: 'test-key' });
+    });
+
+    it('should enable DingTalk login when DingTalk OAuth credentials are configured', async () => {
+      process.env.DINGTALK_CLIENT_ID = 'ding-client';
+      process.env.DINGTALK_CLIENT_SECRET = 'ding-secret';
+      mockGetAppConfig.mockResolvedValue(baseAppConfig);
+      const app = createApp(null);
+
+      const response = await request(app).get('/api/config');
+
+      expect(response.body.dingtalkLoginEnabled).toBe(true);
+      expect(response.body.socialLogins).toEqual(['dingtalk', 'google', 'github']);
     });
 
     it('should include only privacyPolicy and termsOfService from interface config', async () => {

@@ -89,6 +89,9 @@ const userSchema: Schema<IUser> = new Schema<IUser>(
     discordId: {
       type: String,
     },
+    dingtalkId: {
+      type: String,
+    },
     appleId: {
       type: String,
     },
@@ -178,6 +181,7 @@ const oAuthIdFields = [
   'ldapId',
   'githubId',
   'discordId',
+  'dingtalkId',
   'appleId',
 ] as const;
 

@@ -70,6 +70,8 @@ function buildPreLoginPayload() {
     facebookLoginEnabled: !!process.env.FACEBOOK_CLIENT_ID && !!process.env.FACEBOOK_CLIENT_SECRET,
     githubLoginEnabled: !!process.env.GITHUB_CLIENT_ID && !!process.env.GITHUB_CLIENT_SECRET,
     googleLoginEnabled: !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET,
+    dingtalkLoginEnabled:
+      !!process.env.DINGTALK_CLIENT_ID && !!process.env.DINGTALK_CLIENT_SECRET,
     appleLoginEnabled:
       !!process.env.APPLE_CLIENT_ID &&
       !!process.env.APPLE_TEAM_ID &&
@@ -104,6 +106,15 @@ function buildPreLoginPayload() {
   }
 
   return payload;
+}
+
+function buildSocialLogins(configuredSocialLogins, preLoginPayload) {
+  const socialLogins = configuredSocialLogins ?? defaultSocialLogins;
+  if (!preLoginPayload.dingtalkLoginEnabled || socialLogins.includes('dingtalk')) {
+    return socialLogins;
+  }
+
+  return ['dingtalk', ...socialLogins];
 }
 
 /**
@@ -215,7 +226,7 @@ router.get('/', async function (req, res) {
       /** @type {Partial<TStartupConfig>} */
       const payload = {
         ...preLoginPayload,
-        socialLogins: baseConfig?.registration?.socialLogins ?? defaultSocialLogins,
+        socialLogins: buildSocialLogins(baseConfig?.registration?.socialLogins, preLoginPayload),
         turnstile: baseConfig?.turnstileConfig,
         ...(rum ? { rum } : {}),
       };
@@ -258,7 +269,7 @@ router.get('/', async function (req, res) {
       ...publicSharePayload,
       ...buildPostLoginPayload(),
       sharedLinksSnapshotFilesEnabled: sharedLinksEnabled && isFileSnapshotEnabled(appConfig),
-      socialLogins: appConfig?.registration?.socialLogins ?? defaultSocialLogins,
+      socialLogins: buildSocialLogins(appConfig?.registration?.socialLogins, preLoginPayload),
       interface: appConfig?.interfaceConfig,
       titleGenerationTiming: resolveTitleTiming({
         appConfig,

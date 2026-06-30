@@ -27,6 +27,7 @@ export interface IUser extends Document {
   ldapId?: string;
   githubId?: string;
   discordId?: string;
+  dingtalkId?: string;
   appleId?: string;
   plugins?: string[];
   openidIssuer?: string;
@@ -120,6 +121,7 @@ export interface UserFilterOptions extends CursorPaginationParams {
   ldapId?: string;
   githubId?: string;
   discordId?: string;
+  dingtalkId?: string;
   appleId?: string;
   // Date filters
   createdAfter?: string;

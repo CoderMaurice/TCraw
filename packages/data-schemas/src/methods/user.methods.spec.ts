@@ -52,6 +52,21 @@ describe('User schema indexes', () => {
     );
   });
 
+  test('should define a unique DingTalk ID index', async () => {
+    await User.syncIndexes();
+
+    const indexes = await User.collection.indexes();
+
+    expect(indexes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: { dingtalkId: 1, tenantId: 1 },
+          unique: true,
+        }),
+      ]),
+    );
+  });
+
   test('should allow the same OpenID subject from different issuers', async () => {
     await User.syncIndexes();
 
@@ -95,6 +110,20 @@ describe('User Methods - Database Tests', () => {
 
       expect(found).toBeDefined();
       expect(found?.email).toBe('test@example.com');
+    });
+
+    test('should find user by DingTalk ID', async () => {
+      await User.create({
+        name: 'DingTalk User',
+        email: 'dingtalk_user@example.com',
+        provider: 'dingtalk',
+        dingtalkId: 'union-id-123',
+      });
+
+      const found = await methods.findUser({ dingtalkId: 'union-id-123' });
+
+      expect(found).toBeDefined();
+      expect(found?.email).toBe('dingtalk_user@example.com');
     });
 
     test('should find user by email with different case (case-insensitive)', async () => {

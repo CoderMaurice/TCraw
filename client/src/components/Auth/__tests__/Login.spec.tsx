@@ -17,6 +17,7 @@ const mockStartupConfig = {
   isError: false,
   data: {
     socialLogins: ['google', 'facebook', 'openid', 'github', 'discord', 'saml'],
+    dingtalkLoginEnabled: true,
     discordLoginEnabled: true,
     facebookLoginEnabled: true,
     githubLoginEnabled: true,
@@ -119,13 +120,35 @@ jest.mock('react-router-dom', () => ({
   }),
 }));
 
-test('renders login form', () => {
-  const { getByLabelText, getByRole } = setup();
+test('renders DingTalk login by default and keeps email login behind an admin entry', async () => {
+  const { getByLabelText, getByRole, queryByLabelText, queryByRole } = setup({
+    useGetStartupConfigReturnValue: {
+      ...mockStartupConfig,
+      data: {
+        ...mockStartupConfig.data,
+        socialLogins: ['dingtalk'],
+      },
+    },
+  });
+  expect(getByRole('link', { name: /钉钉扫码登录/i })).toBeInTheDocument();
+  expect(getByRole('link', { name: /钉钉扫码登录/i })).toHaveAttribute(
+    'href',
+    'mock-server/oauth/dingtalk',
+  );
+  expect(queryByLabelText(/email/i)).not.toBeInTheDocument();
+  expect(queryByLabelText(/password/i)).not.toBeInTheDocument();
+  expect(queryByRole('button', { name: /Continue/i })).not.toBeInTheDocument();
+  expect(queryByRole('link', { name: /Sign up/i })).not.toBeInTheDocument();
+
+  await userEvent.click(getByRole('button', { name: /邮箱密码登录/i }));
+
   expect(getByLabelText(/email/i)).toBeInTheDocument();
   expect(getByLabelText(/password/i)).toBeInTheDocument();
   expect(getByTestId(document.body, 'login-button')).toBeInTheDocument();
-  expect(getByRole('link', { name: /Sign up/i })).toBeInTheDocument();
-  expect(getByRole('link', { name: /Sign up/i })).toHaveAttribute('href', '/register');
+});
+
+test('renders configured social login links', () => {
+  const { getByRole } = setup();
   expect(getByRole('link', { name: /Continue with Google/i })).toBeInTheDocument();
   expect(getByRole('link', { name: /Continue with Google/i })).toHaveAttribute(
     'href',
@@ -155,7 +178,7 @@ test('renders login form', () => {
 
 test('calls loginUser.mutate on login', async () => {
   const mutate = jest.fn();
-  const { getByLabelText } = setup({
+  const { getByLabelText, getByRole } = setup({
     // @ts-ignore - we don't need all parameters of the QueryObserverResult
     useLoginUserReturnValue: {
       isLoading: false,
@@ -163,6 +186,8 @@ test('calls loginUser.mutate on login', async () => {
       isError: false,
     },
   });
+
+  await userEvent.click(getByRole('button', { name: /邮箱密码登录/i }));
 
   const emailInput = getByLabelText(/email/i);
   const passwordInput = getByLabelText(/password/i);
@@ -176,7 +201,7 @@ test('calls loginUser.mutate on login', async () => {
 });
 
 test('Navigates to / on successful login', async () => {
-  const { getByLabelText } = setup({
+  const { getByLabelText, getByRole } = setup({
     // @ts-ignore - we don't need all parameters of the QueryObserverResult
     useLoginUserReturnValue: {
       isLoading: false,
@@ -193,6 +218,8 @@ test('Navigates to / on successful login', async () => {
       },
     },
   });
+
+  await userEvent.click(getByRole('button', { name: /邮箱密码登录/i }));
 
   const emailInput = getByLabelText(/email/i);
   const passwordInput = getByLabelText(/password/i);
