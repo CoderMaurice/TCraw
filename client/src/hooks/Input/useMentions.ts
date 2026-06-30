@@ -20,7 +20,7 @@ import {
 } from '~/data-provider';
 import useAssistantListMap from '~/hooks/Assistants/useAssistantListMap';
 import { useAgentsMapContext } from '~/Providers/AgentsMapContext';
-import { mapEndpoints, getPresetTitle } from '~/utils';
+import { mapEndpoints, getPresetTitle, resolveAppAssetUrl } from '~/utils';
 import { EndpointIcon } from '~/components/Endpoints';
 import useHasAccess from '~/hooks/Roles/useHasAccess';
 import { filterMentionEndpoints } from './mentions';
@@ -116,7 +116,7 @@ export default function useMentions({
             conversation: {
               agent_id: id,
               endpoint: EModelEndpoint.agents,
-              iconURL: avatar?.filepath,
+              iconURL: avatar?.filepath ? resolveAppAssetUrl(avatar.filepath) : avatar?.filepath,
             },
             containerClassName: 'shadow-stroke overflow-hidden rounded-full',
             endpointsConfig: endpointsConfig,

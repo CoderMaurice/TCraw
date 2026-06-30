@@ -3,6 +3,7 @@ import * as Ariakit from '@ariakit/react';
 import { DropdownPopup, Skeleton } from '@librechat/client';
 import type { MenuItemProps } from '~/common/menus';
 import { useLocalize } from '~/hooks';
+import { resolveAppAssetUrl } from '~/utils';
 
 export function NoImage() {
   return (
@@ -28,21 +29,23 @@ export function NoImage() {
 
 export const AgentAvatarRender = ({ url }: { url?: string }) => {
   const [isLoaded, setIsLoaded] = useState(false);
+  const resolvedUrl = url ? resolveAppAssetUrl(url) : url;
+
   useEffect(() => {
     setIsLoaded(false);
-  }, [url]);
+  }, [resolvedUrl]);
 
   return (
     <div>
       <div className="relative h-20 w-20 overflow-hidden rounded-full">
         <img
-          src={url}
+          src={resolvedUrl}
           className="bg-token-surface-secondary dark:bg-token-surface-tertiary h-full w-full rounded-full object-cover"
           alt="Agent avatar"
           width="80"
           height="80"
           loading="lazy"
-          key={url || 'default-key'}
+          key={resolvedUrl || 'default-key'}
           onLoad={() => setIsLoaded(true)}
           onError={() => setIsLoaded(false)}
           style={{

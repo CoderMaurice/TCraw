@@ -3,6 +3,33 @@ import { Feather } from 'lucide-react';
 import { Skeleton } from '@librechat/client';
 import type t from 'librechat-data-provider';
 
+export const resolveAppAssetUrl = (url: string): string => {
+  if (!url.startsWith('/images/')) {
+    return url;
+  }
+
+  if (typeof document === 'undefined') {
+    return url;
+  }
+
+  const baseHref = document.querySelector('base')?.getAttribute('href') || '/';
+  let basePath = baseHref;
+
+  try {
+    basePath = new URL(baseHref, window.location.origin).pathname;
+  } catch {
+    // Keep the raw href if URL parsing is unavailable in the current environment.
+  }
+
+  basePath = `/${basePath.split('/').filter(Boolean).join('/')}`;
+
+  if (basePath === '/' || url === basePath || url.startsWith(`${basePath}/`)) {
+    return url;
+  }
+
+  return `${basePath}${url}`;
+};
+
 /**
  * Extracts the avatar URL from an agent's avatar property
  * Handles both string and object formats
@@ -13,11 +40,11 @@ export const getAgentAvatarUrl = (agent: t.Agent | null | undefined): string | n
   }
 
   if (typeof agent.avatar === 'string') {
-    return agent.avatar;
+    return resolveAppAssetUrl(agent.avatar);
   }
 
   if (agent.avatar && typeof agent.avatar === 'object' && 'filepath' in agent.avatar) {
-    return agent.avatar.filepath;
+    return resolveAppAssetUrl(agent.avatar.filepath);
   }
 
   return null;

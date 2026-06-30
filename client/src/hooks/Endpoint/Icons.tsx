@@ -12,7 +12,7 @@ import {
 } from '@librechat/client';
 import type { IconMapProps, AgentIconMapProps, IconsRecord } from '~/common';
 import UnknownIcon from './UnknownIcon';
-import { cn } from '~/utils';
+import { cn, resolveAppAssetUrl } from '~/utils';
 
 const AssistantAvatar = ({
   className = '',
@@ -24,7 +24,7 @@ const AssistantAvatar = ({
   if (assistantName && avatar) {
     return (
       <img
-        src={avatar}
+        src={resolveAppAssetUrl(avatar)}
         className="bg-token-surface-secondary dark:bg-token-surface-tertiary h-full w-full rounded-full object-cover"
         alt={assistantName}
         width="80"
@@ -42,7 +42,7 @@ const AgentAvatar = ({ className = '', avatar = '', agentName, size }: AgentIcon
   if (agentName != null && agentName && avatar) {
     return (
       <img
-        src={avatar}
+        src={resolveAppAssetUrl(avatar)}
         className="bg-token-surface-secondary dark:bg-token-surface-tertiary h-full w-full rounded-full object-cover"
         alt={agentName}
         width="80"

@@ -51,6 +51,24 @@ describe('Agent Utilities', () => {
       expect(getAgentAvatarUrl(agent)).toBe('/path/to/object-avatar.png');
     });
 
+    it('should prefix local image avatars with the document base path', () => {
+      const base = document.createElement('base');
+      base.setAttribute('href', '/tcraw/');
+      document.head.appendChild(base);
+
+      const agent = {
+        id: '1',
+        name: 'Test Agent',
+        avatar: { filepath: '/images/user/avatar.png?manual=false' },
+      } as t.Agent;
+
+      try {
+        expect(getAgentAvatarUrl(agent)).toBe('/tcraw/images/user/avatar.png?manual=false');
+      } finally {
+        document.head.removeChild(base);
+      }
+    });
+
     it('should return null for object avatar without filepath', () => {
       const agent = {
         id: '1',
