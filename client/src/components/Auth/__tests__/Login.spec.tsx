@@ -147,6 +147,7 @@ test('renders DingTalk login by default and keeps email login behind an admin en
     },
   });
   expect(getRenderedByTestId('dingtalk-frame-login')).toBeInTheDocument();
+  expect(getByRole('heading', { name: /钉钉扫码登录/i })).toBeInTheDocument();
   expect(queryByRole('link', { name: /钉钉扫码登录/i })).not.toBeInTheDocument();
   await waitFor(() => expect(dingtalkFrameLogin).toHaveBeenCalled());
   expect(dingtalkFrameLogin).toHaveBeenCalledWith(
@@ -164,7 +165,8 @@ test('renders DingTalk login by default and keeps email login behind an admin en
   expect(queryByRole('button', { name: /Continue/i })).not.toBeInTheDocument();
   expect(queryByRole('link', { name: /Sign up/i })).not.toBeInTheDocument();
 
-  await userEvent.click(getByRole('button', { name: /邮箱密码登录/i }));
+  expect(queryByRole('button', { name: /邮箱密码登录/i })).not.toBeInTheDocument();
+  await userEvent.click(getByRole('button', { name: /邮箱登录/i }));
 
   expect(getByLabelText(/email/i)).toBeInTheDocument();
   expect(getByLabelText(/password/i)).toBeInTheDocument();
@@ -211,7 +213,7 @@ test('calls loginUser.mutate on login', async () => {
     },
   });
 
-  await userEvent.click(getByRole('button', { name: /邮箱密码登录/i }));
+  await userEvent.click(getByRole('button', { name: /邮箱登录/i }));
 
   const emailInput = getByLabelText(/email/i);
   const passwordInput = getByLabelText(/password/i);
@@ -243,7 +245,7 @@ test('Navigates to / on successful login', async () => {
     },
   });
 
-  await userEvent.click(getByRole('button', { name: /邮箱密码登录/i }));
+  await userEvent.click(getByRole('button', { name: /邮箱登录/i }));
 
   const emailInput = getByLabelText(/email/i);
   const passwordInput = getByLabelText(/password/i);

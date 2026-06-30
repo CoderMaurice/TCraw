@@ -147,6 +147,9 @@ export default function DingTalkFrameLogin({ clientId }: { clientId: string }) {
 
   return (
     <div className="flex flex-col items-center">
+      <h2 className="mb-4 text-center text-xl font-semibold text-text-primary">
+        {localize('com_auth_dingtalk_login')}
+      </h2>
       <div
         id={containerIdRef.current}
         data-testid="dingtalk-frame-login"
