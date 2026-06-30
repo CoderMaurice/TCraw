@@ -44,7 +44,7 @@ export default function StartupLayout({ isAuthenticated }: { isAuthenticated?: b
   }, [isAuthenticated, navigate, data]);
 
   useEffect(() => {
-    document.title = startupConfig?.appTitle || 'LibreChat';
+    document.title = startupConfig?.appTitle || '致拓企业级数字分身平台';
   }, [startupConfig?.appTitle]);
 
   useEffect(() => {

@@ -80,6 +80,6 @@ describe('buildSharedLinkStartupPayload', () => {
       {},
     );
 
-    expect(payload).toEqual({ appTitle: 'LibreChat' });
+    expect(payload).toEqual({ appTitle: '致拓企业级数字分身平台' });
   });
 });
