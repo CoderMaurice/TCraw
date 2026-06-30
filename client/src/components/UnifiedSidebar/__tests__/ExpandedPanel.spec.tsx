@@ -49,7 +49,9 @@ jest.mock('~/components/Chat/Menus/OpenSidebar', () => ({
 
 jest.mock('~/components/Nav/AccountSettings', () => ({
   __esModule: true,
-  default: () => <div data-testid="account-settings" />,
+  default: ({ collapsed }: { collapsed?: boolean }) => (
+    <div data-testid="account-settings" data-collapsed={String(collapsed)} />
+  ),
 }));
 
 import ExpandedPanel from '../ExpandedPanel';
@@ -123,6 +125,24 @@ describe('ExpandedPanel', () => {
   });
 
   describe('NavIconButton collapse toggle', () => {
+    it('shows the full account control while the sidebar is expanded', async () => {
+      renderPanel({ expanded: true });
+
+      expect(await screen.findByTestId('account-settings')).toHaveAttribute(
+        'data-collapsed',
+        'false',
+      );
+    });
+
+    it('keeps the compact account control while the sidebar is collapsed', async () => {
+      renderPanel({ expanded: false });
+
+      expect(await screen.findByTestId('account-settings')).toHaveAttribute(
+        'data-collapsed',
+        'true',
+      );
+    });
+
     it('collapses sidebar when clicking the active icon while expanded', () => {
       const { onCollapse } = renderPanel({ expanded: true });
       const activeButton = screen.getByRole('button', { name: 'com_ui_chat_history' });

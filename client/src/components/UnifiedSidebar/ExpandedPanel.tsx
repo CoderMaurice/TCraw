@@ -205,8 +205,12 @@ function ExpandedPanel({
       </div>
 
       <div className="mt-auto">
-        <Suspense fallback={<Skeleton className="h-9 w-9 rounded-lg" />}>
-          <AccountSettings collapsed />
+        <Suspense
+          fallback={
+            <Skeleton className={expanded ? 'h-12 w-full rounded-xl' : 'h-9 w-9 rounded-lg'} />
+          }
+        >
+          <AccountSettings collapsed={!expanded} />
         </Suspense>
       </div>
     </div>
