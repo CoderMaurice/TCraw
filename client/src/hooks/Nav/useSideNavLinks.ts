@@ -4,9 +4,7 @@ import { MCPIcon, AttachmentIcon, OpenAIMinimalIcon } from '@librechat/client';
 import {
   Bot,
   Brain,
-  Bookmark,
   Library,
-  NotebookPen,
   ScrollText,
   ArrowRightToLine,
   SlidersHorizontal,
@@ -29,12 +27,10 @@ import {
 } from '~/hooks';
 import MCPBuilderPanel from '~/components/SidePanel/MCPBuilder/MCPBuilderPanel';
 import AgentPanelSwitch from '~/components/SidePanel/Agents/AgentPanelSwitch';
-import BookmarkPanel from '~/components/SidePanel/Bookmarks/BookmarkPanel';
 import PanelSwitch from '~/components/SidePanel/Builder/PanelSwitch';
 import Parameters from '~/components/SidePanel/Parameters/Panel';
 import { MemoryPanel } from '~/components/SidePanel/Memories';
 import FilesPanel from '~/components/SidePanel/Files/Panel';
-import { PromptsAccordion } from '~/components/Prompts';
 import { SkillsAccordion } from '~/components/Skills';
 
 export default function useSideNavLinks({
@@ -55,20 +51,12 @@ export default function useSideNavLinks({
   includeHidePanel?: boolean;
 }) {
   const navigate = useNavigate();
-  const hasAccessToPrompts = useHasAccess({
-    permissionType: PermissionTypes.PROMPTS,
-    permission: Permissions.USE,
-  });
   const hasAccessToSkills = useHasAccess({
     permissionType: PermissionTypes.SKILLS,
     permission: Permissions.USE,
   });
   const hasAccessToKnowledgeBases = useHasAccess({
     permissionType: PermissionTypes.KNOWLEDGE_BASES,
-    permission: Permissions.USE,
-  });
-  const hasAccessToBookmarks = useHasAccess({
-    permissionType: PermissionTypes.BOOKMARKS,
     permission: Permissions.USE,
   });
   const hasAccessToMemories = useHasAccess({
@@ -147,16 +135,6 @@ export default function useSideNavLinks({
       });
     }
 
-    if (hasAccessToPrompts) {
-      links.push({
-        title: 'com_ui_prompts',
-        label: '',
-        icon: NotebookPen,
-        id: 'prompts',
-        Component: PromptsAccordion,
-      });
-    }
-
     if (hasAccessToKnowledgeBases) {
       links.push({
         title: 'com_ui_knowledge_bases',
@@ -175,16 +153,6 @@ export default function useSideNavLinks({
         icon: Brain,
         id: 'memories',
         Component: MemoryPanel,
-      });
-    }
-
-    if (hasAccessToBookmarks) {
-      links.push({
-        title: 'com_sidepanel_conversation_tags',
-        label: '',
-        icon: Bookmark,
-        id: 'bookmarks',
-        Component: BookmarkPanel,
       });
     }
 
@@ -242,7 +210,6 @@ export default function useSideNavLinks({
     navigate,
     hasAccessToAgents,
     hasAccessToCreateAgents,
-    hasAccessToPrompts,
     hasAccessToSkills,
     hasAccessToKnowledgeBases,
     skillsEnabled,
@@ -250,7 +217,6 @@ export default function useSideNavLinks({
     hasAccessToReadMemories,
     interfaceConfig.parameters,
     endpointType,
-    hasAccessToBookmarks,
     availableMCPServers,
     hasAccessToUseMCPSettings,
     hasAccessToCreateMCP,
