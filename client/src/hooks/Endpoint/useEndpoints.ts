@@ -22,6 +22,7 @@ import { mapEndpoints, getIconKey, resolveAppAssetUrl } from '~/utils';
 import { icons } from './Icons';
 
 const defaultInterface = getConfigDefaults().interface;
+const visibleEndpointValues = new Set<string>(['ZT', EModelEndpoint.agents]);
 
 export const useEndpoints = ({
   agents,
@@ -64,6 +65,9 @@ export const useEndpoints = ({
     }
     const result: EModelEndpoint[] = [];
     for (let i = 0; i < endpoints.length; i++) {
+      if (!visibleEndpointValues.has(endpoints[i])) {
+        continue;
+      }
       if (endpoints[i] === EModelEndpoint.agents && !hasAgentAccess) {
         continue;
       }
