@@ -10,6 +10,7 @@ import {
 import English from './en/translation.json';
 import Spanish from './es/translation.json';
 import French from './fr/translation.json';
+import ChineseSimplified from './zh-Hans/translation.json';
 import { TranslationKeys } from '~/hooks';
 import i18n from './i18n';
 
@@ -66,6 +67,15 @@ describe('i18next translation tests', () => {
 
     await changeLanguageSafely('fr');
     expect(i18n.t('com_endpoint_default_with_num', { 0: 'Marie' })).toBe('par défaut : Marie');
+  });
+
+  it('should localize unified sidebar and skill management labels in Simplified Chinese', () => {
+    expect(ChineseSimplified.com_ui_chat_history).toBe('我的会话');
+    expect(ChineseSimplified.com_ui_skills).toBe('技能');
+    expect(ChineseSimplified.com_ui_my_skills).toBe('我的技能');
+    expect(ChineseSimplified.com_ui_projects).toBe('项目');
+    expect(ChineseSimplified.com_ui_search_skills).toBe('搜索技能...');
+    expect(ChineseSimplified.com_ui_create_skill).toBe('创建技能');
   });
 
   it('should normalize language selector values to locale files', () => {
