@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useRecoilValue } from 'recoil';
-import { MessagesSquare } from 'lucide-react';
+import { LayoutGrid, MessagesSquare } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useUserKeyQuery } from 'librechat-data-provider/react-query';
 import { getConfigDefaults, getEndpointField } from 'librechat-data-provider';
 import type { TEndpointsConfig } from 'librechat-data-provider';
@@ -8,13 +9,16 @@ import type { NavLink } from '~/common';
 import ConversationsSection from '~/components/UnifiedSidebar/ConversationsSection';
 import { useGetEndpointsQuery, useGetStartupConfig } from '~/data-provider';
 import useSideNavLinks from '~/hooks/Nav/useSideNavLinks';
+import { useShowMarketplace } from '~/hooks';
 import store from '~/store';
 
 const defaultInterface = getConfigDefaults().interface;
 
 export default function useUnifiedSidebarLinks() {
+  const navigate = useNavigate();
   const conversation = useRecoilValue(store.conversationByIndex(0));
   const endpoint = conversation?.endpoint;
+  const showAgentMarketplace = useShowMarketplace();
   const { data: startupConfig } = useGetStartupConfig();
   const { data: endpointsConfig = {} as TEndpointsConfig } = useGetEndpointsQuery();
 
@@ -58,8 +62,17 @@ export default function useUnifiedSidebarLinks() {
       Component: ConversationsSection,
     };
 
-    return [conversationLink, ...sideNavLinks];
-  }, [sideNavLinks]);
+    const marketplaceLink: NavLink = {
+      title: 'com_agents_marketplace',
+      label: '',
+      icon: LayoutGrid,
+      id: 'agent-marketplace',
+      activePath: '/agents',
+      onClick: () => navigate('/agents'),
+    };
+
+    return [conversationLink, ...(showAgentMarketplace ? [marketplaceLink] : []), ...sideNavLinks];
+  }, [navigate, showAgentMarketplace, sideNavLinks]);
 
   return links;
 }

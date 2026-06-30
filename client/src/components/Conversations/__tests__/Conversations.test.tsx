@@ -66,12 +66,9 @@ const mockFavoritesState: { favorites: FavoriteEntry[]; isLoading: boolean } = {
   isLoading: false,
 };
 
-let mockShowMarketplace = true;
-
 jest.mock('~/hooks', () => ({
   useFavorites: () => mockFavoritesState,
   useLocalize: () => (key: string) => key,
-  useShowMarketplace: () => mockShowMarketplace,
   useNewConvo: () => ({ newConversation: jest.fn() }),
   useElementSize: () => ({ ref: jest.fn(), width: 300, height: 600 }),
   TranslationKeys: {},
@@ -115,7 +112,6 @@ describe('Conversations – favorites CellMeasurerCache key invalidation', () =>
     mockCapturedCache = null;
     mockFavoritesState.favorites = [];
     mockFavoritesState.isLoading = false;
-    mockShowMarketplace = true;
   });
 
   const Wrapper = () => (
@@ -163,20 +159,6 @@ describe('Conversations – favorites CellMeasurerCache key invalidation', () =>
     expect(cache.has(0, 0)).toBe(false);
   });
 
-  it('should invalidate the cached favorites height when marketplace visibility changes', () => {
-    mockFavoritesState.favorites = [{ model: 'gpt-4', endpoint: 'openAI' }];
-    const { rerender } = render(<Wrapper />);
-    const cache = mockCapturedCache!;
-
-    cache.set(0, 0, 300, 48);
-    expect(cache.has(0, 0)).toBe(true);
-
-    mockShowMarketplace = false;
-    rerender(<Wrapper />);
-
-    expect(cache.has(0, 0)).toBe(false);
-  });
-
   it('should retain the cached favorites height when content state is unchanged', () => {
     mockFavoritesState.favorites = [{ model: 'gpt-4', endpoint: 'openAI' }];
     const { rerender } = render(<Wrapper />);
@@ -209,7 +191,6 @@ describe('Conversations – pinned header', () => {
     mockCapturedCache = null;
     mockFavoritesState.favorites = [];
     mockFavoritesState.isLoading = false;
-    mockShowMarketplace = false;
   });
 
   const renderConversations = (conversations: TConversation[], searchQuery = '') =>

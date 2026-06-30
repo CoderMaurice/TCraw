@@ -7,14 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { List, CellMeasurer, CellMeasurerCache } from 'react-virtualized';
 import { Spinner, TooltipAnchor, NewChatIcon, useMediaQuery } from '@librechat/client';
 import type { TConversation } from 'librechat-data-provider';
-import {
-  useLocalize,
-  TranslationKeys,
-  useFavorites,
-  useShowMarketplace,
-  useNewConvo,
-  useElementSize,
-} from '~/hooks';
+import { useLocalize, TranslationKeys, useFavorites, useNewConvo, useElementSize } from '~/hooks';
 import { groupConversationsByDate, clearMessagesCache, cn } from '~/utils';
 import FavoritesList from '~/components/Nav/Favorites/FavoritesList';
 import { useActiveJobs } from '~/data-provider';
@@ -191,7 +184,6 @@ const Conversations: FC<ConversationsProps> = ({
   const { favorites, isLoading: isFavoritesLoading } = useFavorites();
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
   const convoHeight = isSmallScreen ? 44 : 34;
-  const showAgentMarketplace = useShowMarketplace();
   const {
     ref: listContainerRef,
     width: listWidth,
@@ -209,11 +201,9 @@ const Conversations: FC<ConversationsProps> = ({
 
   // Determine if FavoritesList will render content
   const shouldShowFavorites =
-    showFavorites &&
-    !search.query &&
-    (isFavoritesLoading || favorites.length > 0 || showAgentMarketplace);
+    showFavorites && !search.query && (isFavoritesLoading || favorites.length > 0);
 
-  favoritesContentKeyRef.current = `${favorites.length}-${showAgentMarketplace ? 1 : 0}-${isFavoritesLoading ? 1 : 0}`;
+  favoritesContentKeyRef.current = `${favorites.length}-${isFavoritesLoading ? 1 : 0}`;
 
   const filteredConversations = useMemo(
     () => rawConversations.filter(Boolean) as TConversation[],
@@ -318,7 +308,7 @@ const Conversations: FC<ConversationsProps> = ({
       clearFavoritesCache();
     });
     return () => cancelAnimationFrame(frameId);
-  }, [favorites.length, isFavoritesLoading, showAgentMarketplace, clearFavoritesCache]);
+  }, [favorites.length, isFavoritesLoading, clearFavoritesCache]);
 
   useEffect(() => {
     const frameId = requestAnimationFrame(() => {

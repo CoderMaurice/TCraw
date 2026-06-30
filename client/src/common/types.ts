@@ -130,6 +130,7 @@ export type NavLink = {
   icon: LucideIcon | React.FC;
   Component?: React.ComponentType;
   onClick?: (e?: React.MouseEvent) => void;
+  activePath?: string;
   variant?: 'default' | 'ghost';
   id: string;
 };

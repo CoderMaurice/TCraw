@@ -163,6 +163,7 @@ export default function useSideNavLinks({
         label: '',
         icon: Library,
         id: 'knowledge',
+        activePath: '/knowledge',
         onClick: () => navigate('/knowledge'),
       });
     }

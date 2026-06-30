@@ -1,7 +1,8 @@
 import React from 'react';
 import { RecoilRoot } from 'recoil';
 import '@testing-library/jest-dom/extend-expect';
-import { MessagesSquare, NotebookPen } from 'lucide-react';
+import { LayoutGrid, MessagesSquare, NotebookPen } from 'lucide-react';
+import { MemoryRouter } from 'react-router-dom';
 import { render, fireEvent, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { MutableSnapshot } from 'recoil';
@@ -65,6 +66,13 @@ const createLinks = () => [
     icon: NotebookPen,
     id: 'prompts',
   },
+  {
+    title: 'com_agents_marketplace' as const,
+    icon: LayoutGrid,
+    id: 'agent-marketplace',
+    activePath: '/agents',
+    onClick: jest.fn(),
+  },
 ];
 
 const createQueryClient = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -74,12 +82,14 @@ function renderPanel({
   onCollapse = jest.fn(),
   onExpand = jest.fn(),
   initialPanel = DEFAULT_PANEL,
+  route = '/',
   initializeState,
 }: {
   expanded?: boolean;
   onCollapse?: jest.Mock;
   onExpand?: jest.Mock;
   initialPanel?: string;
+  route?: string;
   initializeState?: (snapshot: MutableSnapshot) => void;
 } = {}) {
   if (initialPanel !== DEFAULT_PANEL) {
@@ -88,16 +98,18 @@ function renderPanel({
 
   const result = render(
     <QueryClientProvider client={createQueryClient()}>
-      <RecoilRoot initializeState={initializeState}>
-        <ActivePanelProvider>
-          <ExpandedPanel
-            links={createLinks()}
-            expanded={expanded}
-            onCollapse={onCollapse}
-            onExpand={onExpand}
-          />
-        </ActivePanelProvider>
-      </RecoilRoot>
+      <MemoryRouter initialEntries={[route]}>
+        <RecoilRoot initializeState={initializeState}>
+          <ActivePanelProvider>
+            <ExpandedPanel
+              links={createLinks()}
+              expanded={expanded}
+              onCollapse={onCollapse}
+              onExpand={onExpand}
+            />
+          </ActivePanelProvider>
+        </RecoilRoot>
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 
@@ -139,6 +151,19 @@ describe('ExpandedPanel', () => {
       fireEvent.click(inactiveButton);
       expect(onExpand).toHaveBeenCalledTimes(1);
       expect(localStorage.getItem('side:active-panel')).toBe('prompts');
+    });
+
+    it('marks route links active from the current URL', () => {
+      renderPanel({ expanded: true, route: '/agents' });
+
+      expect(screen.getByRole('button', { name: 'com_agents_marketplace' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      expect(screen.getByRole('button', { name: 'com_ui_chat_history' })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      );
     });
   });
 

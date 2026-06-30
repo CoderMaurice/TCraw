@@ -1,6 +1,7 @@
 import { memo, useCallback, lazy, Suspense } from 'react';
 import { useRecoilValue } from 'recoil';
 import { SquarePen } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { QueryKeys } from 'librechat-data-provider';
 import { useQueryClient } from '@tanstack/react-query';
 import { Skeleton, Sidebar, Button, TooltipAnchor } from '@librechat/client';
@@ -15,8 +16,10 @@ import store from '~/store';
 const AccountSettings = lazy(() => import('~/components/Nav/AccountSettings'));
 
 const NewChatButton = memo(function NewChatButton({
+  expanded,
   setActive,
 }: {
+  expanded: boolean;
   setActive: (id: string) => void;
 }) {
   const localize = useLocalize();
@@ -52,10 +55,16 @@ const NewChatButton = memo(function NewChatButton({
           data-testid="new-chat-button"
           aria-label={localize('com_ui_new_chat')}
           aria-keyshortcuts={ariaKey}
-          className="flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-surface-hover"
+          className={cn(
+            'flex h-9 items-center rounded-lg text-sm font-medium transition-colors hover:bg-surface-hover',
+            expanded ? 'w-full justify-start gap-3 px-3 text-text-primary' : 'w-9 justify-center',
+          )}
           onClick={handleClick}
         >
-          <SquarePen className="h-5 w-5 text-text-primary" />
+          <SquarePen className="h-5 w-5 flex-shrink-0 text-text-primary" />
+          {expanded ? (
+            <span className="min-w-0 truncate">{localize('com_ui_new_chat')}</span>
+          ) : null}
         </a>
       }
     />
@@ -105,18 +114,20 @@ const NavIconButton = memo(function NavIconButton({
       side="right"
       render={
         <Button
-          size="icon"
+          size={expanded ? 'default' : 'icon'}
           variant="ghost"
           aria-label={localize(link.title)}
           aria-pressed={isActive}
           data-testid={`nav-panel-${link.id}`}
           className={cn(
-            'h-9 w-9 rounded-lg',
+            'h-9 rounded-lg text-sm font-medium',
+            expanded ? 'w-full justify-start gap-3 px-3' : 'w-9 justify-center',
             isActive ? 'bg-surface-active-alt text-text-primary' : 'text-text-secondary',
           )}
           onClick={handleClick}
         >
-          <link.icon className="h-5 w-5" aria-hidden="true" />
+          <link.icon className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
+          {expanded ? <span className="min-w-0 truncate">{localize(link.title)}</span> : null}
         </Button>
       }
     />
@@ -135,6 +146,7 @@ function ExpandedPanel({
   onExpand?: () => void;
 }) {
   const localize = useLocalize();
+  const location = useLocation();
   const { active, setActive } = useActivePanel();
   const effectiveActive = resolveActivePanel(active, links);
 
@@ -142,9 +154,21 @@ function ExpandedPanel({
   const toggleClick = expanded ? onCollapse : onExpand;
   const toggleSidebarHint = useShortcutHint('toggleSidebar', localize(toggleLabel));
   const toggleSidebarAriaKey = useShortcutAriaKey('toggleSidebar');
+  const isRouteActive = useCallback(
+    (link: NavLink) => {
+      return Boolean(link.activePath && location.pathname.startsWith(link.activePath));
+    },
+    [location.pathname],
+  );
+  const routeActiveId = links.find((link) => link.onClick && isRouteActive(link))?.id;
 
   return (
-    <div className="flex h-full flex-shrink-0 flex-col gap-2 border-r border-border-light bg-surface-primary-alt px-2 py-2">
+    <div
+      className={cn(
+        'flex h-full flex-shrink-0 flex-col gap-2 border-r border-border-light bg-surface-primary-alt px-2 py-2',
+        expanded ? 'w-48' : 'w-[52px]',
+      )}
+    >
       <TooltipAnchor
         side="right"
         description={toggleSidebarHint}
@@ -164,14 +188,14 @@ function ExpandedPanel({
           </Button>
         }
       />
-      <NewChatButton setActive={setActive} />
+      <NewChatButton expanded={expanded} setActive={setActive} />
       <div className="mx-2 border-b border-border-light" />
       <div className="flex flex-col gap-1 overflow-y-auto">
         {links.map((link) => (
           <NavIconButton
             key={link.id}
             link={link}
-            isActive={link.id === effectiveActive}
+            isActive={routeActiveId ? link.id === routeActiveId : link.id === effectiveActive}
             expanded={expanded ?? true}
             setActive={setActive}
             onExpand={onExpand}
