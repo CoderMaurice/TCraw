@@ -7,6 +7,7 @@ import {
   useUploadKnowledgeBaseDocumentsMutation,
 } from '~/data-provider';
 import { useLocalize } from '~/hooks';
+import type { TranslationKeys } from '~/hooks';
 
 type KnowledgeBaseDocumentsProps = {
   id: string;
@@ -26,6 +27,12 @@ function formatBytes(bytes: number) {
   }
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+const documentStatusLabelKeys: Record<KnowledgeBaseDocument['status'], TranslationKeys> = {
+  processing: 'com_ui_knowledge_base_status_processing',
+  ready: 'com_ui_knowledge_base_status_ready',
+  failed: 'com_ui_knowledge_base_status_failed',
+};
 
 export default function KnowledgeBaseDocuments({
   id,
@@ -134,7 +141,9 @@ export default function KnowledgeBaseDocuments({
                 <FileText className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden="true" />
                 <span className="truncate text-text-primary">{document.filename}</span>
               </span>
-              <span className="truncate text-text-secondary">{document.status}</span>
+              <span className="truncate text-text-secondary">
+                {localize(documentStatusLabelKeys[document.status])}
+              </span>
               <span className="truncate text-text-secondary">{formatBytes(document.bytes)}</span>
               <Button
                 type="button"
