@@ -1,7 +1,7 @@
 import reactRouter from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import type { TStartupConfig } from 'librechat-data-provider';
-import { getByTestId, render, waitFor } from 'test/layout-test-utils';
+import { act, getByTestId, render, waitFor } from 'test/layout-test-utils';
 import * as endpointQueries from '~/data-provider/Endpoints/queries';
 import * as miscDataProvider from '~/data-provider/Misc/queries';
 import * as authMutations from '~/data-provider/Auth/mutations';
@@ -171,6 +171,27 @@ test('renders DingTalk login by default and keeps email login behind an admin en
   expect(getByLabelText(/email/i)).toBeInTheDocument();
   expect(getByLabelText(/password/i)).toBeInTheDocument();
   expect(getByTestId(document.body, 'login-button')).toBeInTheDocument();
+});
+
+test('does not show a load failure when the DingTalk QR code expires', async () => {
+  const dingtalkFrameLogin = window.DTFrameLogin as jest.Mock;
+  const { queryByText } = setup({
+    useGetStartupConfigReturnValue: {
+      ...mockStartupConfig,
+      data: {
+        ...mockStartupConfig.data,
+        socialLogins: ['dingtalk'],
+      },
+    },
+  });
+
+  await waitFor(() => expect(dingtalkFrameLogin).toHaveBeenCalled());
+
+  act(() => {
+    dingtalkFrameLogin.mock.calls[0][3]('二维码已失效');
+  });
+
+  expect(queryByText(/钉钉扫码登录加载失败/i)).not.toBeInTheDocument();
 });
 
 test('renders configured social login links', () => {

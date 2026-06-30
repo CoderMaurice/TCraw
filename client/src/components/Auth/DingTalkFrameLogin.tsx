@@ -127,9 +127,7 @@ export default function DingTalkFrameLogin({ clientId }: { clientId: string }) {
               window.location.href = redirectUrl;
             }
           },
-          () => {
-            setError(true);
-          },
+          () => {},
         );
       } catch {
         if (!cancelled) {
