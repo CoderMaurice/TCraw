@@ -4,12 +4,7 @@
 
 const mongoose = require('mongoose');
 const { logger, getTenantId, SYSTEM_TENANT_ID } = require('@librechat/data-schemas');
-const {
-  ResourceType,
-  PrincipalType,
-  PermissionBits,
-  AccessRoleIds,
-} = require('librechat-data-provider');
+const { ResourceType, PrincipalType, PermissionBits } = require('librechat-data-provider');
 const { enrichRemoteAgentPrincipals, backfillRemoteAgentPermissions } = require('@librechat/api');
 const {
   bulkUpdateResourcePermissions,
@@ -31,70 +26,6 @@ const matchesCurrentTenant = (principal, tenantId) => {
     return true;
   }
   return principal?.tenantId === tenantId;
-};
-
-const publicAgentRolePairs = {
-  [AccessRoleIds.AGENT_VIEWER]: AccessRoleIds.REMOTE_AGENT_VIEWER,
-  [AccessRoleIds.AGENT_EDITOR]: AccessRoleIds.REMOTE_AGENT_EDITOR,
-  [AccessRoleIds.AGENT_OWNER]: AccessRoleIds.REMOTE_AGENT_OWNER,
-  [AccessRoleIds.REMOTE_AGENT_VIEWER]: AccessRoleIds.AGENT_VIEWER,
-  [AccessRoleIds.REMOTE_AGENT_EDITOR]: AccessRoleIds.AGENT_EDITOR,
-  [AccessRoleIds.REMOTE_AGENT_OWNER]: AccessRoleIds.AGENT_OWNER,
-};
-
-const getPairedAgentResourceType = (resourceType) => {
-  if (resourceType === ResourceType.AGENT) {
-    return ResourceType.REMOTE_AGENT;
-  }
-  if (resourceType === ResourceType.REMOTE_AGENT) {
-    return ResourceType.AGENT;
-  }
-  return null;
-};
-
-const syncPublicAgentPermission = async ({
-  resourceType,
-  resourceId,
-  isPublic,
-  publicAccessRoleId,
-  grantedBy,
-}) => {
-  if (isPublic === undefined) {
-    return null;
-  }
-
-  const pairedResourceType = getPairedAgentResourceType(resourceType);
-  if (!pairedResourceType) {
-    return null;
-  }
-
-  const updatedPrincipals = [];
-  const revokedPrincipals = [];
-
-  if (isPublic) {
-    const pairedAccessRoleId = publicAgentRolePairs[publicAccessRoleId];
-    if (!pairedAccessRoleId) {
-      throw new Error(`No paired public access role for ${publicAccessRoleId}`);
-    }
-    updatedPrincipals.push({
-      type: PrincipalType.PUBLIC,
-      id: null,
-      accessRoleId: pairedAccessRoleId,
-    });
-  } else {
-    revokedPrincipals.push({
-      type: PrincipalType.PUBLIC,
-      id: null,
-    });
-  }
-
-  return bulkUpdateResourcePermissions({
-    resourceType: pairedResourceType,
-    resourceId,
-    updatedPrincipals,
-    revokedPrincipals,
-    grantedBy,
-  });
 };
 
 /**
@@ -223,14 +154,6 @@ const updateResourcePermissions = async (req, res) => {
       resourceId,
       updatedPrincipals: validatedPrincipals,
       revokedPrincipals,
-      grantedBy: userId,
-    });
-
-    await syncPublicAgentPermission({
-      resourceType,
-      resourceId,
-      isPublic,
-      publicAccessRoleId,
       grantedBy: userId,
     });
 
