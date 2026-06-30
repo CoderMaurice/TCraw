@@ -193,6 +193,8 @@
     "ignore": [
       "api/data/",
       "data/",
+      "uploads/",
+      "logs/",
       "client/",
       "admin/",
       "packages/"
