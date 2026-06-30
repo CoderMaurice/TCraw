@@ -19,6 +19,7 @@ import { useGetStartupConfig, useGetUserBalance } from '~/data-provider';
 import { useAuthContext } from '~/hooks/AuthContext';
 import { useLocalize } from '~/hooks';
 import Settings from './Settings';
+import { getAccountDisplayName } from './accountDisplayName';
 import store from '~/store';
 
 function HelpSubmenu({
@@ -104,6 +105,7 @@ function AccountSettings({ collapsed = false }: { collapsed?: boolean }) {
   const setShowShortcutsDialog = useSetRecoilState(store.showShortcutsDialog);
   const [showArchived, setShowArchived] = useState(false);
   const accountSettingsButtonRef = useRef<HTMLButtonElement>(null);
+  const accountDisplayName = getAccountDisplayName(user, localize('com_nav_user'));
 
   return (
     <Menu.MenuProvider placement={collapsed ? 'right-end' : undefined}>
@@ -129,7 +131,7 @@ function AccountSettings({ collapsed = false }: { collapsed?: boolean }) {
             className="mt-2 grow overflow-hidden text-ellipsis whitespace-nowrap text-left text-text-primary"
             style={{ marginTop: '0', marginLeft: '0' }}
           >
-            {user?.name ?? user?.username ?? localize('com_nav_user')}
+            {accountDisplayName}
           </div>
         )}
       </Menu.MenuButton>
@@ -142,7 +144,7 @@ function AccountSettings({ collapsed = false }: { collapsed?: boolean }) {
         }}
       >
         <div className="text-token-text-secondary ml-3 mr-2 py-2 text-sm" role="note">
-          {user?.email ?? localize('com_nav_user')}
+          {accountDisplayName}
         </div>
         <DropdownMenuSeparator />
         {startupConfig?.balance?.enabled === true && balanceQuery.data != null && (

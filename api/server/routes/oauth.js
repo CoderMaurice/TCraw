@@ -18,7 +18,14 @@ const {
 } = require('@librechat/api');
 const { checkDomainAllowed, loginLimiter, logHeaders } = require('~/server/middleware');
 const { createOAuthHandler } = require('~/server/controllers/auth/oauth');
-const { createUser, findBalanceByUser, findUser, getUserById, upsertBalanceFields } = require('~/models');
+const {
+  createUser,
+  findBalanceByUser,
+  findUser,
+  getUserById,
+  updateUser,
+  upsertBalanceFields,
+} = require('~/models');
 const { getAppConfig } = require('~/server/services/Config');
 
 const setBalanceConfig = createSetBalanceConfig({
@@ -71,6 +78,17 @@ function getDingTalkCallbackUrl(callbackUrl) {
 function redirectDingTalkFailure(res, err) {
   logger.error('[DingTalk OAuth] Authentication failed', err);
   redirectToAuthFailure(res, authFailureRedirectOptions);
+}
+
+function getDingTalkProfileUpdates(user, profile) {
+  const updates = {};
+  if (profile.name && user.name !== profile.name) {
+    updates.name = profile.name;
+  }
+  if (profile.avatarUrl && user.avatar !== profile.avatarUrl) {
+    updates.avatar = profile.avatarUrl;
+  }
+  return updates;
 }
 
 router.get('/error', (req, res) => {
@@ -180,56 +198,67 @@ router.get('/dingtalk', (req, res) => {
   return res.redirect(url.toString());
 });
 
-router.get('/dingtalk/callback', async (req, res, next) => {
-  const { clientId, clientSecret } = getDingTalkConfig();
-  const authCode = req.query.authCode || req.query.code;
-  try {
-    if (!clientId || !clientSecret) {
-      throw new Error('DingTalk OAuth is not configured');
-    }
-    if (typeof authCode !== 'string' || !authCode) {
-      throw new Error('DingTalk callback is missing authCode');
-    }
-    if (
-      req.session?.dingtalkOAuthState &&
-      req.query.state &&
-      req.query.state !== req.session.dingtalkOAuthState
-    ) {
-      throw new Error('DingTalk callback state does not match');
-    }
+router.get(
+  '/dingtalk/callback',
+  async (req, res, next) => {
+    const { clientId, clientSecret } = getDingTalkConfig();
+    const authCode = req.query.authCode || req.query.code;
+    try {
+      if (!clientId || !clientSecret) {
+        throw new Error('DingTalk OAuth is not configured');
+      }
+      if (typeof authCode !== 'string' || !authCode) {
+        throw new Error('DingTalk callback is missing authCode');
+      }
+      if (
+        req.session?.dingtalkOAuthState &&
+        req.query.state &&
+        req.query.state !== req.session.dingtalkOAuthState
+      ) {
+        throw new Error('DingTalk callback state does not match');
+      }
 
-    const token = await exchangeDingTalkAuthCode({
-      clientId,
-      clientSecret,
-      authCode,
-      fetch: undici.fetch,
-    });
-    const rawProfile = await fetchDingTalkUserProfile({
-      accessToken: token.accessToken,
-      fetch: undici.fetch,
-    });
-    const profile = normalizeDingTalkProfile(rawProfile);
-
-    let user = await findUser({ dingtalkId: profile.id });
-    if (!user) {
-      const userId = await createUser({
-        email: profile.email,
-        emailVerified: true,
-        provider: 'dingtalk',
-        dingtalkId: profile.id,
-        username: profile.username,
-        name: profile.name,
-        avatar: profile.avatarUrl,
+      const token = await exchangeDingTalkAuthCode({
+        clientId,
+        clientSecret,
+        authCode,
+        fetch: undici.fetch,
       });
-      user = await getUserById(userId.toString());
-    }
+      const rawProfile = await fetchDingTalkUserProfile({
+        accessToken: token.accessToken,
+        fetch: undici.fetch,
+      });
+      const profile = normalizeDingTalkProfile(rawProfile);
 
-    req.user = user;
-    return next();
-  } catch (err) {
-    return redirectDingTalkFailure(res, err);
-  }
-}, setBalanceConfig, checkDomainAllowed, oauthHandler);
+      let user = await findUser({ dingtalkId: profile.id });
+      if (!user) {
+        const userId = await createUser({
+          email: profile.email,
+          emailVerified: true,
+          provider: 'dingtalk',
+          dingtalkId: profile.id,
+          username: profile.username,
+          name: profile.name,
+          avatar: profile.avatarUrl,
+        });
+        user = await getUserById(userId.toString());
+      } else {
+        const updates = getDingTalkProfileUpdates(user, profile);
+        if (Object.keys(updates).length > 0) {
+          user = (await updateUser(user._id.toString(), updates)) ?? user;
+        }
+      }
+
+      req.user = user;
+      return next();
+    } catch (err) {
+      return redirectDingTalkFailure(res, err);
+    }
+  },
+  setBalanceConfig,
+  checkDomainAllowed,
+  oauthHandler,
+);
 
 /**
  * GitHub Routes

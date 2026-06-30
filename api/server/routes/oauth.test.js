@@ -64,6 +64,7 @@ const mockNormalizeDingTalkProfile = jest.fn();
 const mockFindUser = jest.fn();
 const mockCreateUser = jest.fn();
 const mockGetUserById = jest.fn();
+const mockUpdateUser = jest.fn();
 
 jest.mock('passport', () => ({
   authenticate: (...args) => mockPassportAuthenticate(...args),
@@ -111,6 +112,7 @@ jest.mock('~/models', () => ({
   findUser: (...args) => mockFindUser(...args),
   createUser: (...args) => mockCreateUser(...args),
   getUserById: (...args) => mockGetUserById(...args),
+  updateUser: (...args) => mockUpdateUser(...args),
   upsertBalanceFields: jest.fn(),
 }));
 
@@ -190,6 +192,7 @@ describe('OAuth route failure logging', () => {
     mockFindUser.mockClear();
     mockCreateUser.mockClear();
     mockGetUserById.mockClear();
+    mockUpdateUser.mockClear();
     mockOpenIDCallbackAuthenticatorOptions = undefined;
     mockPassportAuthenticate.mockImplementation(() => (_req, _res, next) => next());
     mockOpenIDCallbackMiddleware.mockImplementation((_req, _res, next) => next());
@@ -317,5 +320,41 @@ describe('OAuth route failure logging', () => {
       avatar: 'https://example.com/avatar.png',
     });
     expect(mockOAuthHandler.mock.calls[0][0].user).toBe(user);
+  });
+
+  it('syncs DingTalk display names for existing users before continuing', async () => {
+    const app = createApp();
+    const existingUser = {
+      _id: 'user-id',
+      email: 'majianning@zitoo.com.cn',
+      provider: 'dingtalk',
+      dingtalkId: 'union-id-123',
+      name: 'majianning@zitoo.com.cn',
+    };
+    const updatedUser = {
+      ...existingUser,
+      name: '马建宁',
+      avatar: 'https://example.com/avatar.png',
+    };
+    mockExchangeDingTalkAuthCode.mockResolvedValue({ accessToken: 'user-token' });
+    mockFetchDingTalkUserProfile.mockResolvedValue({ unionId: 'union-id-123' });
+    mockNormalizeDingTalkProfile.mockReturnValue({
+      id: 'union-id-123',
+      email: 'majianning@zitoo.com.cn',
+      name: '马建宁',
+      username: '马建宁',
+      avatarUrl: 'https://example.com/avatar.png',
+    });
+    mockFindUser.mockResolvedValue(existingUser);
+    mockUpdateUser.mockResolvedValue(updatedUser);
+
+    await request(app).get('/oauth/dingtalk/callback?authCode=auth-code').expect(204);
+
+    expect(mockUpdateUser).toHaveBeenCalledWith('user-id', {
+      name: '马建宁',
+      avatar: 'https://example.com/avatar.png',
+    });
+    expect(mockCreateUser).not.toHaveBeenCalled();
+    expect(mockOAuthHandler.mock.calls[0][0].user).toBe(updatedUser);
   });
 });
