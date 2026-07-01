@@ -9,6 +9,7 @@ const {
   updateKnowledgeBaseForUser,
   deleteKnowledgeBaseForUser,
   createKnowledgeBaseForUser,
+  mapWeKnoraDocumentToRecord,
   requireKnowledgeBasePermission,
   listKnowledgeBaseDocumentsForUser,
   createKnowledgeBaseDocumentForUser,
@@ -100,6 +101,12 @@ const sendServiceError = (res, error) => {
 
   logger.error('[knowledgeBases] Unexpected route error:', error);
   return res.status(500).json({ message: 'Failed to process knowledge base request' });
+};
+
+const createRouteError = (message, statusCode) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
 };
 
 const getDocumentUpload = async () => {
@@ -283,10 +290,34 @@ router.post('/:id/documents', uploadDocumentMiddleware, async (req, res) => {
 
     const auth = authFromRequest(req);
     const knowledgeBaseId = req.params.id;
+
+    const kb = await requireKnowledgeBasePermission(
+      auth,
+      knowledgeBaseId,
+      PermissionBits.EDIT,
+      deps,
+    );
+
+    if (kb.provider === 'weknora') {
+      if (!kb.externalId) {
+        throw createRouteError('WeKnora knowledge base is missing an external id', 500);
+      }
+
+      if (!deps.weknoraClient) {
+        throw createRouteError('WeKnora client is not configured', 500);
+      }
+
+      const document = await deps.weknoraClient.uploadDocument(kb.externalId, {
+        filename: sanitizeFilename(req.file.originalname),
+        data: req.file.buffer,
+        mimeType: req.file.mimetype,
+        bytes: req.file.size ?? 0,
+      });
+
+      return res.status(201).json(mapWeKnoraDocumentToRecord(document, kb, auth));
+    }
+
     const fileId = getUploadFileId(req);
-
-    await requireKnowledgeBasePermission(auth, knowledgeBaseId, PermissionBits.EDIT, deps);
-
     const result = await createKnowledgeBaseDocumentForUser(
       auth,
       knowledgeBaseId,

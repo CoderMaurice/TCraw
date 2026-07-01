@@ -374,6 +374,101 @@ describe('knowledge base service', () => {
     expect(deps.findKnowledgeBaseDocuments).toHaveBeenCalledWith('kb_allowed', auth.tenantId);
   });
 
+  it('lists documents from WeKnora for WeKnora-backed knowledge bases', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+    deps.weknoraClient = {
+      listDocuments: jest.fn().mockResolvedValue([
+        {
+          externalId: 'wk_doc_1',
+          externalKnowledgeBaseId: 'wk_kb_1',
+          fileId: 'file_1',
+          filename: 'guide.pdf',
+          bytes: 123,
+          mimeType: 'application/pdf',
+          status: 'ready',
+          error: '',
+        },
+      ]),
+    } as unknown as WeKnoraClient;
+
+    deps.findKnowledgeBaseById.mockResolvedValue(
+      makeKnowledgeBase({
+        id: 'kb_weknora',
+        provider: 'weknora',
+        externalId: 'wk_kb_1',
+      }),
+    );
+    deps.checkPermission.mockResolvedValue(true);
+
+    const result = await listKnowledgeBaseDocumentsForUser(auth, 'kb_weknora', deps);
+
+    expect(result).toEqual({
+      data: [
+        {
+          id: 'wk_doc_1',
+          knowledgeBaseId: 'kb_weknora',
+          file_id: 'file_1',
+          filename: 'guide.pdf',
+          bytes: 123,
+          mimeType: 'application/pdf',
+          status: 'ready',
+          error: '',
+          createdBy: auth.userId,
+          tenantId: auth.tenantId,
+        },
+      ],
+      nextCursor: undefined,
+    });
+    expect(deps.weknoraClient.listDocuments).toHaveBeenCalledWith('wk_kb_1');
+    expect(deps.findKnowledgeBaseDocuments).not.toHaveBeenCalled();
+  });
+
+  it('rejects WeKnora-backed document listing when the external id is missing', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+    deps.weknoraClient = {
+      listDocuments: jest.fn(),
+    } as unknown as WeKnoraClient;
+
+    deps.findKnowledgeBaseById.mockResolvedValue(
+      makeKnowledgeBase({
+        id: 'kb_weknora',
+        provider: 'weknora',
+      }),
+    );
+    deps.checkPermission.mockResolvedValue(true);
+
+    await expect(listKnowledgeBaseDocumentsForUser(auth, 'kb_weknora', deps)).rejects.toMatchObject(
+      {
+        statusCode: 500,
+      },
+    );
+    expect(deps.weknoraClient.listDocuments).not.toHaveBeenCalled();
+    expect(deps.findKnowledgeBaseDocuments).not.toHaveBeenCalled();
+  });
+
+  it('rejects WeKnora-backed document listing when the WeKnora client is unavailable', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+
+    deps.findKnowledgeBaseById.mockResolvedValue(
+      makeKnowledgeBase({
+        id: 'kb_weknora',
+        provider: 'weknora',
+        externalId: 'wk_kb_1',
+      }),
+    );
+    deps.checkPermission.mockResolvedValue(true);
+
+    await expect(listKnowledgeBaseDocumentsForUser(auth, 'kb_weknora', deps)).rejects.toMatchObject(
+      {
+        statusCode: 500,
+      },
+    );
+    expect(deps.findKnowledgeBaseDocuments).not.toHaveBeenCalled();
+  });
+
   it('creates a ready document and refreshes counts after EDIT permission succeeds', async () => {
     const auth = makeAuth();
     const deps = makeDeps();

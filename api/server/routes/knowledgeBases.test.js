@@ -12,9 +12,24 @@ const mockCreateKnowledgeBaseDocumentForUser = jest.fn();
 const mockUpdateKnowledgeBaseDocumentForUser = jest.fn();
 const mockDeleteKnowledgeBaseDocumentForUser = jest.fn();
 const mockRequireKnowledgeBasePermission = jest.fn();
+const mockMapWeKnoraDocumentToRecord = jest.fn((document, kb, auth) => ({
+  id: document.externalId,
+  knowledgeBaseId: kb.id,
+  file_id: document.fileId,
+  filename: document.filename,
+  bytes: document.bytes,
+  mimeType: document.mimeType,
+  status: document.status,
+  error: document.error,
+  createdBy: auth.userId,
+  tenantId: auth.tenantId,
+}));
 const mockGetStorageMetadata = jest.fn();
 const mockSanitizeFilename = jest.fn((filename) => filename.trim());
-const mockWeKnoraClient = { listSharedKnowledgeBases: jest.fn() };
+const mockWeKnoraClient = {
+  listSharedKnowledgeBases: jest.fn(),
+  uploadDocument: jest.fn(),
+};
 const mockWeKnoraClientCreations = [];
 const mockCreateWeKnoraClient = jest.fn((env) => {
   mockWeKnoraClientCreations.push(env);
@@ -28,6 +43,7 @@ const mockUploadMiddleware = jest.fn((req, _res, next) => {
     originalname: 'handbook.pdf',
     mimetype: 'application/pdf',
     size: 1234,
+    buffer: Buffer.from('hello'),
     path: '/tmp/handbook.pdf',
   };
   req.file_id = 'file_route';
@@ -57,6 +73,7 @@ jest.mock('@librechat/api', () => ({
   updateKnowledgeBaseDocumentForUser: mockUpdateKnowledgeBaseDocumentForUser,
   deleteKnowledgeBaseDocumentForUser: mockDeleteKnowledgeBaseDocumentForUser,
   requireKnowledgeBasePermission: mockRequireKnowledgeBasePermission,
+  mapWeKnoraDocumentToRecord: mockMapWeKnoraDocumentToRecord,
   getStorageMetadata: mockGetStorageMetadata,
   sanitizeFilename: mockSanitizeFilename,
   createWeKnoraClient: mockCreateWeKnoraClient,
@@ -153,6 +170,7 @@ describe('knowledge base routes', () => {
     mockUpdateKnowledgeBaseDocumentForUser.mockReset();
     mockDeleteKnowledgeBaseDocumentForUser.mockReset();
     mockRequireKnowledgeBasePermission.mockReset();
+    mockMapWeKnoraDocumentToRecord.mockClear();
     mockGetStorageMetadata.mockReset();
     mockSanitizeFilename.mockClear();
     mockUploadMiddleware.mockClear();
@@ -162,6 +180,7 @@ describe('knowledge base routes', () => {
     mockHandleFileUpload.mockReset();
     mockGetStrategyFunctions.mockClear();
     mockUploadVectors.mockReset();
+    mockWeKnoraClient.uploadDocument.mockReset();
     mockKnowledgeBaseAccessMiddleware.mockClear();
     mockKnowledgeBaseCreateMiddleware.mockClear();
     logger.error.mockClear();
@@ -461,6 +480,78 @@ describe('knowledge base routes', () => {
       }),
       expect.any(Object),
     );
+  });
+
+  it('uploads documents directly to WeKnora for WeKnora-backed knowledge bases', async () => {
+    const weknoraDocument = {
+      id: 'wk_doc_1',
+      knowledgeBaseId: 'kb_weknora',
+      file_id: 'file_1',
+      filename: 'handbook.pdf',
+      bytes: 1234,
+      mimeType: 'application/pdf',
+      status: 'processing',
+      error: '',
+      createdBy: 'user_1',
+      tenantId: 'tenant_1',
+    };
+    mockRequireKnowledgeBasePermission.mockResolvedValue({
+      id: 'kb_weknora',
+      provider: 'weknora',
+      externalId: 'wk_kb_1',
+    });
+    mockWeKnoraClient.uploadDocument.mockResolvedValue({
+      externalId: 'wk_doc_1',
+      externalKnowledgeBaseId: 'wk_kb_1',
+      fileId: 'file_1',
+      filename: 'handbook.pdf',
+      bytes: 1234,
+      mimeType: 'application/pdf',
+      status: 'processing',
+      error: '',
+    });
+
+    const response = await request(app)
+      .post('/knowledge-bases/kb_weknora/documents')
+      .attach('file', Buffer.from('hello'), 'handbook.pdf');
+
+    expect(response.status).toBe(201);
+    expect(response.body).toEqual(weknoraDocument);
+    expect(mockRequireKnowledgeBasePermission).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user_1' }),
+      'kb_weknora',
+      PermissionBits.EDIT,
+      expect.any(Object),
+    );
+    expect(mockWeKnoraClient.uploadDocument).toHaveBeenCalledWith('wk_kb_1', {
+      filename: 'handbook.pdf',
+      data: Buffer.from('hello'),
+      mimeType: 'application/pdf',
+      bytes: 1234,
+    });
+    expect(mockMapWeKnoraDocumentToRecord).toHaveBeenCalledWith(
+      {
+        externalId: 'wk_doc_1',
+        externalKnowledgeBaseId: 'wk_kb_1',
+        fileId: 'file_1',
+        filename: 'handbook.pdf',
+        bytes: 1234,
+        mimeType: 'application/pdf',
+        status: 'processing',
+        error: '',
+      },
+      {
+        id: 'kb_weknora',
+        provider: 'weknora',
+        externalId: 'wk_kb_1',
+      },
+      expect.objectContaining({ userId: 'user_1' }),
+    );
+    expect(mockCreateKnowledgeBaseDocumentForUser).not.toHaveBeenCalled();
+    expect(mockHandleFileUpload).not.toHaveBeenCalled();
+    expect(mockUploadVectors).not.toHaveBeenCalled();
+    await new Promise(process.nextTick);
+    expect(mockUpdateKnowledgeBaseDocumentForUser).not.toHaveBeenCalled();
   });
 
   it('deletes a document for a knowledge base', async () => {

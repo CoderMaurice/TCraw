@@ -18,6 +18,7 @@ import type {
   ListKnowledgeBaseDocumentsForUserResult,
   ListKnowledgeBasesForUserInput,
   ListKnowledgeBasesForUserResult,
+  MappedWeKnoraDocument,
   MongoResourceId,
   UpdateKnowledgeBaseDocumentForUserInput,
   UpdateKnowledgeBaseForUserInput,
@@ -43,6 +44,25 @@ function getMongoResourceId(kb: KnowledgeBaseRecord): string {
     throw createServiceError('Knowledge base is missing a Mongo resource id', 500);
   }
   return resourceId.toString();
+}
+
+export function mapWeKnoraDocumentToRecord(
+  document: MappedWeKnoraDocument,
+  kb: KnowledgeBaseRecord,
+  auth: KnowledgeAuthContext,
+): KnowledgeBaseDocumentRecord {
+  return {
+    id: document.externalId,
+    knowledgeBaseId: kb.id,
+    file_id: document.fileId,
+    filename: document.filename,
+    bytes: document.bytes,
+    mimeType: document.mimeType,
+    status: document.status,
+    error: document.error,
+    createdBy: auth.userId,
+    tenantId: auth.tenantId,
+  };
 }
 
 function deduplicateNonEmptyIds(ids: string[]): string[] {
@@ -199,7 +219,23 @@ export async function listKnowledgeBaseDocumentsForUser(
   id: string,
   deps: KnowledgeBaseServiceDependencies,
 ): Promise<ListKnowledgeBaseDocumentsForUserResult> {
-  await requireKnowledgeBasePermission(auth, id, PermissionBits.VIEW, deps);
+  const kb = await requireKnowledgeBasePermission(auth, id, PermissionBits.VIEW, deps);
+
+  if (kb.provider === 'weknora') {
+    if (!kb.externalId) {
+      throw createServiceError('WeKnora knowledge base is missing an external id', 500);
+    }
+
+    if (!deps.weknoraClient) {
+      throw createServiceError('WeKnora client is not configured', 500);
+    }
+
+    const data = (await deps.weknoraClient.listDocuments(kb.externalId)).map((document) =>
+      mapWeKnoraDocumentToRecord(document, kb, auth),
+    );
+    return { data, nextCursor: undefined };
+  }
+
   const data = await deps.findKnowledgeBaseDocuments(id, auth.tenantId);
   return { data, nextCursor: undefined };
 }
