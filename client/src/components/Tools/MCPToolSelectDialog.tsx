@@ -325,36 +325,48 @@ function MCPToolSelectDialog({
 
               <div
                 ref={gridRef}
-                className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                className={
+                  filteredServers.length > 0
+                    ? 'grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+                    : 'flex items-center justify-center'
+                }
                 style={{ minHeight: '410px' }}
               >
-                {filteredServers
-                  .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-                  .map((serverInfo) => {
-                    const isInstalled = installedToolsSet.has(serverInfo.serverName);
-                    const isConfiguring = configuringServer === serverInfo.serverName;
-                    const isServerInitializing = isInitializing === serverInfo.serverName;
+                {filteredServers.length === 0 ? (
+                  <p className="text-sm text-text-secondary">
+                    {localize(
+                      searchValue ? 'com_ui_no_mcp_servers_match' : 'com_ui_no_mcp_servers',
+                    )}
+                  </p>
+                ) : (
+                  filteredServers
+                    .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                    .map((serverInfo) => {
+                      const isInstalled = installedToolsSet.has(serverInfo.serverName);
+                      const isConfiguring = configuringServer === serverInfo.serverName;
+                      const isServerInitializing = isInitializing === serverInfo.serverName;
 
-                    const tool: AgentToolType = {
-                      agent_id: agentId,
-                      tool_id: serverInfo.serverName,
-                      metadata: {
-                        ...serverInfo.metadata,
-                      },
-                    };
+                      const tool: AgentToolType = {
+                        agent_id: agentId,
+                        tool_id: serverInfo.serverName,
+                        metadata: {
+                          ...serverInfo.metadata,
+                        },
+                      };
 
-                    return (
-                      <MCPToolItem
-                        tool={tool}
-                        isInstalled={isInstalled}
-                        key={serverInfo.serverName}
-                        isConfiguring={isConfiguring}
-                        isInitializing={isServerInitializing}
-                        onAddTool={() => onAddTool(serverInfo.serverName)}
-                        onRemoveTool={() => removeTool(serverInfo.serverName)}
-                      />
-                    );
-                  })}
+                      return (
+                        <MCPToolItem
+                          tool={tool}
+                          isInstalled={isInstalled}
+                          key={serverInfo.serverName}
+                          isConfiguring={isConfiguring}
+                          isInitializing={isServerInitializing}
+                          onAddTool={() => onAddTool(serverInfo.serverName)}
+                          onRemoveTool={() => removeTool(serverInfo.serverName)}
+                        />
+                      );
+                    })
+                )}
               </div>
             </div>
 

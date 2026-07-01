@@ -1,6 +1,6 @@
 import React from 'react';
 import userEvent from '@testing-library/user-event';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { useForm, FormProvider, useWatch } from 'react-hook-form';
 import { AgentCapabilities } from 'librechat-data-provider';
 import type { AgentForm } from '~/common';
@@ -82,7 +82,7 @@ describe('KnowledgeBases', () => {
     });
   });
 
-  it('adds selected knowledge bases once and enables file search', async () => {
+  it('toggles multiple selected knowledge bases and enables file search without closing the dialog', async () => {
     const user = userEvent.setup();
 
     render(
@@ -91,13 +91,29 @@ describe('KnowledgeBases', () => {
       </Wrapper>,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Add knowledge base Support' }));
+    expect(screen.queryByLabelText('Search knowledge bases')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Add knowledge base' }));
+    const dialog = screen.getByRole('dialog', { name: 'Knowledge bases' });
+    expect(dialog).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Add knowledge base Support' }));
 
     expect(screen.getByTestId('knowledge-base-ids')).toHaveTextContent('kb_1');
     expect(screen.getByTestId('file-search-enabled')).toHaveTextContent('true');
-    expect(screen.getByRole('button', { name: 'Remove Support' })).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Add knowledge base Support' }),
-    ).not.toBeInTheDocument();
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Remove Support' })).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Add knowledge base Policies' }));
+
+    expect(screen.getByTestId('knowledge-base-ids')).toHaveTextContent('kb_1,kb_2');
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Remove Support' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Remove Policies' })).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Remove Support' }));
+
+    expect(screen.getByTestId('knowledge-base-ids')).toHaveTextContent('kb_2');
+    expect(within(dialog).getByRole('button', { name: 'Add knowledge base Support' })).toBeInTheDocument();
   });
 });

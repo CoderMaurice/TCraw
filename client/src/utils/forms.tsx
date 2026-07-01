@@ -1,10 +1,15 @@
 import { EarthIcon } from 'lucide-react';
 import {
+  Tools,
+  ArtifactModes,
   FileSources,
   alternateName,
   EModelEndpoint,
   EToolResources,
-  LocalStorageKeys,
+  ImageDetail,
+  ReasoningEffort,
+  ReasoningSummary,
+  Verbosity,
   defaultAgentFormValues,
 } from 'librechat-data-provider';
 import type { Agent, TFile } from 'librechat-data-provider';
@@ -44,14 +49,39 @@ export const createProviderOption = (provider: string) => ({
   value: provider,
 });
 
+const defaultAgentModelParameters = {
+  temperature: 0.5,
+  top_p: 1,
+  frequency_penalty: 0,
+  presence_penalty: 0,
+  stop: [],
+  resendFiles: true,
+  imageDetail: ImageDetail.auto,
+  reasoning_effort: ReasoningEffort.medium,
+  reasoning_summary: ReasoningSummary.auto,
+  verbosity: Verbosity.none,
+  useResponsesApi: true,
+  web_search: true,
+  disableStreaming: false,
+};
+
 /**
- * Gets default agent form values with localStorage values for model and provider.
- * This is used to initialize agent forms with the last used model and provider.
+ * Gets default agent form values for new agents.
  **/
 export const getDefaultAgentFormValues = () => ({
   ...defaultAgentFormValues,
-  model: localStorage.getItem(LocalStorageKeys.LAST_AGENT_MODEL) ?? '',
-  provider: createProviderOption(localStorage.getItem(LocalStorageKeys.LAST_AGENT_PROVIDER) ?? ''),
+  artifacts: ArtifactModes.SHADCNUI,
+  [Tools.execute_code]: true,
+  [Tools.file_search]: false,
+  [Tools.web_search]: false,
+  support_contact: undefined,
+  skills_enabled: true,
+  model: 'gpt-5.5',
+  provider: createProviderOption('ZT'),
+  model_parameters: {
+    ...defaultAgentModelParameters,
+    stop: [...defaultAgentModelParameters.stop],
+  },
   avatar_file: null,
   avatar_preview: '',
   avatar_action: null,

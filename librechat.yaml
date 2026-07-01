@@ -28,6 +28,9 @@ interface:
   fileCitations: true
 
 endpoints:
+  agents:
+    allowedProviders:
+      - ZT
   all:
     titlePrompt: |
       根据下面的对话生成一个简短标题。

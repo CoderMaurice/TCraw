@@ -4,7 +4,7 @@
 import * as React from 'react';
 import { render, waitFor, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { Agent } from 'librechat-data-provider';
+import type { Agent, TEndpointsConfig } from 'librechat-data-provider';
 
 // Mock toast context - define this after all mocks
 let mockShowToast: jest.Mock;
@@ -204,7 +204,7 @@ jest.mock('react-hook-form', () => {
 // Import after mocks
 import { dataService } from 'librechat-data-provider';
 import { useGetAgentByIdQuery } from '~/data-provider';
-import AgentPanel from './AgentPanel';
+import AgentPanel, { getAgentProviderOptions } from './AgentPanel';
 
 // Mock useGetAgentByIdQuery
 jest.mock('~/data-provider', () => {
@@ -400,5 +400,22 @@ describe('AgentPanel - Update Agent Toast Messages', () => {
         });
       });
     });
+  });
+});
+
+describe('getAgentProviderOptions', () => {
+  it('returns only providers allowed by the agents endpoint config', () => {
+    expect(
+      getAgentProviderOptions({
+        endpointsConfig: {
+          openAI: {},
+          google: {},
+          anthropic: {},
+          ZT: {},
+          agents: {},
+        } as TEndpointsConfig,
+        allowedProviders: new Set(['ZT']),
+      }),
+    ).toEqual([{ value: 'ZT', label: 'ZT' }]);
   });
 });

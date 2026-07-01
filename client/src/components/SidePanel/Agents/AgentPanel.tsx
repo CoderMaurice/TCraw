@@ -214,6 +214,23 @@ export const isAvatarUploadOnlyDirty = (
   return result.sawDirty && result.onlyAvatarDirty;
 };
 
+export function getAgentProviderOptions({
+  endpointsConfig,
+  allowedProviders,
+}: {
+  endpointsConfig?: t.TEndpointsConfig | null;
+  allowedProviders: Set<string | t.EModelEndpoint>;
+}): ReturnType<typeof createProviderOption>[] {
+  return Object.keys(endpointsConfig ?? {})
+    .filter(
+      (key) =>
+        !isAssistantsEndpoint(key) &&
+        (allowedProviders.size > 0 ? allowedProviders.has(key) : true) &&
+        key !== EModelEndpoint.agents,
+    )
+    .map((provider) => createProviderOption(provider));
+}
+
 export default function AgentPanel() {
   const localize = useLocalize();
   const { user } = useAuthContext();
@@ -312,15 +329,7 @@ export default function AgentPanel() {
   );
 
   const providers = useMemo(
-    () =>
-      Object.keys(endpointsConfig ?? {})
-        .filter(
-          (key) =>
-            !isAssistantsEndpoint(key) &&
-            (allowedProviders.size > 0 ? allowedProviders.has(key) : true) &&
-            key !== EModelEndpoint.agents,
-        )
-        .map((provider) => createProviderOption(provider)),
+    () => getAgentProviderOptions({ endpointsConfig, allowedProviders }),
     [endpointsConfig, allowedProviders],
   );
 

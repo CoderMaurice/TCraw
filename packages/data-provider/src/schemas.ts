@@ -4,6 +4,7 @@ import type { SearchResultData } from './types/web';
 import type { TFile } from './types/files';
 import { TFeedback, feedbackSchema } from './feedback';
 import { Tools } from './types/assistants';
+import { ArtifactModes } from './artifacts';
 
 export const isUUID = z.string().uuid();
 
@@ -311,35 +312,51 @@ export const defaultAssistantFormValues = {
   append_current_datetime: false,
 };
 
+export const defaultAgentModelParameters = {
+  temperature: 0.5,
+  top_p: 1,
+  frequency_penalty: 0,
+  presence_penalty: 0,
+  stop: [] as string[],
+  resendFiles: true,
+  imageDetail: ImageDetail.auto,
+  reasoning_effort: ReasoningEffort.medium,
+  reasoning_summary: ReasoningSummary.auto,
+  verbosity: Verbosity.none,
+  useResponsesApi: true,
+  web_search: true,
+  disableStreaming: false,
+};
+
 export const defaultAgentFormValues = {
   agent: {},
   id: '',
   name: '',
   description: '',
   instructions: '',
-  model: '',
-  model_parameters: {},
+  model: 'gpt-5.5',
+  model_parameters: {
+    ...defaultAgentModelParameters,
+    stop: [...defaultAgentModelParameters.stop],
+  },
   tools: [],
   tool_options: {},
   knowledge_base_ids: [] as string[],
-  provider: {},
+  provider: { label: 'ChatGPT', value: 'ZT' },
   edges: [],
-  artifacts: '',
+  artifacts: ArtifactModes.SHADCNUI,
   recursion_limit: undefined,
-  [Tools.execute_code]: false,
+  [Tools.execute_code]: true,
   [Tools.file_search]: false,
   [Tools.web_search]: false,
   category: 'general',
-  support_contact: {
-    name: '',
-    email: '',
-  },
+  support_contact: undefined,
   /** Optional allowlist. Only applies when `skills_enabled === true`.
    *  Empty/undefined + enabled = full catalog; non-empty + enabled = narrow to ids. */
   skills: undefined as string[] | undefined,
   /** Master toggle for skill use on this agent. `true` activates skills
    *  (full catalog unless `skills` narrows it). Anything else = inactive. */
-  skills_enabled: undefined as boolean | undefined,
+  skills_enabled: true as boolean | undefined,
   /** `undefined` = feature disabled by default (no subagent tool injected). */
   subagents: undefined as
     | { enabled?: boolean; allowSelf?: boolean; agent_ids?: string[] }
