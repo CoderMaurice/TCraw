@@ -12,6 +12,7 @@ import {
 import type { KnowledgeBase } from 'librechat-data-provider';
 import { useDeleteKnowledgeBaseMutation, useUpdateKnowledgeBaseMutation } from '~/data-provider';
 import { useLocalize } from '~/hooks';
+import KnowledgeBaseAccess from './KnowledgeBaseAccess';
 
 type KnowledgeBaseSettingsProps = {
   knowledgeBase: KnowledgeBase;
@@ -117,6 +118,10 @@ export default function KnowledgeBaseSettings({
           )}
         </Button>
       </form>
+
+      <div className="border-t border-border-light pt-5">
+        <KnowledgeBaseAccess resourceDbId={knowledgeBase._id} name={knowledgeBase.name} />
+      </div>
 
       <div className="border-t border-border-light pt-5">
         <Button
