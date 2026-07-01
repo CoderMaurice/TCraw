@@ -3,7 +3,7 @@ import { AlertCircle, ArrowLeft, Clock3, Database, FileText, Timer } from 'lucid
 import { useNavigate, useParams } from 'react-router-dom';
 import { Spinner } from '@librechat/client';
 import type { KnowledgeBase } from 'librechat-data-provider';
-import { useKnowledgeBaseDocumentsQuery, useKnowledgeBaseQuery } from '~/data-provider';
+import { useInfiniteKnowledgeBaseDocumentsQuery, useKnowledgeBaseQuery } from '~/data-provider';
 import { useLocalize } from '~/hooks';
 import type { TranslationKeys } from '~/hooks';
 import { cn } from '~/utils';
@@ -45,15 +45,25 @@ export function KnowledgeBaseDetail() {
   const { id = '' } = useParams();
   const [activeTab, setActiveTab] = useState<KnowledgeBaseTab>('documents');
   const { data: knowledgeBase, isLoading: isKnowledgeBaseLoading } = useKnowledgeBaseQuery(id);
-  const { data: documentsData, isLoading: isDocumentsLoading } = useKnowledgeBaseDocumentsQuery(
-    id,
-    {
-      refetchInterval: (data) =>
-        data?.data.some((document) => document.status === 'processing') ? 2000 : false,
-    },
-  );
+  const {
+    data: documentsData,
+    isLoading: isDocumentsLoading,
+    isFetchingNextPage,
+    fetchNextPage,
+    hasNextPage,
+  } = useInfiniteKnowledgeBaseDocumentsQuery(id, { limit: 50 }, {
+    refetchInterval: (data) =>
+      data?.pages.some((page) =>
+        page.data.some((document) => document.status === 'processing'),
+      )
+        ? 2000
+        : false,
+  });
 
-  const documents = useMemo(() => documentsData?.data ?? [], [documentsData?.data]);
+  const documents = useMemo(
+    () => documentsData?.pages.flatMap((page) => page.data) ?? [],
+    [documentsData?.pages],
+  );
 
   if (isKnowledgeBaseLoading) {
     return (
@@ -169,6 +179,9 @@ export function KnowledgeBaseDetail() {
               id={knowledgeBase.id}
               documents={documents}
               isLoading={isDocumentsLoading}
+              isLoadingMore={isFetchingNextPage}
+              hasMore={Boolean(hasNextPage)}
+              onLoadMore={() => fetchNextPage()}
               provider={knowledgeBase.provider}
             />
           ) : null}

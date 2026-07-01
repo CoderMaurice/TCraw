@@ -343,7 +343,7 @@ describe('knowledge base service', () => {
     expect(result.data[0].id).not.toBe('2a2da502-5549-44e7-b98c-ff5b9417b208');
   });
 
-  it('preserves owner access for WeKnora knowledge bases that the user already owns', async () => {
+  it('does not upgrade passive WeKnora sync to owner when effective share permission exists', async () => {
     const auth = makeAuth();
     const deps = makeDeps();
     const existing = makeKnowledgeBase({
@@ -377,15 +377,11 @@ describe('knowledge base service', () => {
 
     await listKnowledgeBasesForUser(auth, {}, deps);
 
-    expect(deps.checkPermission).toHaveBeenCalledWith({
-      userId: auth.userId,
-      role: auth.role,
-      resourceType: ResourceType.KNOWLEDGE_BASE,
-      resourceId: '64f1f77bcf86cd799439099',
-      requiredPermission: PermissionBits.SHARE,
-    });
+    expect(deps.checkPermission).not.toHaveBeenCalledWith(
+      expect.objectContaining({ requiredPermission: PermissionBits.SHARE }),
+    );
     expect(deps.grantPermission).toHaveBeenCalledWith(
-      expect.objectContaining({ accessRoleId: AccessRoleIds.KNOWLEDGE_BASE_OWNER }),
+      expect.objectContaining({ accessRoleId: AccessRoleIds.KNOWLEDGE_BASE_VIEWER }),
     );
   });
 

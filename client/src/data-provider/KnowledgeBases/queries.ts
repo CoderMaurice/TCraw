@@ -1,11 +1,18 @@
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { dataService, QueryKeys } from 'librechat-data-provider';
-import type { QueryObserverResult, UseQueryOptions } from '@tanstack/react-query';
+import type {
+  InfiniteData,
+  UseInfiniteQueryOptions,
+  UseInfiniteQueryResult,
+  QueryObserverResult,
+  UseQueryOptions,
+} from '@tanstack/react-query';
 import type {
   KnowledgeBase,
   ListKnowledgeBasesRequest,
   ListKnowledgeBasesResponse,
   KnowledgeBaseSelectorResponse,
+  ListKnowledgeBaseDocumentsRequest,
   ListKnowledgeBaseDocumentsResponse,
 } from 'librechat-data-provider';
 
@@ -45,12 +52,41 @@ export const useKnowledgeBaseQuery = (
 
 export const useKnowledgeBaseDocumentsQuery = (
   id?: string | null,
+  params?: ListKnowledgeBaseDocumentsRequest,
   config?: UseQueryOptions<ListKnowledgeBaseDocumentsResponse>,
 ): QueryObserverResult<ListKnowledgeBaseDocumentsResponse> => {
   return useQuery<ListKnowledgeBaseDocumentsResponse>(
-    [QueryKeys.knowledgeBaseDocuments, id],
-    () => dataService.listKnowledgeBaseDocuments(id as string),
+    [QueryKeys.knowledgeBaseDocuments, id, params],
+    () => dataService.listKnowledgeBaseDocuments(id as string, params),
     {
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMount: false,
+      retry: false,
+      ...config,
+      enabled: Boolean(id) && (config?.enabled ?? true),
+    },
+  );
+};
+
+export const useInfiniteKnowledgeBaseDocumentsQuery = (
+  id?: string | null,
+  params?: Pick<ListKnowledgeBaseDocumentsRequest, 'limit'>,
+  config?: UseInfiniteQueryOptions<
+    ListKnowledgeBaseDocumentsResponse,
+    unknown,
+    InfiniteData<ListKnowledgeBaseDocumentsResponse>
+  >,
+): UseInfiniteQueryResult<InfiniteData<ListKnowledgeBaseDocumentsResponse>> => {
+  return useInfiniteQuery<ListKnowledgeBaseDocumentsResponse>(
+    [QueryKeys.knowledgeBaseDocuments, id, params],
+    ({ pageParam }) =>
+      dataService.listKnowledgeBaseDocuments(id as string, {
+        ...params,
+        cursor: typeof pageParam === 'string' ? pageParam : undefined,
+      }),
+    {
+      getNextPageParam: (lastPage) => lastPage?.nextCursor ?? undefined,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
       refetchOnMount: false,

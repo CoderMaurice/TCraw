@@ -6,7 +6,7 @@ import { ResourceType } from 'librechat-data-provider';
 import { KnowledgeBaseDetail } from '../KnowledgeBaseDetail';
 import {
   useKnowledgeBaseQuery,
-  useKnowledgeBaseDocumentsQuery,
+  useInfiniteKnowledgeBaseDocumentsQuery,
   useUpdateKnowledgeBaseMutation,
   useDeleteKnowledgeBaseMutation,
   useUploadKnowledgeBaseDocumentsMutation,
@@ -96,6 +96,7 @@ jest.mock('~/hooks', () => ({
       com_ui_knowledge_base_reupload_document: 'Re-upload',
       com_ui_knowledge_base_delete_confirm: 'Delete this knowledge base?',
       com_ui_confirm_delete_knowledge_base: 'Confirm delete',
+      com_ui_load_more: 'Load more',
     };
     return (labels[key] ?? key).replaceAll('{{0}}', values?.[0] ?? '');
   },
@@ -103,7 +104,7 @@ jest.mock('~/hooks', () => ({
 
 jest.mock('~/data-provider', () => ({
   useKnowledgeBaseQuery: jest.fn(),
-  useKnowledgeBaseDocumentsQuery: jest.fn(),
+  useInfiniteKnowledgeBaseDocumentsQuery: jest.fn(),
   useUpdateKnowledgeBaseMutation: jest.fn(),
   useDeleteKnowledgeBaseMutation: jest.fn(),
   useUploadKnowledgeBaseDocumentsMutation: jest.fn(),
@@ -112,6 +113,7 @@ jest.mock('~/data-provider', () => ({
 
 describe('KnowledgeBaseDetail', () => {
   const deleteKnowledgeBase = jest.fn();
+  const fetchNextPage = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -130,28 +132,36 @@ describe('KnowledgeBaseDetail', () => {
       },
       isLoading: false,
     });
-    (useKnowledgeBaseDocumentsQuery as jest.Mock).mockReturnValue({
+    (useInfiniteKnowledgeBaseDocumentsQuery as jest.Mock).mockReturnValue({
       data: {
-        data: [
+        pages: [
           {
-            id: 'doc_1',
-            knowledgeBaseId: 'kb_1',
-            file_id: 'file_1',
-            filename: 'runbook.pdf',
-            bytes: 2048,
-            status: 'ready',
-          },
-          {
-            id: 'doc_processing',
-            knowledgeBaseId: 'kb_1',
-            file_id: 'file_processing',
-            filename: 'indexing.md',
-            bytes: 1024,
-            status: 'processing',
+            data: [
+              {
+                id: 'doc_1',
+                knowledgeBaseId: 'kb_1',
+                file_id: 'file_1',
+                filename: 'runbook.pdf',
+                bytes: 2048,
+                status: 'ready',
+              },
+              {
+                id: 'doc_processing',
+                knowledgeBaseId: 'kb_1',
+                file_id: 'file_processing',
+                filename: 'indexing.md',
+                bytes: 1024,
+                status: 'processing',
+              },
+            ],
+            nextCursor: '2',
           },
         ],
       },
       isLoading: false,
+      isFetchingNextPage: false,
+      fetchNextPage,
+      hasNextPage: true,
     });
     (useUpdateKnowledgeBaseMutation as jest.Mock).mockReturnValue({
       mutateAsync: jest.fn(),
@@ -182,8 +192,9 @@ describe('KnowledgeBaseDetail', () => {
     render(<RouterProvider router={router} />);
 
     expect(useKnowledgeBaseQuery).toHaveBeenCalledWith('kb_1');
-    expect(useKnowledgeBaseDocumentsQuery).toHaveBeenCalledWith(
+    expect(useInfiniteKnowledgeBaseDocumentsQuery).toHaveBeenCalledWith(
       'kb_1',
+      { limit: 50 },
       expect.objectContaining({ refetchInterval: expect.any(Function) }),
     );
     expect(screen.getByText('Support')).toBeInTheDocument();
@@ -198,6 +209,10 @@ describe('KnowledgeBaseDetail', () => {
     expect(screen.getByText('indexing.md')).toBeInTheDocument();
     expect(screen.getAllByText('Processing')).toHaveLength(1);
     expect(screen.queryAllByRole('button', { name: 'Delete document' })).toHaveLength(0);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Load more' }));
+
+    expect(fetchNextPage).toHaveBeenCalledTimes(1);
 
     await userEvent.click(screen.getByRole('button', { name: 'Access' }));
 
@@ -229,21 +244,28 @@ describe('KnowledgeBaseDetail', () => {
 
   it('shows failed document details and opens file picker for re-upload', async () => {
     const inputClick = jest.spyOn(HTMLInputElement.prototype, 'click').mockImplementation();
-    (useKnowledgeBaseDocumentsQuery as jest.Mock).mockReturnValue({
+    (useInfiniteKnowledgeBaseDocumentsQuery as jest.Mock).mockReturnValue({
       data: {
-        data: [
+        pages: [
           {
-            id: 'doc_failed',
-            knowledgeBaseId: 'kb_1',
-            file_id: 'file_failed',
-            filename: 'strategy.docx',
-            bytes: 4096,
-            status: 'failed',
-            error: 'Embedding model is not configured',
+            data: [
+              {
+                id: 'doc_failed',
+                knowledgeBaseId: 'kb_1',
+                file_id: 'file_failed',
+                filename: 'strategy.docx',
+                bytes: 4096,
+                status: 'failed',
+                error: 'Embedding model is not configured',
+              },
+            ],
           },
         ],
       },
       isLoading: false,
+      isFetchingNextPage: false,
+      fetchNextPage,
+      hasNextPage: false,
     });
     const router = createMemoryRouter(
       [{ path: '/knowledge/:id', element: <KnowledgeBaseDetail /> }],

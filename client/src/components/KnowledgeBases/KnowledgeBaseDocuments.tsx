@@ -14,6 +14,9 @@ type KnowledgeBaseDocumentsProps = {
   id: string;
   documents: KnowledgeBaseDocument[];
   isLoading: boolean;
+  isLoadingMore?: boolean;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
   provider?: 'local' | 'weknora';
 };
 
@@ -40,6 +43,9 @@ export default function KnowledgeBaseDocuments({
   id,
   documents,
   isLoading,
+  isLoadingMore = false,
+  hasMore = false,
+  onLoadMore,
   provider = 'local',
 }: KnowledgeBaseDocumentsProps) {
   const localize = useLocalize();
@@ -194,6 +200,21 @@ export default function KnowledgeBaseDocuments({
           ))}
         </div>
       )}
+
+      {hasMore ? (
+        <div className="flex justify-center">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={isLoadingMore}
+            onClick={onLoadMore}
+          >
+            {isLoadingMore ? <Spinner className="size-4" /> : null}
+            {localize('com_ui_load_more')}
+          </Button>
+        </div>
+      ) : null}
 
       <OGDialog
         open={Boolean(selectedFailedDocument)}
