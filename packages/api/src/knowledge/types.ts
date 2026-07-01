@@ -1,5 +1,6 @@
 import type {
   AccessRoleIds,
+  KnowledgeBaseDocumentStatus,
   PermissionBits,
   PrincipalType,
   ResourceType,
@@ -157,3 +158,67 @@ export type KnowledgeBaseServiceError = Error & {
   statusCode: number;
   document?: KnowledgeBaseDocumentRecord;
 };
+
+export type WeKnoraMetadataValue =
+  | string
+  | number
+  | boolean
+  | null
+  | WeKnoraMetadataValue[]
+  | { [key: string]: WeKnoraMetadataValue };
+
+export type WeKnoraMetadata = { [key: string]: WeKnoraMetadataValue };
+
+export interface MappedWeKnoraKnowledgeBase {
+  externalId: string;
+  externalSpaceId: string;
+  externalShareId: string;
+  name: string;
+  description: string;
+  documentCount: number;
+  readyDocumentCount: number;
+  failedDocumentCount: number;
+  processingDocumentCount: number;
+}
+
+export interface MappedWeKnoraDocument {
+  externalId: string;
+  externalKnowledgeBaseId: string;
+  fileId: string;
+  filename: string;
+  bytes: number;
+  mimeType: string;
+  status: KnowledgeBaseDocumentStatus;
+  error: string;
+}
+
+export interface MappedWeKnoraSearchResult {
+  externalDocumentId: string;
+  externalKnowledgeBaseId: string;
+  content: string;
+  score: number;
+  metadata: WeKnoraMetadata;
+}
+
+export interface CreateWeKnoraKnowledgeBaseInput {
+  name: string;
+  description?: string;
+}
+
+export interface UploadWeKnoraDocumentFile {
+  filename: string;
+  data: Blob | ArrayBuffer | Uint8Array | string;
+  mimeType?: string;
+  bytes?: number;
+}
+
+export interface WeKnoraClient {
+  listSharedKnowledgeBases(): Promise<MappedWeKnoraKnowledgeBase[]>;
+  listDocuments(externalKnowledgeBaseId: string): Promise<MappedWeKnoraDocument[]>;
+  createKnowledgeBase(input: CreateWeKnoraKnowledgeBaseInput): Promise<MappedWeKnoraKnowledgeBase>;
+  uploadDocument(
+    externalKnowledgeBaseId: string,
+    file: UploadWeKnoraDocumentFile,
+  ): Promise<MappedWeKnoraDocument>;
+  search(query: string, externalKnowledgeBaseIds: string[]): Promise<MappedWeKnoraSearchResult[]>;
+}
