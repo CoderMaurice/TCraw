@@ -1,13 +1,5 @@
 import { useDeferredValue, useMemo, useState } from 'react';
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Clock3,
-  Database,
-  FileText,
-  Plus,
-  Search,
-} from 'lucide-react';
+import { Clock3, Database, FileText, Plus, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Input, Spinner, useMediaQuery } from '@librechat/client';
 import type { KnowledgeBase } from 'librechat-data-provider';
@@ -96,10 +88,6 @@ export function KnowledgeBasePage() {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {knowledgeBases.map((knowledgeBase) => {
               const totalDocuments = knowledgeBase.documentCount;
-              const readyDocuments = knowledgeBase.readyDocumentCount;
-              const failedDocuments = knowledgeBase.failedDocumentCount;
-              const readyPercent =
-                totalDocuments > 0 ? Math.round((readyDocuments / totalDocuments) * 100) : 0;
               const updatedDate = formatKnowledgeBaseDate(knowledgeBase.updatedAt);
               const accessLabelKey = accessLabelKeys[knowledgeBase.access ?? 'owned'];
 
@@ -108,7 +96,7 @@ export function KnowledgeBasePage() {
                   key={knowledgeBase.id}
                   type="button"
                   className={cn(
-                    'group/knowledge flex min-h-[13rem] flex-col rounded-lg border border-border-medium bg-surface-secondary p-4 text-left transition-colors',
+                    'group/knowledge flex min-h-[11rem] flex-col rounded-lg border border-border-medium bg-surface-secondary p-4 text-left transition-colors',
                     'hover:border-border-heavy hover:bg-surface-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring-primary',
                   )}
                   onClick={() => navigate(`/knowledge/${knowledgeBase.id}`)}
@@ -133,53 +121,18 @@ export function KnowledgeBasePage() {
                     </span>
                   </span>
 
-                  <span className="mt-5 grid grid-cols-3 gap-3 border-y border-border-light py-3">
-                    <span className="min-w-0">
-                      <span className="flex items-center gap-1.5 text-xs text-text-secondary">
-                        <FileText className="h-3.5 w-3.5" aria-hidden="true" />
-                        {localize('com_ui_knowledge_base_documents_total')}
-                      </span>
-                      <span className="mt-1 block text-lg font-semibold text-text-primary">
-                        {totalDocuments}
-                      </span>
+                  <span className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-border-light pt-3 text-xs text-text-secondary">
+                    <span className="flex items-center gap-1.5">
+                      <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+                      {totalDocuments} {localize('com_ui_knowledge_base_documents')}
                     </span>
-                    <span className="min-w-0">
-                      <span className="flex items-center gap-1.5 text-xs text-text-secondary">
-                        <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-                        {localize('com_ui_knowledge_base_documents_ready')}
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <Clock3 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                      <span className="truncate">
+                        {updatedDate
+                          ? localize('com_ui_knowledge_base_updated', { 0: updatedDate })
+                          : localize('com_ui_unknown')}
                       </span>
-                      <span className="mt-1 block text-lg font-semibold text-text-primary">
-                        {readyDocuments}
-                      </span>
-                    </span>
-                    <span className="min-w-0">
-                      <span className="flex items-center gap-1.5 text-xs text-text-secondary">
-                        <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
-                        {localize('com_ui_knowledge_base_documents_failed')}
-                      </span>
-                      <span className="mt-1 block text-lg font-semibold text-text-primary">
-                        {failedDocuments}
-                      </span>
-                    </span>
-                  </span>
-
-                  <span className="mt-auto pt-3">
-                    <span className="flex items-center justify-between gap-3 text-xs text-text-secondary">
-                      <span className="flex min-w-0 items-center gap-1.5">
-                        <Clock3 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                        <span className="truncate">
-                          {updatedDate
-                            ? localize('com_ui_knowledge_base_updated', { 0: updatedDate })
-                            : localize('com_ui_unknown')}
-                        </span>
-                      </span>
-                      <span className="shrink-0">{readyPercent}%</span>
-                    </span>
-                    <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-surface-primary">
-                      <span
-                        className="block h-full rounded-full bg-green-700"
-                        style={{ width: `${readyPercent}%` }}
-                      />
                     </span>
                   </span>
                 </button>
