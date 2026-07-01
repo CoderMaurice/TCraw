@@ -1,4 +1,9 @@
-import { AccessRoleIds, PermissionBits, PrincipalType, ResourceType } from 'librechat-data-provider';
+import {
+  AccessRoleIds,
+  PermissionBits,
+  PrincipalType,
+  ResourceType,
+} from 'librechat-data-provider';
 
 import {
   createKnowledgeBaseForUser,
@@ -10,6 +15,7 @@ import {
   listKnowledgeBasesForUser,
   requireKnowledgeBasePermission,
   resolveKnowledgeBaseFileIdsForAgent,
+  updateKnowledgeBaseDocumentForUser,
   updateKnowledgeBaseForUser,
   validateKnowledgeBaseBindings,
 } from './service';
@@ -48,6 +54,7 @@ function makeDeps(): jest.Mocked<KnowledgeBaseServiceDependencies> {
     createKnowledgeBaseDocument: jest.fn(),
     findKnowledgeBaseDocuments: jest.fn(),
     findReadyKnowledgeBaseDocumentFileIds: jest.fn(),
+    updateKnowledgeBaseDocument: jest.fn(),
     updateKnowledgeBaseCounts: jest.fn(),
     deleteKnowledgeBaseDocument: jest.fn(),
     deleteKnowledgeBaseWithDocuments: jest.fn(),
@@ -275,10 +282,7 @@ describe('knowledge base service', () => {
     expect(deps.checkPermission).toHaveBeenCalledWith(
       expect.objectContaining({ requiredPermission: PermissionBits.DELETE }),
     );
-    expect(deps.deleteKnowledgeBaseWithDocuments).toHaveBeenCalledWith(
-      'kb_allowed',
-      auth.tenantId,
-    );
+    expect(deps.deleteKnowledgeBaseWithDocuments).toHaveBeenCalledWith('kb_allowed', auth.tenantId);
   });
 
   it('lists documents after VIEW permission succeeds', async () => {
@@ -338,7 +342,11 @@ describe('knowledge base service', () => {
   it('creates a failed document, refreshes counts, and rejects failed uploads', async () => {
     const auth = makeAuth();
     const deps = makeDeps();
-    const failedDocument = { ...makeDocument(auth), status: 'failed' as const, error: 'RAG failed' };
+    const failedDocument = {
+      ...makeDocument(auth),
+      status: 'failed' as const,
+      error: 'RAG failed',
+    };
 
     deps.findKnowledgeBaseById.mockResolvedValue(makeKnowledgeBase(auth));
     deps.checkPermission.mockResolvedValue(true);
@@ -365,6 +373,51 @@ describe('knowledge base service', () => {
     });
     expect(deps.createKnowledgeBaseDocument).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'failed', error: 'RAG failed' }),
+    );
+    expect(deps.updateKnowledgeBaseCounts).toHaveBeenCalledWith('kb_allowed', auth.tenantId);
+  });
+
+  it('updates a processing document status and refreshes counts after EDIT permission succeeds', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+    const updatedDocument = {
+      ...makeDocument(auth),
+      status: 'ready' as const,
+      filename: 'indexed.pdf',
+      error: '',
+    };
+
+    deps.findKnowledgeBaseById.mockResolvedValue(makeKnowledgeBase(auth));
+    deps.checkPermission.mockResolvedValue(true);
+    deps.updateKnowledgeBaseDocument.mockResolvedValue(updatedDocument);
+    deps.updateKnowledgeBaseCounts.mockResolvedValue(makeKnowledgeBase(auth));
+
+    const result = await updateKnowledgeBaseDocumentForUser(
+      auth,
+      'kb_allowed',
+      'kbdoc_1',
+      {
+        filename: ' indexed.pdf ',
+        bytes: 2048,
+        mimeType: 'application/pdf',
+        status: 'ready',
+        error: '',
+      },
+      deps,
+    );
+
+    expect(result).toBe(updatedDocument);
+    expect(deps.updateKnowledgeBaseDocument).toHaveBeenCalledWith(
+      'kbdoc_1',
+      'kb_allowed',
+      auth.tenantId,
+      {
+        filename: 'indexed.pdf',
+        bytes: 2048,
+        mimeType: 'application/pdf',
+        status: 'ready',
+        error: '',
+      },
     );
     expect(deps.updateKnowledgeBaseCounts).toHaveBeenCalledWith('kb_allowed', auth.tenantId);
   });

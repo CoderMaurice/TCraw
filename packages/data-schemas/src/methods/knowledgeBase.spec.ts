@@ -144,6 +144,49 @@ describe('KnowledgeBase methods', () => {
     expect(fileIds).toEqual([{ file_id: 'file-ready-1' }]);
   });
 
+  it('updates a document status inside the requested knowledge base and tenant', async () => {
+    await methods.createKnowledgeBaseDocument({
+      id: 'doc-update',
+      knowledgeBaseId: 'kb-update',
+      file_id: 'file-update',
+      filename: 'uploading.txt',
+      bytes: 100,
+      createdBy: 'user-1',
+      tenantId: 'tenant-a',
+    });
+
+    const updated = await methods.updateKnowledgeBaseDocument(
+      'doc-update',
+      'kb-update',
+      'tenant-a',
+      {
+        filename: 'ready.txt',
+        bytes: 120,
+        status: 'ready',
+        error: '',
+      },
+    );
+
+    expect(updated).toMatchObject({
+      id: 'doc-update',
+      knowledgeBaseId: 'kb-update',
+      filename: 'ready.txt',
+      bytes: 120,
+      status: 'ready',
+      error: '',
+      tenantId: 'tenant-a',
+    });
+
+    const wrongTenant = await methods.updateKnowledgeBaseDocument(
+      'doc-update',
+      'kb-update',
+      'tenant-b',
+      { status: 'failed', error: 'wrong tenant' },
+    );
+
+    expect(wrongTenant).toBeNull();
+  });
+
   it('finds knowledge bases by Mongo resource ids with tenant filtering in input order', async () => {
     const tenantAFirst = await methods.createKnowledgeBase({
       id: 'kb-tenant-a-first',
@@ -247,10 +290,7 @@ describe('KnowledgeBase methods', () => {
       ['kb-shared-name'],
       'tenant-a',
     );
-    const tenantBDocuments = await methods.findKnowledgeBaseDocuments(
-      'kb-shared-name',
-      'tenant-b',
-    );
+    const tenantBDocuments = await methods.findKnowledgeBaseDocuments('kb-shared-name', 'tenant-b');
 
     expect(tenantAFileIds).toEqual([{ file_id: 'file-tenant-a' }]);
     expect(tenantBDocuments.map((document) => document.file_id)).toEqual(['file-tenant-b']);

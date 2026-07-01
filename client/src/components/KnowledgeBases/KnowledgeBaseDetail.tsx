@@ -24,8 +24,13 @@ export function KnowledgeBaseDetail() {
   const { id = '' } = useParams();
   const [activeTab, setActiveTab] = useState<KnowledgeBaseTab>('documents');
   const { data: knowledgeBase, isLoading: isKnowledgeBaseLoading } = useKnowledgeBaseQuery(id);
-  const { data: documentsData, isLoading: isDocumentsLoading } =
-    useKnowledgeBaseDocumentsQuery(id);
+  const { data: documentsData, isLoading: isDocumentsLoading } = useKnowledgeBaseDocumentsQuery(
+    id,
+    {
+      refetchInterval: (data) =>
+        data?.data.some((document) => document.status === 'processing') ? 2000 : false,
+    },
+  );
 
   const documents = useMemo(() => documentsData?.data ?? [], [documentsData?.data]);
 

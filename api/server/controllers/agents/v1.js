@@ -346,6 +346,7 @@ const getKnowledgeBaseDeps = (req) =>
     createKnowledgeBaseDocument: db.createKnowledgeBaseDocument,
     findKnowledgeBaseDocuments: db.findKnowledgeBaseDocuments,
     findReadyKnowledgeBaseDocumentFileIds: db.findReadyKnowledgeBaseDocumentFileIds,
+    updateKnowledgeBaseDocument: db.updateKnowledgeBaseDocument,
     updateKnowledgeBaseCounts: db.updateKnowledgeBaseCounts,
     deleteKnowledgeBaseDocument: db.deleteKnowledgeBaseDocument,
     deleteKnowledgeBaseWithDocuments: db.deleteKnowledgeBaseWithDocuments,

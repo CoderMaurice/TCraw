@@ -9,6 +9,7 @@ const mockUpdateKnowledgeBaseForUser = jest.fn();
 const mockDeleteKnowledgeBaseForUser = jest.fn();
 const mockListKnowledgeBaseDocumentsForUser = jest.fn();
 const mockCreateKnowledgeBaseDocumentForUser = jest.fn();
+const mockUpdateKnowledgeBaseDocumentForUser = jest.fn();
 const mockDeleteKnowledgeBaseDocumentForUser = jest.fn();
 const mockRequireKnowledgeBasePermission = jest.fn();
 const mockGetStorageMetadata = jest.fn();
@@ -47,6 +48,7 @@ jest.mock('@librechat/api', () => ({
   deleteKnowledgeBaseForUser: mockDeleteKnowledgeBaseForUser,
   listKnowledgeBaseDocumentsForUser: mockListKnowledgeBaseDocumentsForUser,
   createKnowledgeBaseDocumentForUser: mockCreateKnowledgeBaseDocumentForUser,
+  updateKnowledgeBaseDocumentForUser: mockUpdateKnowledgeBaseDocumentForUser,
   deleteKnowledgeBaseDocumentForUser: mockDeleteKnowledgeBaseDocumentForUser,
   requireKnowledgeBasePermission: mockRequireKnowledgeBasePermission,
   getStorageMetadata: mockGetStorageMetadata,
@@ -111,6 +113,7 @@ jest.mock('~/models', () => ({
   findKnowledgeBaseDocuments: jest.fn(),
   findReadyKnowledgeBaseDocumentFileIds: jest.fn(),
   updateKnowledgeBaseCounts: jest.fn(),
+  updateKnowledgeBaseDocument: jest.fn(),
   deleteKnowledgeBaseDocument: jest.fn(),
   deleteKnowledgeBaseWithDocuments: jest.fn(),
   getRoleByName: jest.fn(),
@@ -138,6 +141,7 @@ describe('knowledge base routes', () => {
     mockDeleteKnowledgeBaseForUser.mockReset();
     mockListKnowledgeBaseDocumentsForUser.mockReset();
     mockCreateKnowledgeBaseDocumentForUser.mockReset();
+    mockUpdateKnowledgeBaseDocumentForUser.mockReset();
     mockDeleteKnowledgeBaseDocumentForUser.mockReset();
     mockRequireKnowledgeBasePermission.mockReset();
     mockGetStorageMetadata.mockReset();
@@ -215,6 +219,7 @@ describe('knowledge base routes', () => {
         createKnowledgeBaseDocument: db.createKnowledgeBaseDocument,
         findKnowledgeBaseDocuments: db.findKnowledgeBaseDocuments,
         findReadyKnowledgeBaseDocumentFileIds: db.findReadyKnowledgeBaseDocumentFileIds,
+        updateKnowledgeBaseDocument: db.updateKnowledgeBaseDocument,
         updateKnowledgeBaseCounts: db.updateKnowledgeBaseCounts,
         deleteKnowledgeBaseDocument: db.deleteKnowledgeBaseDocument,
         deleteKnowledgeBaseWithDocuments: db.deleteKnowledgeBaseWithDocuments,
@@ -323,7 +328,9 @@ describe('knowledge base routes', () => {
     expect(mockDeleteKnowledgeBaseForUser).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 'user_1' }),
       'kb_1',
-      expect.objectContaining({ deleteKnowledgeBaseWithDocuments: db.deleteKnowledgeBaseWithDocuments }),
+      expect.objectContaining({
+        deleteKnowledgeBaseWithDocuments: db.deleteKnowledgeBaseWithDocuments,
+      }),
     );
   });
 
@@ -342,9 +349,13 @@ describe('knowledge base routes', () => {
     );
   });
 
-  it('uploads and embeds a document before creating a ready document record', async () => {
-    const serviceResult = { id: 'kbdoc_1', file_id: 'file_route', status: 'ready' };
+  it('creates a processing document record before embedding finishes', async () => {
+    const serviceResult = { id: 'kbdoc_1', file_id: 'file_route', status: 'processing' };
     mockCreateKnowledgeBaseDocumentForUser.mockResolvedValue(serviceResult);
+    mockUpdateKnowledgeBaseDocumentForUser.mockResolvedValue({
+      ...serviceResult,
+      status: 'ready',
+    });
 
     const response = await request(app)
       .post('/knowledge-bases/kb_1/documents')
@@ -380,36 +391,55 @@ describe('knowledge base routes', () => {
         filename: 'handbook.pdf',
         bytes: 1234,
         mimeType: 'application/pdf',
-        status: 'ready',
+        status: 'processing',
       },
       expect.objectContaining({ createKnowledgeBaseDocument: db.createKnowledgeBaseDocument }),
     );
     expect(mockRequireKnowledgeBasePermission.mock.invocationCallOrder[0]).toBeLessThan(
+      mockCreateKnowledgeBaseDocumentForUser.mock.invocationCallOrder[0],
+    );
+    expect(mockCreateKnowledgeBaseDocumentForUser.mock.invocationCallOrder[0]).toBeLessThan(
       mockHandleFileUpload.mock.invocationCallOrder[0],
+    );
+    await new Promise(process.nextTick);
+    expect(mockUpdateKnowledgeBaseDocumentForUser).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user_1' }),
+      'kb_1',
+      'kbdoc_1',
+      {
+        filename: 'handbook.pdf',
+        bytes: 1234,
+        mimeType: 'application/pdf',
+        status: 'ready',
+        error: '',
+      },
+      expect.objectContaining({ updateKnowledgeBaseDocument: db.updateKnowledgeBaseDocument }),
     );
   });
 
-  it('creates a failed document record and returns an error when embedding fails', async () => {
+  it('updates the processing document as failed when embedding fails', async () => {
     const vectorError = new Error('RAG failed');
-    const serviceError = new Error('Knowledge base document upload failed');
-    serviceError.statusCode = 500;
+    const serviceResult = { id: 'kbdoc_1', file_id: 'file_route', status: 'processing' };
     mockUploadVectors.mockRejectedValue(vectorError);
-    mockCreateKnowledgeBaseDocumentForUser.mockRejectedValue(serviceError);
+    mockCreateKnowledgeBaseDocumentForUser.mockResolvedValue(serviceResult);
+    mockUpdateKnowledgeBaseDocumentForUser.mockResolvedValue({
+      ...serviceResult,
+      status: 'failed',
+      error: 'RAG failed',
+    });
 
     const response = await request(app)
       .post('/knowledge-bases/kb_1/documents')
       .attach('file', Buffer.from('hello'), 'handbook.pdf');
 
-    expect(response.status).toBe(500);
-    expect(response.body).toEqual({ message: 'Failed to process knowledge base request' });
-    expect(mockCreateKnowledgeBaseDocumentForUser).toHaveBeenCalledWith(
+    expect(response.status).toBe(201);
+    expect(response.body).toEqual(serviceResult);
+    await new Promise(process.nextTick);
+    expect(mockUpdateKnowledgeBaseDocumentForUser).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 'user_1' }),
       'kb_1',
+      'kbdoc_1',
       expect.objectContaining({
-        file_id: 'file_route',
-        filename: 'handbook.pdf',
-        bytes: 1234,
-        mimeType: 'application/pdf',
         status: 'failed',
         error: 'RAG failed',
       }),

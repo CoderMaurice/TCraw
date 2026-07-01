@@ -12,6 +12,7 @@ import type {
   IKnowledgeBase,
   IKnowledgeBaseDocument,
   ReadyKnowledgeBaseDocumentFileId,
+  UpdateKnowledgeBaseDocumentInput,
   UpdateKnowledgeBaseInput,
 } from '@librechat/data-schemas';
 
@@ -74,6 +75,14 @@ export interface CreateKnowledgeBaseDocumentForUserInput {
   error?: string;
 }
 
+export interface UpdateKnowledgeBaseDocumentForUserInput {
+  filename?: string;
+  bytes?: number;
+  mimeType?: string;
+  status?: IKnowledgeBaseDocument['status'];
+  error?: string;
+}
+
 export interface KnowledgeBasePermissionGrant {
   principalType: PrincipalType;
   principalId: string | null;
@@ -121,6 +130,12 @@ export interface KnowledgeBaseServiceDependencies {
     knowledgeBaseIds: string[],
     tenantId?: string,
   ): Promise<ReadyKnowledgeBaseDocumentFileId[]>;
+  updateKnowledgeBaseDocument(
+    id: string,
+    knowledgeBaseId: string,
+    tenantId: string | undefined,
+    update: UpdateKnowledgeBaseDocumentInput,
+  ): Promise<KnowledgeBaseDocumentRecord | null>;
   updateKnowledgeBaseCounts(id: string, tenantId?: string): Promise<KnowledgeBaseRecord | null>;
   deleteKnowledgeBaseDocument(
     id: string,

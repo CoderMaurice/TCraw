@@ -60,3 +60,7 @@ export type CreateKnowledgeBaseDocumentInput = Pick<
   'id' | 'knowledgeBaseId' | 'file_id' | 'filename' | 'bytes' | 'createdBy'
 > &
   Partial<Pick<IKnowledgeBaseDocument, 'mimeType' | 'status' | 'error' | 'tenantId'>>;
+
+export type UpdateKnowledgeBaseDocumentInput = Partial<
+  Pick<IKnowledgeBaseDocument, 'filename' | 'bytes' | 'mimeType' | 'status' | 'error'>
+>;

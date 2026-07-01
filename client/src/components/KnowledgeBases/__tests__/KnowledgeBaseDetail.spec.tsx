@@ -27,13 +27,7 @@ jest.mock('@librechat/client', () => ({
     <label {...props}>{children}</label>
   ),
   OGDialog: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  OGDialogTemplate: ({
-    main,
-    buttons,
-  }: {
-    main?: React.ReactNode;
-    buttons?: React.ReactNode;
-  }) => (
+  OGDialogTemplate: ({ main, buttons }: { main?: React.ReactNode; buttons?: React.ReactNode }) => (
     <div>
       {main}
       {buttons}
@@ -163,7 +157,10 @@ describe('KnowledgeBaseDetail', () => {
     render(<RouterProvider router={router} />);
 
     expect(useKnowledgeBaseQuery).toHaveBeenCalledWith('kb_1');
-    expect(useKnowledgeBaseDocumentsQuery).toHaveBeenCalledWith('kb_1');
+    expect(useKnowledgeBaseDocumentsQuery).toHaveBeenCalledWith(
+      'kb_1',
+      expect.objectContaining({ refetchInterval: expect.any(Function) }),
+    );
     expect(screen.getByText('Support')).toBeInTheDocument();
     expect(screen.getByText('Support playbooks')).toBeInTheDocument();
     expect(screen.getByText('1 / 2 ready')).toBeInTheDocument();

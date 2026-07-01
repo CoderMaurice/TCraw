@@ -1,5 +1,10 @@
 import { randomUUID } from 'crypto';
-import { AccessRoleIds, PermissionBits, PrincipalType, ResourceType } from 'librechat-data-provider';
+import {
+  AccessRoleIds,
+  PermissionBits,
+  PrincipalType,
+  ResourceType,
+} from 'librechat-data-provider';
 
 import type {
   KnowledgeAuthContext,
@@ -14,6 +19,7 @@ import type {
   ListKnowledgeBasesForUserInput,
   ListKnowledgeBasesForUserResult,
   MongoResourceId,
+  UpdateKnowledgeBaseDocumentForUserInput,
   UpdateKnowledgeBaseForUserInput,
 } from './types';
 
@@ -182,6 +188,31 @@ export async function createKnowledgeBaseDocumentForUser(
   }
 
   return created;
+}
+
+export async function updateKnowledgeBaseDocumentForUser(
+  auth: KnowledgeAuthContext,
+  id: string,
+  documentId: string,
+  input: UpdateKnowledgeBaseDocumentForUserInput,
+  deps: KnowledgeBaseServiceDependencies,
+): Promise<KnowledgeBaseDocumentRecord> {
+  await requireKnowledgeBasePermission(auth, id, PermissionBits.EDIT, deps);
+
+  const update = {
+    filename: normalizeOptionalName(input.filename),
+    bytes: typeof input.bytes === 'number' ? input.bytes : undefined,
+    mimeType: normalizeOptionalDescription(input.mimeType),
+    status: input.status,
+    error: normalizeOptionalDescription(input.error),
+  };
+  const updated = await deps.updateKnowledgeBaseDocument(documentId, id, auth.tenantId, update);
+  if (!updated) {
+    throw createServiceError('Knowledge base document not found', 404);
+  }
+
+  await deps.updateKnowledgeBaseCounts(id, auth.tenantId);
+  return updated;
 }
 
 export async function deleteKnowledgeBaseDocumentForUser(

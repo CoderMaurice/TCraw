@@ -6,6 +6,7 @@ import type {
   IKnowledgeBaseMongoDocument,
   IKnowledgeBaseDocument,
   IKnowledgeBase,
+  UpdateKnowledgeBaseDocumentInput,
 } from '~/types';
 
 export type UpdateKnowledgeBaseInput = Partial<Pick<IKnowledgeBase, 'name' | 'description'>>;
@@ -40,6 +41,12 @@ export interface KnowledgeBaseMethods {
     knowledgeBaseIds: string[],
     tenantId?: string,
   ): Promise<ReadyKnowledgeBaseDocumentFileId[]>;
+  updateKnowledgeBaseDocument(
+    id: string,
+    knowledgeBaseId: string,
+    tenantId: string | undefined,
+    update: UpdateKnowledgeBaseDocumentInput,
+  ): Promise<IKnowledgeBaseDocument | null>;
   updateKnowledgeBaseCounts(id: string, tenantId?: string): Promise<IKnowledgeBase | null>;
   deleteKnowledgeBaseDocument(
     id: string,
@@ -218,6 +225,47 @@ export function createKnowledgeBaseMethods(
       .lean<ReadyKnowledgeBaseDocumentFileId[]>();
   }
 
+  async function updateKnowledgeBaseDocument(
+    id: string,
+    knowledgeBaseId: string,
+    tenantId: string | undefined,
+    update: UpdateKnowledgeBaseDocumentInput,
+  ): Promise<IKnowledgeBaseDocument | null> {
+    const KnowledgeBaseDocument = getKnowledgeBaseDocumentModel();
+    const $set: UpdateKnowledgeBaseDocumentInput = {};
+    if (typeof update.filename === 'string') {
+      $set.filename = update.filename.trim();
+    }
+    if (typeof update.bytes === 'number') {
+      $set.bytes = update.bytes;
+    }
+    if (typeof update.mimeType === 'string') {
+      $set.mimeType = update.mimeType;
+    }
+    if (typeof update.status === 'string') {
+      $set.status = update.status;
+    }
+    if (typeof update.error === 'string') {
+      $set.error = update.error;
+    }
+
+    if (Object.keys($set).length === 0) {
+      return await KnowledgeBaseDocument.findOne({
+        id,
+        ...knowledgeBaseDocumentFilter(knowledgeBaseId, tenantId),
+      }).lean<IKnowledgeBaseDocument>();
+    }
+
+    return await KnowledgeBaseDocument.findOneAndUpdate(
+      {
+        id,
+        ...knowledgeBaseDocumentFilter(knowledgeBaseId, tenantId),
+      },
+      { $set },
+      { new: true, runValidators: true },
+    ).lean<IKnowledgeBaseDocument>();
+  }
+
   async function updateKnowledgeBaseCounts(
     id: string,
     tenantId?: string,
@@ -305,6 +353,7 @@ export function createKnowledgeBaseMethods(
     createKnowledgeBaseDocument,
     findKnowledgeBaseDocuments,
     findReadyKnowledgeBaseDocumentFileIds,
+    updateKnowledgeBaseDocument,
     updateKnowledgeBaseCounts,
     deleteKnowledgeBaseDocument,
     deleteKnowledgeBaseWithDocuments,

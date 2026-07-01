@@ -12,6 +12,7 @@ const {
   requireKnowledgeBasePermission,
   listKnowledgeBaseDocumentsForUser,
   createKnowledgeBaseDocumentForUser,
+  updateKnowledgeBaseDocumentForUser,
   deleteKnowledgeBaseDocumentForUser,
   listKnowledgeBasesForUser,
 } = require('@librechat/api');
@@ -36,6 +37,7 @@ const deps = {
   createKnowledgeBaseDocument: db.createKnowledgeBaseDocument,
   findKnowledgeBaseDocuments: db.findKnowledgeBaseDocuments,
   findReadyKnowledgeBaseDocumentFileIds: db.findReadyKnowledgeBaseDocumentFileIds,
+  updateKnowledgeBaseDocument: db.updateKnowledgeBaseDocument,
   updateKnowledgeBaseCounts: db.updateKnowledgeBaseCounts,
   deleteKnowledgeBaseDocument: db.deleteKnowledgeBaseDocument,
   deleteKnowledgeBaseWithDocuments: db.deleteKnowledgeBaseWithDocuments,
@@ -119,8 +121,15 @@ const uploadDocumentMiddleware = async (req, res, next) => {
 
 const getUploadFileId = (req) => req.file_id || crypto.randomUUID();
 
-const buildFailedDocumentInput = ({ req, fileId, error }) => ({
+const buildProcessingDocumentInput = ({ req, fileId }) => ({
   file_id: fileId,
+  filename: sanitizeFilename(req.file.originalname),
+  bytes: req.file.size ?? 0,
+  mimeType: req.file.mimetype,
+  status: 'processing',
+});
+
+const buildFailedDocumentUpdateInput = ({ req, error }) => ({
   filename: sanitizeFilename(req.file.originalname),
   bytes: req.file.size ?? 0,
   mimeType: req.file.mimetype,
@@ -166,6 +175,47 @@ const processKnowledgeBaseDocumentUpload = async ({ req, knowledgeBaseId, fileId
   };
 };
 
+const finalizeKnowledgeBaseDocumentUpload = async ({
+  auth,
+  knowledgeBaseId,
+  documentId,
+  req,
+  fileId,
+}) => {
+  try {
+    const documentInput = await processKnowledgeBaseDocumentUpload({
+      req,
+      knowledgeBaseId,
+      fileId,
+    });
+    await updateKnowledgeBaseDocumentForUser(
+      auth,
+      knowledgeBaseId,
+      documentId,
+      {
+        filename: documentInput.filename,
+        bytes: documentInput.bytes,
+        mimeType: documentInput.mimeType,
+        status: 'ready',
+        error: '',
+      },
+      deps,
+    );
+  } catch (error) {
+    try {
+      await updateKnowledgeBaseDocumentForUser(
+        auth,
+        knowledgeBaseId,
+        documentId,
+        buildFailedDocumentUpdateInput({ req, error }),
+        deps,
+      );
+    } catch (updateError) {
+      logger.error('[knowledgeBases] Failed to mark document upload as failed:', updateError);
+    }
+  }
+};
+
 router.use(requireJwtAuth);
 router.use(configMiddleware);
 router.use(checkKnowledgeBaseAccess);
@@ -207,7 +257,11 @@ router.post('/', checkKnowledgeBaseCreate, async (req, res) => {
 
 router.get('/:id/documents', async (req, res) => {
   try {
-    const result = await listKnowledgeBaseDocumentsForUser(authFromRequest(req), req.params.id, deps);
+    const result = await listKnowledgeBaseDocumentsForUser(
+      authFromRequest(req),
+      req.params.id,
+      deps,
+    );
     return res.json(result);
   } catch (error) {
     return sendServiceError(res, error);
@@ -228,29 +282,21 @@ router.post('/:id/documents', uploadDocumentMiddleware, async (req, res) => {
 
     await requireKnowledgeBasePermission(auth, knowledgeBaseId, PermissionBits.EDIT, deps);
 
-    let documentInput;
-    try {
-      documentInput = await processKnowledgeBaseDocumentUpload({
-        req,
-        knowledgeBaseId,
-        fileId,
-      });
-    } catch (error) {
-      await createKnowledgeBaseDocumentForUser(
-        auth,
-        knowledgeBaseId,
-        buildFailedDocumentInput({ req, fileId, error }),
-        deps,
-      );
-      throw error;
-    }
-
     const result = await createKnowledgeBaseDocumentForUser(
       auth,
       knowledgeBaseId,
-      documentInput,
+      buildProcessingDocumentInput({ req, fileId }),
       deps,
     );
+
+    void finalizeKnowledgeBaseDocumentUpload({
+      auth,
+      knowledgeBaseId,
+      documentId: result.id,
+      req,
+      fileId,
+    });
+
     return res.status(201).json(result);
   } catch (error) {
     return sendServiceError(res, error);
