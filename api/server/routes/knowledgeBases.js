@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { readFile } = require('fs/promises');
+const { readFile, unlink } = require('fs/promises');
 const express = require('express');
 const { logger } = require('@librechat/data-schemas');
 const {
@@ -108,6 +108,18 @@ const createRouteError = (message, statusCode) => {
   const error = new Error(message);
   error.statusCode = statusCode;
   return error;
+};
+
+const cleanupTempUpload = async (filePath) => {
+  if (!filePath) {
+    return;
+  }
+
+  try {
+    await unlink(filePath);
+  } catch (error) {
+    logger.error('[knowledgeBases] Failed to remove temp upload:', error);
+  }
 };
 
 const getDocumentUpload = async () => {
@@ -300,23 +312,27 @@ router.post('/:id/documents', uploadDocumentMiddleware, async (req, res) => {
     );
 
     if (kb.provider === 'weknora') {
-      if (!kb.externalId) {
-        throw createRouteError('WeKnora knowledge base is missing an external id', 500);
+      try {
+        if (!kb.externalId) {
+          throw createRouteError('WeKnora knowledge base is missing an external id', 500);
+        }
+
+        if (!deps.weknoraClient) {
+          throw createRouteError('WeKnora client is not configured', 500);
+        }
+
+        const fileBytes = await readFile(req.file.path);
+        const document = await deps.weknoraClient.uploadDocument(kb.externalId, {
+          filename: sanitizeFilename(req.file.originalname),
+          data: fileBytes,
+          mimeType: req.file.mimetype,
+          bytes: req.file.size ?? 0,
+        });
+
+        return res.status(201).json(mapWeKnoraDocumentToRecord(document, kb, auth));
+      } finally {
+        await cleanupTempUpload(req.file.path);
       }
-
-      if (!deps.weknoraClient) {
-        throw createRouteError('WeKnora client is not configured', 500);
-      }
-
-      const fileBytes = await readFile(req.file.path);
-      const document = await deps.weknoraClient.uploadDocument(kb.externalId, {
-        filename: sanitizeFilename(req.file.originalname),
-        data: fileBytes,
-        mimeType: req.file.mimetype,
-        bytes: req.file.size ?? 0,
-      });
-
-      return res.status(201).json(mapWeKnoraDocumentToRecord(document, kb, auth));
     }
 
     const fileId = getUploadFileId(req);

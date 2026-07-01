@@ -95,6 +95,7 @@ jest.mock('@librechat/data-schemas', () => ({
 
 jest.mock('fs/promises', () => ({
   readFile: jest.fn(),
+  unlink: jest.fn(),
 }));
 
 jest.mock('~/server/middleware/requireJwtAuth', () => (req, _res, next) => {
@@ -155,7 +156,7 @@ jest.mock('~/server/services/PermissionService', () => ({
 }));
 
 const db = require('~/models');
-const { readFile: mockReadFile } = require('fs/promises');
+const { readFile: mockReadFile, unlink: mockUnlink } = require('fs/promises');
 const { logger } = require('@librechat/data-schemas');
 const PermissionService = require('~/server/services/PermissionService');
 const knowledgeBaseRoutes = require('./knowledgeBases');
@@ -186,6 +187,7 @@ describe('knowledge base routes', () => {
     mockUploadVectors.mockReset();
     mockWeKnoraClient.uploadDocument.mockReset();
     mockReadFile.mockReset();
+    mockUnlink.mockReset();
     mockKnowledgeBaseAccessMiddleware.mockClear();
     mockKnowledgeBaseCreateMiddleware.mockClear();
     logger.error.mockClear();
@@ -537,6 +539,7 @@ describe('knowledge base routes', () => {
       bytes: 1234,
     });
     expect(mockReadFile).toHaveBeenCalledWith('/tmp/handbook.pdf');
+    expect(mockUnlink).toHaveBeenCalledWith('/tmp/handbook.pdf');
     expect(mockMapWeKnoraDocumentToRecord).toHaveBeenCalledWith(
       {
         externalId: 'wk_doc_1',
@@ -560,6 +563,30 @@ describe('knowledge base routes', () => {
     expect(mockUploadVectors).not.toHaveBeenCalled();
     await new Promise(process.nextTick);
     expect(mockUpdateKnowledgeBaseDocumentForUser).not.toHaveBeenCalled();
+  });
+
+  it('cleans up WeKnora temp files when upload fails', async () => {
+    const uploadError = new Error('WeKnora upload failed');
+    uploadError.statusCode = 502;
+    mockRequireKnowledgeBasePermission.mockResolvedValue({
+      id: 'kb_weknora',
+      provider: 'weknora',
+      externalId: 'wk_kb_1',
+    });
+    mockReadFile.mockResolvedValue(Buffer.from('disk-backed hello'));
+    mockWeKnoraClient.uploadDocument.mockRejectedValue(uploadError);
+
+    const response = await request(app)
+      .post('/knowledge-bases/kb_weknora/documents')
+      .attach('file', Buffer.from('hello'), 'handbook.pdf');
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ message: 'Failed to process knowledge base request' });
+    expect(mockUnlink).toHaveBeenCalledWith('/tmp/handbook.pdf');
+    expect(logger.error).toHaveBeenCalledWith(
+      '[knowledgeBases] Unexpected route error:',
+      uploadError,
+    );
   });
 
   it('deletes a document for a knowledge base', async () => {
