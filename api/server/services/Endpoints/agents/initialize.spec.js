@@ -13,6 +13,7 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 const mockInitializeAgent = jest.fn();
 const mockValidateAgentModel = jest.fn();
 const mockResolveKnowledgeBaseFileIdsForAgent = jest.fn();
+const mockCreateWeKnoraClient = jest.fn(() => null);
 const mockCheckPermission = jest.fn();
 const mockFindAccessibleResources = jest.fn();
 const mockProcessAddedConvo = jest.fn().mockResolvedValue({ userMCPAuthMap: undefined });
@@ -31,6 +32,7 @@ jest.mock('@librechat/api', () => ({
   validateAgentModel: (...args) => mockValidateAgentModel(...args),
   resolveKnowledgeBaseFileIdsForAgent: (...args) =>
     mockResolveKnowledgeBaseFileIdsForAgent(...args),
+  createWeKnoraClient: (...args) => mockCreateWeKnoraClient(...args),
   GenerationJobManager: { setCollectedUsage: jest.fn() },
   getCustomEndpointConfig: jest.fn(),
   createSequentialChainEdges: jest.fn(),
@@ -80,7 +82,7 @@ jest.mock('~/cache', () => ({
   logViolation: jest.fn(),
 }));
 
-const { initializeClient } = require('./initialize');
+const { initializeClient, buildWeKnoraKnowledgeContext } = require('./initialize');
 const { getSkillToolDeps } = require('./skillDeps');
 const { logger } = require('@librechat/data-schemas');
 const { User, AclEntry } = require('~/db/models');
@@ -93,6 +95,65 @@ jest.spyOn(logger, 'warn').mockImplementation(() => {});
 const PRIMARY_ID = 'agent_primary';
 const TARGET_ID = 'agent_target';
 const AUTHORIZED_ID = 'agent_authorized';
+
+describe('buildWeKnoraKnowledgeContext', () => {
+  it('calls WeKnora search for bound WeKnora knowledge bases and formats results', async () => {
+    const findKnowledgeBaseById = jest.fn().mockResolvedValue({
+      id: 'kb_mirrored',
+      provider: 'weknora',
+      externalId: '2a2da502-5549-44e7-b98c-ff5b9417b208',
+      tenantId: 'tenant-a',
+    });
+    const weknoraClient = {
+      search: jest.fn().mockResolvedValue([
+        {
+          title: '制度手册',
+          filename: '制度手册.pdf',
+          content: '报销需要在审批系统提交。',
+          score: 0.82,
+        },
+      ]),
+    };
+
+    const context = await buildWeKnoraKnowledgeContext({
+      query: '怎么报销',
+      knowledgeBaseIds: ['kb_mirrored'],
+      tenantId: 'tenant-a',
+      findKnowledgeBaseById,
+      weknoraClient,
+    });
+
+    expect(findKnowledgeBaseById).toHaveBeenCalledWith('kb_mirrored', 'tenant-a');
+    expect(weknoraClient.search).toHaveBeenCalledWith('怎么报销', [
+      '2a2da502-5549-44e7-b98c-ff5b9417b208',
+    ]);
+    expect(context).toContain('制度手册');
+    expect(context).toContain('报销需要在审批系统提交。');
+  });
+
+  it('filters local knowledge bases and WeKnora knowledge bases without external ids', async () => {
+    const findKnowledgeBaseById = jest
+      .fn()
+      .mockResolvedValueOnce({ id: 'kb_local', provider: 'local', externalId: 'local_external' })
+      .mockResolvedValueOnce({ id: 'kb_weknora_empty', provider: 'weknora' });
+    const weknoraClient = {
+      search: jest.fn(),
+    };
+
+    const context = await buildWeKnoraKnowledgeContext({
+      query: '怎么报销',
+      knowledgeBaseIds: ['kb_local', 'kb_weknora_empty'],
+      tenantId: 'tenant-a',
+      findKnowledgeBaseById,
+      weknoraClient,
+    });
+
+    expect(context).toBe('');
+    expect(findKnowledgeBaseById).toHaveBeenNthCalledWith(1, 'kb_local', 'tenant-a');
+    expect(findKnowledgeBaseById).toHaveBeenNthCalledWith(2, 'kb_weknora_empty', 'tenant-a');
+    expect(weknoraClient.search).not.toHaveBeenCalled();
+  });
+});
 
 describe('initializeClient — processAgent ACL gate', () => {
   let mongoServer;
@@ -112,6 +173,7 @@ describe('initializeClient — processAgent ACL gate', () => {
     await mongoose.connection.dropDatabase();
     jest.clearAllMocks();
     agentClientArgs = undefined;
+    mockCreateWeKnoraClient.mockReturnValue(null);
     mockCheckPermission.mockImplementation((...args) =>
       actualPermissionService.checkPermission(...args),
     );
@@ -233,6 +295,65 @@ describe('initializeClient — processAgent ACL gate', () => {
       'file_kb_1',
       'file_kb_2',
     ]);
+  });
+
+  it('uses request text for WeKnora search and appends results to primary additional instructions', async () => {
+    const endpointOption = makeEndpointOption();
+    endpointOption.agent = Promise.resolve({
+      id: PRIMARY_ID,
+      name: 'Primary',
+      provider: 'openai',
+      model: 'gpt-4',
+      tools: [],
+      knowledge_base_ids: ['kb_weknora'],
+    });
+    const primaryConfig = {
+      ...makePrimaryConfig([]),
+      additional_instructions: 'Existing instructions',
+    };
+    const weknoraClient = {
+      search: jest.fn().mockResolvedValue([
+        {
+          metadata: { filename: '报销制度.pdf' },
+          externalDocumentId: 'doc_1',
+          content: '报销需要在审批系统提交。',
+          score: 0.82,
+        },
+      ]),
+    };
+    const findKnowledgeBaseByIdSpy = jest.spyOn(models, 'findKnowledgeBaseById').mockResolvedValue({
+      id: 'kb_weknora',
+      provider: 'weknora',
+      externalId: 'wk_kb_1',
+      tenantId: 'tenant-a',
+    });
+    mockCreateWeKnoraClient.mockReturnValue(weknoraClient);
+    mockInitializeAgent.mockResolvedValue(primaryConfig);
+
+    const req = makeReq();
+    req.user.tenantId = 'tenant-a';
+    req.body.text = '怎么报销';
+
+    try {
+      await initializeClient({
+        req,
+        res: {},
+        signal: new AbortController().signal,
+        endpointOption,
+      });
+
+      expect(mockCreateWeKnoraClient).toHaveBeenCalledWith(process.env);
+      expect(findKnowledgeBaseByIdSpy).toHaveBeenCalledWith('kb_weknora', 'tenant-a');
+      expect(weknoraClient.search).toHaveBeenCalledWith('怎么报销', ['wk_kb_1']);
+      expect(agentClientArgs.agent.additional_instructions).toContain('Existing instructions');
+      expect(agentClientArgs.agent.additional_instructions).toContain(
+        '以下内容来自已绑定知识库，回答时优先参考',
+      );
+      expect(agentClientArgs.agent.additional_instructions).toContain('报销制度.pdf');
+      expect(agentClientArgs.agent.additional_instructions).toContain('报销需要在审批系统提交。');
+    } finally {
+      findKnowledgeBaseByIdSpy.mockRestore();
+    }
   });
 
   it('resolves shared agent knowledge bases without checking direct knowledge base ACL', async () => {
