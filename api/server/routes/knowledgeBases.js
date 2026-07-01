@@ -15,6 +15,7 @@ const {
   updateKnowledgeBaseDocumentForUser,
   deleteKnowledgeBaseDocumentForUser,
   listKnowledgeBasesForUser,
+  createWeKnoraClient,
 } = require('@librechat/api');
 const { Permissions, PermissionBits, PermissionTypes } = require('librechat-data-provider');
 const requireJwtAuth = require('~/server/middleware/requireJwtAuth');
@@ -28,11 +29,14 @@ const { createMulterInstance } = require('./files/multer');
 
 const router = express.Router();
 let documentUpload;
+const weknoraClient = createWeKnoraClient(process.env);
 
 const deps = {
   createKnowledgeBase: db.createKnowledgeBase,
   findKnowledgeBaseById: db.findKnowledgeBaseById,
+  findKnowledgeBaseByExternalId: db.findKnowledgeBaseByExternalId,
   findKnowledgeBasesByResourceIds: db.findKnowledgeBasesByResourceIds,
+  upsertExternalKnowledgeBase: db.upsertExternalKnowledgeBase,
   updateKnowledgeBase: db.updateKnowledgeBase,
   createKnowledgeBaseDocument: db.createKnowledgeBaseDocument,
   findKnowledgeBaseDocuments: db.findKnowledgeBaseDocuments,
@@ -44,6 +48,7 @@ const deps = {
   grantPermission: PermissionService.grantPermission,
   findAccessibleResources: PermissionService.findAccessibleResources,
   checkPermission: PermissionService.checkPermission,
+  weknoraClient,
 };
 
 const checkKnowledgeBaseAccess = generateCheckAccess({

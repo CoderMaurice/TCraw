@@ -14,6 +14,12 @@ const mockDeleteKnowledgeBaseDocumentForUser = jest.fn();
 const mockRequireKnowledgeBasePermission = jest.fn();
 const mockGetStorageMetadata = jest.fn();
 const mockSanitizeFilename = jest.fn((filename) => filename.trim());
+const mockWeKnoraClient = { listSharedKnowledgeBases: jest.fn() };
+const mockWeKnoraClientCreations = [];
+const mockCreateWeKnoraClient = jest.fn((env) => {
+  mockWeKnoraClientCreations.push(env);
+  return mockWeKnoraClient;
+});
 const mockKnowledgeBaseAccessMiddleware = jest.fn((_req, _res, next) => next());
 const mockKnowledgeBaseCreateMiddleware = jest.fn((_req, _res, next) => next());
 const mockCheckAccessConfigs = [];
@@ -53,6 +59,7 @@ jest.mock('@librechat/api', () => ({
   requireKnowledgeBasePermission: mockRequireKnowledgeBasePermission,
   getStorageMetadata: mockGetStorageMetadata,
   sanitizeFilename: mockSanitizeFilename,
+  createWeKnoraClient: mockCreateWeKnoraClient,
   generateCheckAccess: jest.fn((config) => {
     mockCheckAccessConfigs.push(config);
 
@@ -107,7 +114,9 @@ jest.mock('~/server/services/Files/VectorDB/crud', () => ({
 jest.mock('~/models', () => ({
   createKnowledgeBase: jest.fn(),
   findKnowledgeBaseById: jest.fn(),
+  findKnowledgeBaseByExternalId: jest.fn(),
   findKnowledgeBasesByResourceIds: jest.fn(),
+  upsertExternalKnowledgeBase: jest.fn(),
   updateKnowledgeBase: jest.fn(),
   createKnowledgeBaseDocument: jest.fn(),
   findKnowledgeBaseDocuments: jest.fn(),
@@ -192,6 +201,10 @@ describe('knowledge base routes', () => {
     ]);
   });
 
+  it('creates one WeKnora client for knowledge base route deps', () => {
+    expect(mockWeKnoraClientCreations).toEqual([process.env]);
+  });
+
   it('returns listed knowledge bases and passes auth, query, and deps', async () => {
     const serviceResult = {
       data: [{ id: 'kb_1', name: 'Support KB' }],
@@ -214,7 +227,9 @@ describe('knowledge base routes', () => {
       {
         createKnowledgeBase: db.createKnowledgeBase,
         findKnowledgeBaseById: db.findKnowledgeBaseById,
+        findKnowledgeBaseByExternalId: db.findKnowledgeBaseByExternalId,
         findKnowledgeBasesByResourceIds: db.findKnowledgeBasesByResourceIds,
+        upsertExternalKnowledgeBase: db.upsertExternalKnowledgeBase,
         updateKnowledgeBase: db.updateKnowledgeBase,
         createKnowledgeBaseDocument: db.createKnowledgeBaseDocument,
         findKnowledgeBaseDocuments: db.findKnowledgeBaseDocuments,
@@ -226,6 +241,7 @@ describe('knowledge base routes', () => {
         grantPermission: PermissionService.grantPermission,
         findAccessibleResources: PermissionService.findAccessibleResources,
         checkPermission: PermissionService.checkPermission,
+        weknoraClient: mockWeKnoraClient,
       },
     );
   });

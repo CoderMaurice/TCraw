@@ -13,6 +13,7 @@ import type {
   IKnowledgeBase,
   IKnowledgeBaseDocument,
   ReadyKnowledgeBaseDocumentFileId,
+  UpsertExternalKnowledgeBaseInput,
   UpdateKnowledgeBaseDocumentInput,
   UpdateKnowledgeBaseInput,
 } from '@librechat/data-schemas';
@@ -111,6 +112,14 @@ export interface KnowledgeBasePermissionCheckInput {
 export interface KnowledgeBaseServiceDependencies {
   createKnowledgeBase(input: CreateKnowledgeBaseInput): Promise<KnowledgeBaseRecord>;
   findKnowledgeBaseById(id: string, tenantId?: string): Promise<KnowledgeBaseRecord | null>;
+  findKnowledgeBaseByExternalId?(
+    provider: string,
+    externalId: string,
+    tenantId?: string,
+  ): Promise<KnowledgeBaseRecord | null>;
+  upsertExternalKnowledgeBase?(
+    input: UpsertExternalKnowledgeBaseInput,
+  ): Promise<KnowledgeBaseRecord>;
   findKnowledgeBasesByResourceIds(
     resourceIds: KnowledgeBaseResourceReference[],
     tenantId?: string,
@@ -152,6 +161,7 @@ export interface KnowledgeBaseServiceDependencies {
     input: KnowledgeBaseAccessibleResourcesInput,
   ): Promise<KnowledgeBaseResourceReference[]>;
   checkPermission(input: KnowledgeBasePermissionCheckInput): Promise<boolean>;
+  weknoraClient?: WeKnoraClient | null;
 }
 
 export type KnowledgeBaseServiceError = Error & {

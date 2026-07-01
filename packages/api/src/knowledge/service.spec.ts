@@ -24,6 +24,7 @@ import type {
   KnowledgeBaseDocumentRecord,
   KnowledgeBaseRecord,
   KnowledgeBaseServiceDependencies,
+  WeKnoraClient,
 } from './types';
 
 type MongoId = {
@@ -64,7 +65,12 @@ function makeDeps(): jest.Mocked<KnowledgeBaseServiceDependencies> {
   };
 }
 
-function makeKnowledgeBase(auth = makeAuth()): KnowledgeBaseRecord {
+function makeKnowledgeBase(
+  authOrOverrides: KnowledgeAuthContext | Partial<KnowledgeBaseRecord> = makeAuth(),
+): KnowledgeBaseRecord {
+  const auth = 'userId' in authOrOverrides ? authOrOverrides : makeAuth();
+  const overrides = 'userId' in authOrOverrides ? {} : authOrOverrides;
+
   return {
     _id: mongoId('64f1f77bcf86cd799439011'),
     id: 'kb_allowed',
@@ -76,6 +82,7 @@ function makeKnowledgeBase(auth = makeAuth()): KnowledgeBaseRecord {
     documentCount: 0,
     readyDocumentCount: 0,
     failedDocumentCount: 0,
+    ...overrides,
   };
 }
 
@@ -191,6 +198,73 @@ describe('knowledge base service', () => {
       [firstResourceId, secondResourceId],
       auth.tenantId,
     );
+  });
+
+  it('syncs TCRAW shared WeKnora knowledge bases before listing accessible knowledge bases', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+
+    deps.weknoraClient = {
+      listSharedKnowledgeBases: jest.fn().mockResolvedValue([
+        {
+          externalId: '2a2da502-5549-44e7-b98c-ff5b9417b208',
+          externalSpaceId: '3c6805d0-88c3-46dd-8d20-3a90dd51d63d',
+          externalShareId: '003cff10-6084-4602-84c3-86d3b9e3fa74',
+          name: '上海致拓',
+          description: '',
+          documentCount: 22,
+          readyDocumentCount: 22,
+          failedDocumentCount: 0,
+          processingDocumentCount: 0,
+        },
+      ]),
+    } as unknown as WeKnoraClient;
+    deps.upsertExternalKnowledgeBase = jest.fn().mockResolvedValue(
+      makeKnowledgeBase({
+        _id: mongoId('64f1f77bcf86cd799439099'),
+        id: 'kb_mirrored',
+        provider: 'weknora',
+        externalId: '2a2da502-5549-44e7-b98c-ff5b9417b208',
+        name: '上海致拓',
+        documentCount: 22,
+      }),
+    );
+    deps.grantPermission.mockResolvedValue(null);
+    deps.findAccessibleResources.mockResolvedValue(['64f1f77bcf86cd799439099']);
+    deps.findKnowledgeBasesByResourceIds.mockResolvedValue([
+      makeKnowledgeBase({
+        _id: mongoId('64f1f77bcf86cd799439099'),
+        id: 'kb_mirrored',
+        provider: 'weknora',
+        name: '上海致拓',
+        documentCount: 22,
+      }),
+    ]);
+
+    const result = await listKnowledgeBasesForUser(auth, {}, deps);
+
+    expect(deps.weknoraClient.listSharedKnowledgeBases).toHaveBeenCalledTimes(1);
+    expect(deps.upsertExternalKnowledgeBase).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'weknora',
+        externalId: '2a2da502-5549-44e7-b98c-ff5b9417b208',
+        name: '上海致拓',
+        documentCount: 22,
+        author: auth.userId,
+        authorName: auth.name,
+        tenantId: auth.tenantId,
+      }),
+    );
+    expect(deps.grantPermission).toHaveBeenCalledWith({
+      principalType: PrincipalType.USER,
+      principalId: auth.userId,
+      resourceType: ResourceType.KNOWLEDGE_BASE,
+      resourceId: '64f1f77bcf86cd799439099',
+      accessRoleId: AccessRoleIds.KNOWLEDGE_BASE_OWNER,
+      grantedBy: auth.userId,
+    });
+    expect(result.data[0].id).toBe('kb_mirrored');
+    expect(result.data[0].id).not.toBe('2a2da502-5549-44e7-b98c-ff5b9417b208');
   });
 
   it('does not query knowledge base records when no accessible resources exist', async () => {

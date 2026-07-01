@@ -55,6 +55,53 @@ function deduplicateNonEmptyIds(ids: string[]): string[] {
   }, []);
 }
 
+export async function syncWeKnoraKnowledgeBasesForUser(
+  auth: KnowledgeAuthContext,
+  deps: KnowledgeBaseServiceDependencies,
+): Promise<KnowledgeBaseRecord[]> {
+  if (!deps.weknoraClient || !deps.upsertExternalKnowledgeBase) {
+    return [];
+  }
+
+  const { upsertExternalKnowledgeBase, weknoraClient } = deps;
+  const externalKnowledgeBases = await weknoraClient.listSharedKnowledgeBases();
+  return await Promise.all(
+    externalKnowledgeBases.map(async (externalKnowledgeBase) => {
+      const knowledgeBase = await upsertExternalKnowledgeBase({
+        id: `kb_${randomUUID()}`,
+        name: externalKnowledgeBase.name,
+        description: externalKnowledgeBase.description,
+        author: auth.userId,
+        authorName: auth.name,
+        tenantId: auth.tenantId,
+        provider: 'weknora',
+        externalId: externalKnowledgeBase.externalId,
+        externalSpaceId: externalKnowledgeBase.externalSpaceId,
+        externalShareId: externalKnowledgeBase.externalShareId,
+        documentCount: externalKnowledgeBase.documentCount,
+        readyDocumentCount: externalKnowledgeBase.readyDocumentCount,
+        failedDocumentCount: externalKnowledgeBase.failedDocumentCount,
+        processingDocumentCount: externalKnowledgeBase.processingDocumentCount,
+      });
+
+      if (!knowledgeBase) {
+        throw createServiceError('Failed to sync WeKnora knowledge base', 500);
+      }
+
+      await deps.grantPermission({
+        principalType: PrincipalType.USER,
+        principalId: auth.userId,
+        resourceType: ResourceType.KNOWLEDGE_BASE,
+        resourceId: getMongoResourceId(knowledgeBase),
+        accessRoleId: AccessRoleIds.KNOWLEDGE_BASE_OWNER,
+        grantedBy: auth.userId,
+      });
+
+      return knowledgeBase;
+    }),
+  );
+}
+
 export async function createKnowledgeBaseForUser(
   auth: KnowledgeAuthContext,
   input: CreateKnowledgeBaseForUserInput,
@@ -87,6 +134,8 @@ export async function listKnowledgeBasesForUser(
   input: ListKnowledgeBasesForUserInput,
   deps: KnowledgeBaseServiceDependencies,
 ): Promise<ListKnowledgeBasesForUserResult> {
+  await syncWeKnoraKnowledgeBasesForUser(auth, deps);
+
   const resourceIds = await deps.findAccessibleResources({
     userId: auth.userId,
     role: auth.role,
