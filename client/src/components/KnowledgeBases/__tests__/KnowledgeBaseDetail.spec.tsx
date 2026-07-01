@@ -80,6 +80,10 @@ jest.mock('~/hooks', () => ({
       com_ui_share: 'Share',
       com_ui_delete_document: 'Delete document',
       com_ui_delete_knowledge_base: 'Delete knowledge base',
+      com_ui_knowledge_base_failure_reason: 'Failure reason',
+      com_ui_knowledge_base_failure_reason_empty: 'No failure reason was recorded.',
+      com_ui_knowledge_base_view_failure_reason: 'View reason',
+      com_ui_knowledge_base_reupload_document: 'Re-upload',
       com_ui_knowledge_base_delete_confirm: 'Delete this knowledge base?',
       com_ui_confirm_delete_knowledge_base: 'Confirm delete',
     };
@@ -192,5 +196,46 @@ describe('KnowledgeBaseDetail', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Confirm delete' }));
 
     expect(deleteKnowledgeBase).toHaveBeenCalledWith('kb_1');
+  });
+
+  it('shows failed document details and opens file picker for re-upload', async () => {
+    const inputClick = jest.spyOn(HTMLInputElement.prototype, 'click').mockImplementation();
+    (useKnowledgeBaseDocumentsQuery as jest.Mock).mockReturnValue({
+      data: {
+        data: [
+          {
+            id: 'doc_failed',
+            knowledgeBaseId: 'kb_1',
+            file_id: 'file_failed',
+            filename: 'strategy.docx',
+            bytes: 4096,
+            status: 'failed',
+            error: 'Embedding model is not configured',
+          },
+        ],
+      },
+      isLoading: false,
+    });
+    const router = createMemoryRouter(
+      [{ path: '/knowledge/:id', element: <KnowledgeBaseDetail /> }],
+      {
+        initialEntries: ['/knowledge/kb_1'],
+      },
+    );
+
+    try {
+      render(<RouterProvider router={router} />);
+
+      await userEvent.click(screen.getByRole('button', { name: 'View reason' }));
+
+      expect(screen.getByText('Failure reason')).toBeInTheDocument();
+      expect(screen.getByText('Embedding model is not configured')).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Re-upload' }));
+
+      expect(inputClick).toHaveBeenCalled();
+    } finally {
+      inputClick.mockRestore();
+    }
   });
 });

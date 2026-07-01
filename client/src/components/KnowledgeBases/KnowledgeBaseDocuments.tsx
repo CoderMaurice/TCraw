@@ -1,6 +1,6 @@
 import { useRef, useState, type ChangeEvent } from 'react';
-import { Button, Spinner, useToastContext } from '@librechat/client';
-import { FileText, Trash2, Upload } from 'lucide-react';
+import { Button, OGDialog, OGDialogTemplate, Spinner, useToastContext } from '@librechat/client';
+import { AlertCircle, FileText, RotateCcw, Trash2, Upload } from 'lucide-react';
 import type { KnowledgeBaseDocument } from 'librechat-data-provider';
 import {
   useDeleteKnowledgeBaseDocumentMutation,
@@ -8,6 +8,7 @@ import {
 } from '~/data-provider';
 import { useLocalize } from '~/hooks';
 import type { TranslationKeys } from '~/hooks';
+import { cn } from '~/utils';
 
 type KnowledgeBaseDocumentsProps = {
   id: string;
@@ -42,6 +43,8 @@ export default function KnowledgeBaseDocuments({
   const localize = useLocalize();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [selectedFailedDocument, setSelectedFailedDocument] =
+    useState<KnowledgeBaseDocument | null>(null);
   const uploadDocuments = useUploadKnowledgeBaseDocumentsMutation(id);
   const deleteDocument = useDeleteKnowledgeBaseDocumentMutation(id);
   const { showToast } = useToastContext();
@@ -85,6 +88,11 @@ export default function KnowledgeBaseDocuments({
     }
   };
 
+  const handleReupload = () => {
+    setSelectedFailedDocument(null);
+    inputRef.current?.click();
+  };
+
   return (
     <section className="flex min-h-0 flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -126,25 +134,45 @@ export default function KnowledgeBaseDocuments({
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-border-medium">
-          <div className="grid grid-cols-[minmax(0,1fr)_7rem_7rem_3rem] items-center gap-3 border-b border-border-light bg-surface-secondary px-3 py-2 text-xs font-medium uppercase text-text-secondary">
+          <div className="grid grid-cols-[minmax(0,1fr)_7rem_7rem_8rem_3rem] items-center gap-3 border-b border-border-light bg-surface-secondary px-3 py-2 text-xs font-medium uppercase text-text-secondary">
             <span>{localize('com_ui_filename')}</span>
             <span>{localize('com_ui_status')}</span>
             <span>{localize('com_ui_size')}</span>
+            <span className="sr-only">{localize('com_ui_knowledge_base_failure_reason')}</span>
             <span className="sr-only">{localize('com_ui_delete')}</span>
           </div>
           {documents.map((document) => (
             <div
               key={document.id}
-              className="grid grid-cols-[minmax(0,1fr)_7rem_7rem_3rem] items-center gap-3 border-b border-border-light px-3 py-3 text-sm last:border-b-0"
+              className="grid grid-cols-[minmax(0,1fr)_7rem_7rem_8rem_3rem] items-center gap-3 border-b border-border-light px-3 py-3 text-sm last:border-b-0"
             >
               <span className="flex min-w-0 items-center gap-2">
                 <FileText className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden="true" />
                 <span className="truncate text-text-primary">{document.filename}</span>
               </span>
-              <span className="truncate text-text-secondary">
+              <span
+                className={cn(
+                  'truncate text-text-secondary',
+                  document.status === 'failed' && 'text-red-600 dark:text-red-400',
+                )}
+              >
                 {localize(documentStatusLabelKeys[document.status])}
               </span>
               <span className="truncate text-text-secondary">{formatBytes(document.bytes)}</span>
+              <span>
+                {document.status === 'failed' ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 gap-1 px-2 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                    onClick={() => setSelectedFailedDocument(document)}
+                  >
+                    <AlertCircle className="h-4 w-4" aria-hidden="true" />
+                    {localize('com_ui_knowledge_base_view_failure_reason')}
+                  </Button>
+                ) : null}
+              </span>
               <Button
                 type="button"
                 variant="ghost"
@@ -159,6 +187,49 @@ export default function KnowledgeBaseDocuments({
           ))}
         </div>
       )}
+
+      <OGDialog
+        open={Boolean(selectedFailedDocument)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedFailedDocument(null);
+          }
+        }}
+      >
+        {selectedFailedDocument ? (
+          <OGDialogTemplate
+            title={localize('com_ui_knowledge_base_failure_reason')}
+            showCloseButton={true}
+            className="w-11/12 max-w-lg bg-surface-primary text-text-primary"
+            main={
+              <div className="space-y-3 text-left">
+                <p className="text-sm font-medium text-text-primary">
+                  {selectedFailedDocument.filename}
+                </p>
+                <pre className="max-h-64 whitespace-pre-wrap rounded-lg border border-border-light bg-surface-secondary p-3 text-sm text-text-secondary">
+                  {selectedFailedDocument.error?.trim() ||
+                    localize('com_ui_knowledge_base_failure_reason_empty')}
+                </pre>
+              </div>
+            }
+            buttons={
+              <div className="flex justify-end gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setSelectedFailedDocument(null)}
+                >
+                  {localize('com_ui_close')}
+                </Button>
+                <Button type="button" variant="submit" onClick={handleReupload}>
+                  <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                  {localize('com_ui_knowledge_base_reupload_document')}
+                </Button>
+              </div>
+            }
+          />
+        ) : null}
+      </OGDialog>
     </section>
   );
 }
