@@ -1,12 +1,40 @@
 import { useDeferredValue, useMemo, useState } from 'react';
-import { Database, Plus, Search } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock3,
+  Database,
+  FileText,
+  Plus,
+  Search,
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Input, Spinner, useMediaQuery } from '@librechat/client';
+import type { KnowledgeBase } from 'librechat-data-provider';
+import type { TranslationKeys } from '~/hooks';
 import OpenSidebar from '~/components/Chat/Menus/OpenSidebar';
 import { useKnowledgeBasesQuery } from '~/data-provider';
 import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
 import KnowledgeBaseCreateDialog from './KnowledgeBaseCreateDialog';
+
+const accessLabelKeys: Record<NonNullable<KnowledgeBase['access']>, TranslationKeys> = {
+  owned: 'com_ui_knowledge_base_access_owned',
+  shared: 'com_ui_knowledge_base_access_shared',
+  team: 'com_ui_knowledge_base_access_team',
+};
+
+function formatKnowledgeBaseDate(dateString: string) {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+  return date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
 
 export function KnowledgeBasePage() {
   const localize = useLocalize();
@@ -24,7 +52,7 @@ export function KnowledgeBasePage() {
 
   return (
     <main className="flex h-full min-h-0 flex-col overflow-auto bg-surface-primary text-text-primary">
-      <div className="container mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 py-8 md:px-6 lg:pt-12">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-6 md:px-6 lg:py-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5">
             {isSmallScreen ? <OpenSidebar /> : null}
@@ -38,7 +66,7 @@ export function KnowledgeBasePage() {
           </Button>
         </div>
 
-        <label className="relative min-w-0 flex-1">
+        <label className="relative min-w-0">
           <span className="sr-only">{localize('com_ui_search_knowledge_bases')}</span>
           <Search
             className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"
@@ -61,41 +89,102 @@ export function KnowledgeBasePage() {
         />
 
         {isLoading ? (
-          <div className="flex flex-1 items-center justify-center">
+          <div className="flex min-h-52 items-center justify-center">
             <Spinner className="text-text-primary" />
           </div>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2 md:gap-4">
-            {knowledgeBases.map((knowledgeBase) => (
-              <button
-                key={knowledgeBase.id}
-                type="button"
-                className={cn(
-                  'group/knowledge flex min-h-[8rem] flex-col rounded-xl border border-border-medium bg-surface-secondary p-4 text-left transition-colors',
-                  'hover:border-border-heavy hover:bg-surface-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring-primary',
-                )}
-                onClick={() => navigate(`/knowledge/${knowledgeBase.id}`)}
-              >
-                <span className="flex min-w-0 items-center gap-2">
-                  <Database
-                    className="h-4 w-4 shrink-0 text-text-secondary"
-                    aria-hidden="true"
-                  />
-                  <span className="truncate text-base font-semibold text-text-primary">
-                    {knowledgeBase.name}
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {knowledgeBases.map((knowledgeBase) => {
+              const totalDocuments = knowledgeBase.documentCount;
+              const readyDocuments = knowledgeBase.readyDocumentCount;
+              const failedDocuments = knowledgeBase.failedDocumentCount;
+              const readyPercent =
+                totalDocuments > 0 ? Math.round((readyDocuments / totalDocuments) * 100) : 0;
+              const updatedDate = formatKnowledgeBaseDate(knowledgeBase.updatedAt);
+              const accessLabelKey = accessLabelKeys[knowledgeBase.access ?? 'owned'];
+
+              return (
+                <button
+                  key={knowledgeBase.id}
+                  type="button"
+                  className={cn(
+                    'group/knowledge flex min-h-[13rem] flex-col rounded-lg border border-border-medium bg-surface-secondary p-4 text-left transition-colors',
+                    'hover:border-border-heavy hover:bg-surface-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring-primary',
+                  )}
+                  onClick={() => navigate(`/knowledge/${knowledgeBase.id}`)}
+                >
+                  <span className="flex min-w-0 items-start justify-between gap-3">
+                    <span className="flex min-w-0 items-start gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-primary text-text-secondary">
+                        <Database className="h-4 w-4" aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-base font-semibold text-text-primary">
+                          {knowledgeBase.name}
+                        </span>
+                        <span className="mt-1 line-clamp-2 min-h-[2.5rem] text-sm leading-5 text-text-secondary">
+                          {knowledgeBase.description ||
+                            localize('com_ui_knowledge_base_empty_description')}
+                        </span>
+                      </span>
+                    </span>
+                    <span className="shrink-0 rounded-full border border-border-light px-2 py-0.5 text-xs font-medium text-text-secondary">
+                      {localize(accessLabelKey)}
+                    </span>
                   </span>
-                </span>
-                {knowledgeBase.description ? (
-                  <span className="mt-2 line-clamp-2 text-sm leading-relaxed text-text-secondary">
-                    {knowledgeBase.description}
+
+                  <span className="mt-5 grid grid-cols-3 gap-3 border-y border-border-light py-3">
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-1.5 text-xs text-text-secondary">
+                        <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+                        {localize('com_ui_knowledge_base_documents_total')}
+                      </span>
+                      <span className="mt-1 block text-lg font-semibold text-text-primary">
+                        {totalDocuments}
+                      </span>
+                    </span>
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-1.5 text-xs text-text-secondary">
+                        <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        {localize('com_ui_knowledge_base_documents_ready')}
+                      </span>
+                      <span className="mt-1 block text-lg font-semibold text-text-primary">
+                        {readyDocuments}
+                      </span>
+                    </span>
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-1.5 text-xs text-text-secondary">
+                        <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+                        {localize('com_ui_knowledge_base_documents_failed')}
+                      </span>
+                      <span className="mt-1 block text-lg font-semibold text-text-primary">
+                        {failedDocuments}
+                      </span>
+                    </span>
                   </span>
-                ) : null}
-                <span className="mt-auto pt-4 text-xs text-text-secondary">
-                  {knowledgeBase.readyDocumentCount} / {knowledgeBase.documentCount}{' '}
-                  {localize('com_ui_ready')}
-                </span>
-              </button>
-            ))}
+
+                  <span className="mt-auto pt-3">
+                    <span className="flex items-center justify-between gap-3 text-xs text-text-secondary">
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <Clock3 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <span className="truncate">
+                          {updatedDate
+                            ? localize('com_ui_knowledge_base_updated', { 0: updatedDate })
+                            : localize('com_ui_unknown')}
+                        </span>
+                      </span>
+                      <span className="shrink-0">{readyPercent}%</span>
+                    </span>
+                    <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-surface-primary">
+                      <span
+                        className="block h-full rounded-full bg-green-700"
+                        style={{ width: `${readyPercent}%` }}
+                      />
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
 
