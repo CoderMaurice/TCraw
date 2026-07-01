@@ -125,7 +125,16 @@ describe('WeKnora adapter', () => {
             status: 'failed',
             error: 'parse failed',
           },
+          {
+            id: 'knowledge_url',
+            title: 'Return and Refund Policy',
+            file_name: '',
+            file_size: 0,
+            source: 'https://topens.com/policies/refund-policy',
+            parse_status: 'completed',
+          },
         ],
+        total: 8,
       }),
     );
 
@@ -152,6 +161,16 @@ describe('WeKnora adapter', () => {
           mimeType: '',
           status: 'failed',
           error: 'parse failed',
+        },
+        {
+          externalId: 'knowledge_url',
+          externalKnowledgeBaseId: 'wk_kb_1',
+          fileId: 'knowledge_url',
+          filename: 'Return and Refund Policy',
+          bytes: 0,
+          mimeType: '',
+          status: 'ready',
+          error: '',
         },
       ],
       nextCursor: '4',

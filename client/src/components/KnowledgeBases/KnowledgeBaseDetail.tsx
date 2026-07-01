@@ -19,11 +19,6 @@ const tabs: Array<{ id: KnowledgeBaseTab; labelKey: TranslationKeys }> = [
   { id: 'settings', labelKey: 'com_ui_knowledge_base_settings' },
 ];
 
-const providerLabelKeys: Record<NonNullable<KnowledgeBase['provider']>, TranslationKeys> = {
-  local: 'com_ui_knowledge_base_provider_local',
-  weknora: 'com_ui_knowledge_base_provider_weknora',
-};
-
 function formatKnowledgeBaseDate(dateString?: string) {
   if (!dateString) {
     return '';
@@ -85,8 +80,6 @@ export function KnowledgeBaseDetail() {
   const processingDocuments = knowledgeBase.processingDocumentCount ?? 0;
   const failedDocuments = knowledgeBase.failedDocumentCount ?? 0;
   const updatedDate = formatKnowledgeBaseDate(knowledgeBase.updatedAt);
-  const providerLabelKey = providerLabelKeys[knowledgeBase.provider ?? 'local'];
-  const providerLabel = localize(providerLabelKey);
 
   return (
     <main className="flex h-full min-h-0 flex-col overflow-y-auto bg-surface-primary text-text-primary">
@@ -114,12 +107,6 @@ export function KnowledgeBaseDetail() {
               </p>
             ) : null}
             <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-text-secondary">
-              <span
-                aria-label={localize('com_ui_knowledge_base_source', { 0: providerLabel })}
-                className="rounded-full border border-border-light px-2 py-0.5 text-xs font-medium text-text-secondary"
-              >
-                {providerLabel}
-              </span>
               <span className="flex items-center gap-1.5">
                 <FileText className="h-4 w-4" aria-hidden="true" />
                 {localize('com_ui_knowledge_base_documents_count', {

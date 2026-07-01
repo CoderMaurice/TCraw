@@ -1,9 +1,7 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { dataService, QueryKeys } from 'librechat-data-provider';
 import type {
-  InfiniteData,
   UseInfiniteQueryOptions,
-  UseInfiniteQueryResult,
   QueryObserverResult,
   UseQueryOptions,
 } from '@tanstack/react-query';
@@ -72,29 +70,23 @@ export const useKnowledgeBaseDocumentsQuery = (
 export const useInfiniteKnowledgeBaseDocumentsQuery = (
   id?: string | null,
   params?: Pick<ListKnowledgeBaseDocumentsRequest, 'limit'>,
-  config?: UseInfiniteQueryOptions<
-    ListKnowledgeBaseDocumentsResponse,
-    unknown,
-    InfiniteData<ListKnowledgeBaseDocumentsResponse>
-  >,
-): UseInfiniteQueryResult<InfiniteData<ListKnowledgeBaseDocumentsResponse>> => {
-  return useInfiniteQuery<ListKnowledgeBaseDocumentsResponse>(
-    [QueryKeys.knowledgeBaseDocuments, id, params],
-    ({ pageParam }) =>
+  config?: UseInfiniteQueryOptions<ListKnowledgeBaseDocumentsResponse, unknown>,
+) => {
+  return useInfiniteQuery<ListKnowledgeBaseDocumentsResponse>({
+    queryKey: [QueryKeys.knowledgeBaseDocuments, id, params],
+    queryFn: ({ pageParam }) =>
       dataService.listKnowledgeBaseDocuments(id as string, {
         ...params,
-        cursor: typeof pageParam === 'string' ? pageParam : undefined,
+        cursor: pageParam?.toString(),
       }),
-    {
-      getNextPageParam: (lastPage) => lastPage?.nextCursor ?? undefined,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-      refetchOnMount: false,
-      retry: false,
-      ...config,
-      enabled: Boolean(id) && (config?.enabled ?? true),
-    },
-  );
+    getNextPageParam: (lastPage) => lastPage?.nextCursor ?? undefined,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    retry: false,
+    ...config,
+    enabled: Boolean(id) && (config?.enabled ?? true),
+  });
 };
 
 export const useKnowledgeBaseSelectorQuery = (

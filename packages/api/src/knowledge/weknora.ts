@@ -67,7 +67,7 @@ function getArray(response: JsonValue): JsonObject[] {
 function stringField(source: JsonObject, fields: string[], fallback = ''): string {
   const value = fields
     .map((field) => source[field])
-    .find((fieldValue) => typeof fieldValue === 'string');
+    .find((fieldValue) => typeof fieldValue === 'string' && fieldValue.trim().length > 0);
   return typeof value === 'string' ? value.trim() : fallback;
 }
 
@@ -157,7 +157,7 @@ function nextDocumentCursor(
     return String(page + 1);
   }
 
-  const totalCount = numberField(responseObject, ['total_count', 'totalCount', 'count'], 0);
+  const totalCount = numberField(responseObject, ['total_count', 'totalCount', 'total', 'count'], 0);
   if (totalCount > page * pageSize) {
     return String(page + 1);
   }
@@ -242,7 +242,7 @@ function mapDocument(raw: JsonObject, externalKnowledgeBaseId: string): MappedWe
     externalId,
     externalKnowledgeBaseId,
     fileId: stringField(raw, ['file_id', 'fileId'], externalId),
-    filename: stringField(raw, ['filename', 'file_name', 'fileName', 'name'], externalId),
+    filename: stringField(raw, ['filename', 'file_name', 'fileName', 'name', 'title', 'source'], externalId),
     bytes: numberField(raw, ['bytes', 'size', 'file_size', 'fileSize']),
     mimeType: stringField(raw, ['mime_type', 'mimeType', 'content_type', 'contentType']),
     status: mapWeKnoraDocumentStatus(stringField(raw, ['parse_status', 'parseStatus', 'status'])),

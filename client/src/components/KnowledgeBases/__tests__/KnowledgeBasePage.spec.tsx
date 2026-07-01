@@ -34,9 +34,6 @@ jest.mock('~/hooks', () => ({
       com_ui_search_knowledge_bases: 'Search knowledge bases',
       com_ui_knowledge_bases: 'Knowledge Bases',
       com_ui_knowledge_base_documents_count: '{{0}} documents',
-      com_ui_knowledge_base_provider_local: 'Local',
-      com_ui_knowledge_base_provider_weknora: 'WeKnora',
-      com_ui_knowledge_base_source: 'Source: {{0}}',
       com_ui_knowledge_base_status_failed: 'Failed',
       com_ui_knowledge_base_status_failed_count: 'Failed: {{0}}',
       com_ui_knowledge_base_status_processing: 'Processing',
@@ -62,7 +59,7 @@ describe('KnowledgeBasePage', () => {
     });
   });
 
-  it('renders searchable knowledge bases with WeKnora source and compact status counts', () => {
+  it('renders searchable knowledge bases without exposing backend provider labels', () => {
     (useKnowledgeBasesQuery as jest.Mock).mockReturnValue({
       data: {
         data: [
@@ -93,7 +90,8 @@ describe('KnowledgeBasePage', () => {
     expect(screen.getByRole('button', { name: 'Create knowledge base' })).toBeInTheDocument();
     expect(screen.getByText('Support')).toBeInTheDocument();
     expect(screen.getByText('Support playbooks')).toBeInTheDocument();
-    expect(screen.getByText('WeKnora')).toBeInTheDocument();
+    expect(screen.queryByText('WeKnora')).not.toBeInTheDocument();
+    expect(screen.queryByText('com_ui_knowledge_base_provider_weknora')).not.toBeInTheDocument();
     expect(screen.getByText('22 documents')).toBeInTheDocument();
     expect(screen.getByText('Processing: 2')).toBeInTheDocument();
     expect(screen.getByText('Failed: 1')).toBeInTheDocument();

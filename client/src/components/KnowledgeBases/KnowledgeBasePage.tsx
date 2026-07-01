@@ -16,11 +16,6 @@ const accessLabelKeys: Record<NonNullable<KnowledgeBase['access']>, TranslationK
   team: 'com_ui_knowledge_base_access_team',
 };
 
-const providerLabelKeys: Record<NonNullable<KnowledgeBase['provider']>, TranslationKeys> = {
-  local: 'com_ui_knowledge_base_provider_local',
-  weknora: 'com_ui_knowledge_base_provider_weknora',
-};
-
 function formatKnowledgeBaseDate(dateString?: string) {
   if (!dateString) {
     return '';
@@ -100,8 +95,6 @@ export function KnowledgeBasePage() {
               const failedDocuments = knowledgeBase.failedDocumentCount ?? 0;
               const updatedDate = formatKnowledgeBaseDate(knowledgeBase.updatedAt);
               const accessLabelKey = accessLabelKeys[knowledgeBase.access ?? 'owned'];
-              const providerLabelKey = providerLabelKeys[knowledgeBase.provider ?? 'local'];
-              const providerLabel = localize(providerLabelKey);
 
               return (
                 <button
@@ -129,14 +122,6 @@ export function KnowledgeBasePage() {
                       </span>
                     </span>
                     <span className="flex shrink-0 flex-col items-end gap-1">
-                      <span
-                        aria-label={localize('com_ui_knowledge_base_source', {
-                          0: providerLabel,
-                        })}
-                        className="rounded-full border border-border-light px-2 py-0.5 text-xs font-medium text-text-secondary"
-                      >
-                        {providerLabel}
-                      </span>
                       <span className="text-xs text-text-secondary">{localize(accessLabelKey)}</span>
                     </span>
                   </span>
