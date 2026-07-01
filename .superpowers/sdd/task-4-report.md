@@ -1,5 +1,0 @@
-STATUS: DONE_WITH_CONCERNS
-COMMITS: 90b26b534
-TESTS: npx jest src/knowledge/service.spec.ts --runInBand --coverage=false from packages/api: PASS; npx jest server/routes/knowledgeBases.test.js --runInBand from api: PASS; npm run build from packages/api: PASS; npm run test:api -- server/routes/knowledgeBases.test.js --runInBand from repo root: PASS; npm run test:packages:api -- src/knowledge/service.spec.ts --runInBand --coverage=false from repo root: FAIL because the package script consumed the file pattern under --testPathIgnorePatterns and ran the full packages/api suite, exposing unrelated existing environment failures.
-CHANGED_FILES: packages/api/src/knowledge/service.ts; packages/api/src/knowledge/service.spec.ts; api/server/routes/knowledgeBases.js; api/server/routes/knowledgeBases.test.js; .superpowers/sdd/task-4-report.md
-CONCERNS: Root packages/api test script invocation ran the full suite instead of the target spec and failed on unrelated existing issues including missing global fetch/clearTimeout, MCP allowlist expectations, Playwright/Jest matcher redefinition, and LibreOffice fixture/environment failures.

@@ -43,7 +43,6 @@ const mockUploadMiddleware = jest.fn((req, _res, next) => {
     originalname: 'handbook.pdf',
     mimetype: 'application/pdf',
     size: 1234,
-    buffer: Buffer.from('hello'),
     path: '/tmp/handbook.pdf',
   };
   req.file_id = 'file_route';
@@ -92,6 +91,10 @@ jest.mock('@librechat/data-schemas', () => ({
   logger: {
     error: jest.fn(),
   },
+}));
+
+jest.mock('fs/promises', () => ({
+  readFile: jest.fn(),
 }));
 
 jest.mock('~/server/middleware/requireJwtAuth', () => (req, _res, next) => {
@@ -152,6 +155,7 @@ jest.mock('~/server/services/PermissionService', () => ({
 }));
 
 const db = require('~/models');
+const { readFile: mockReadFile } = require('fs/promises');
 const { logger } = require('@librechat/data-schemas');
 const PermissionService = require('~/server/services/PermissionService');
 const knowledgeBaseRoutes = require('./knowledgeBases');
@@ -181,6 +185,7 @@ describe('knowledge base routes', () => {
     mockGetStrategyFunctions.mockClear();
     mockUploadVectors.mockReset();
     mockWeKnoraClient.uploadDocument.mockReset();
+    mockReadFile.mockReset();
     mockKnowledgeBaseAccessMiddleware.mockClear();
     mockKnowledgeBaseCreateMiddleware.mockClear();
     logger.error.mockClear();
@@ -483,6 +488,7 @@ describe('knowledge base routes', () => {
   });
 
   it('uploads documents directly to WeKnora for WeKnora-backed knowledge bases', async () => {
+    const diskFileBytes = Buffer.from('disk-backed hello');
     const weknoraDocument = {
       id: 'wk_doc_1',
       knowledgeBaseId: 'kb_weknora',
@@ -510,6 +516,7 @@ describe('knowledge base routes', () => {
       status: 'processing',
       error: '',
     });
+    mockReadFile.mockResolvedValue(diskFileBytes);
 
     const response = await request(app)
       .post('/knowledge-bases/kb_weknora/documents')
@@ -525,10 +532,11 @@ describe('knowledge base routes', () => {
     );
     expect(mockWeKnoraClient.uploadDocument).toHaveBeenCalledWith('wk_kb_1', {
       filename: 'handbook.pdf',
-      data: Buffer.from('hello'),
+      data: diskFileBytes,
       mimeType: 'application/pdf',
       bytes: 1234,
     });
+    expect(mockReadFile).toHaveBeenCalledWith('/tmp/handbook.pdf');
     expect(mockMapWeKnoraDocumentToRecord).toHaveBeenCalledWith(
       {
         externalId: 'wk_doc_1',

@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { readFile } = require('fs/promises');
 const express = require('express');
 const { logger } = require('@librechat/data-schemas');
 const {
@@ -307,9 +308,10 @@ router.post('/:id/documents', uploadDocumentMiddleware, async (req, res) => {
         throw createRouteError('WeKnora client is not configured', 500);
       }
 
+      const fileBytes = await readFile(req.file.path);
       const document = await deps.weknoraClient.uploadDocument(kb.externalId, {
         filename: sanitizeFilename(req.file.originalname),
-        data: req.file.buffer,
+        data: fileBytes,
         mimeType: req.file.mimetype,
         bytes: req.file.size ?? 0,
       });
