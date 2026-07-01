@@ -29,6 +29,22 @@ const knowledgeBaseSchema: Schema<IKnowledgeBaseMongoDocument> =
         type: String,
         default: '',
       },
+      provider: {
+        type: String,
+        enum: ['local', 'weknora'],
+        index: true,
+      },
+      externalId: {
+        type: String,
+        index: true,
+      },
+      externalSpaceId: {
+        type: String,
+      },
+      externalShareId: {
+        type: String,
+        default: '',
+      },
       documentCount: {
         type: Number,
         default: 0,
@@ -40,6 +56,11 @@ const knowledgeBaseSchema: Schema<IKnowledgeBaseMongoDocument> =
         min: 0,
       },
       failedDocumentCount: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      processingDocumentCount: {
         type: Number,
         default: 0,
         min: 0,
@@ -57,5 +78,6 @@ const knowledgeBaseSchema: Schema<IKnowledgeBaseMongoDocument> =
 
 knowledgeBaseSchema.index({ tenantId: 1, name: 1 });
 knowledgeBaseSchema.index({ tenantId: 1, updatedAt: -1 });
+knowledgeBaseSchema.index({ tenantId: 1, provider: 1, externalId: 1 });
 
 export default knowledgeBaseSchema;

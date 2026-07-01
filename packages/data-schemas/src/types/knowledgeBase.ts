@@ -1,6 +1,8 @@
 import type { KnowledgeBaseDocumentStatus } from 'librechat-data-provider';
 import type { Document, Types } from 'mongoose';
 
+export type KnowledgeBaseProvider = 'local' | 'weknora';
+
 export interface IKnowledgeBase {
   _id?: Types.ObjectId;
   id: string;
@@ -8,9 +10,14 @@ export interface IKnowledgeBase {
   description: string;
   author: string;
   authorName: string;
+  provider?: KnowledgeBaseProvider;
+  externalId?: string;
+  externalSpaceId?: string;
+  externalShareId?: string;
   documentCount: number;
   readyDocumentCount: number;
   failedDocumentCount: number;
+  processingDocumentCount?: number;
   lastIndexedAt?: Date | null;
   tenantId?: string;
   createdAt?: Date;
@@ -47,9 +54,14 @@ export type CreateKnowledgeBaseInput = Pick<IKnowledgeBase, 'id' | 'name' | 'aut
       IKnowledgeBase,
       | 'description'
       | 'authorName'
+      | 'provider'
+      | 'externalId'
+      | 'externalSpaceId'
+      | 'externalShareId'
       | 'documentCount'
       | 'readyDocumentCount'
       | 'failedDocumentCount'
+      | 'processingDocumentCount'
       | 'lastIndexedAt'
       | 'tenantId'
     >

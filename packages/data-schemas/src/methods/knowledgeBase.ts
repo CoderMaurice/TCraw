@@ -9,7 +9,13 @@ import type {
   UpdateKnowledgeBaseDocumentInput,
 } from '~/types';
 
+export type { KnowledgeBaseProvider } from '~/types';
+
 export type UpdateKnowledgeBaseInput = Partial<Pick<IKnowledgeBase, 'name' | 'description'>>;
+
+export type UpsertExternalKnowledgeBaseInput = CreateKnowledgeBaseInput &
+  Required<Pick<IKnowledgeBase, 'provider' | 'externalId' | 'externalSpaceId'>> &
+  Partial<Pick<IKnowledgeBase, 'externalShareId' | 'processingDocumentCount'>>;
 
 export type ReadyKnowledgeBaseDocumentFileId = Pick<IKnowledgeBaseDocument, 'file_id'>;
 
@@ -21,6 +27,12 @@ export type DeleteKnowledgeBaseWithDocumentsResult = {
 export interface KnowledgeBaseMethods {
   createKnowledgeBase(input: CreateKnowledgeBaseInput): Promise<IKnowledgeBase>;
   findKnowledgeBaseById(id: string, tenantId?: string): Promise<IKnowledgeBase | null>;
+  findKnowledgeBaseByExternalId(
+    provider: string,
+    externalId: string,
+    tenantId?: string,
+  ): Promise<IKnowledgeBase | null>;
+  upsertExternalKnowledgeBase(input: UpsertExternalKnowledgeBaseInput): Promise<IKnowledgeBase>;
   findKnowledgeBasesByResourceIds(
     resourceIds: Array<string | Types.ObjectId>,
     tenantId?: string,
@@ -116,6 +128,60 @@ export function createKnowledgeBaseMethods(
   ): Promise<IKnowledgeBase | null> {
     const KnowledgeBase = getKnowledgeBaseModel();
     return await KnowledgeBase.findOne(knowledgeBaseFilter(id, tenantId)).lean<IKnowledgeBase>();
+  }
+
+  async function findKnowledgeBaseByExternalId(
+    provider: string,
+    externalId: string,
+    tenantId?: string,
+  ): Promise<IKnowledgeBase | null> {
+    const KnowledgeBase = getKnowledgeBaseModel();
+    return await KnowledgeBase.findOne({
+      provider,
+      externalId,
+      ...tenantFilter<IKnowledgeBaseMongoDocument>(tenantId),
+    }).lean<IKnowledgeBase>();
+  }
+
+  async function upsertExternalKnowledgeBase(
+    input: UpsertExternalKnowledgeBaseInput,
+  ): Promise<IKnowledgeBase> {
+    const KnowledgeBase = getKnowledgeBaseModel();
+    const knowledgeBase = await KnowledgeBase.findOneAndUpdate(
+      {
+        provider: input.provider,
+        externalId: input.externalId,
+        ...tenantFilter<IKnowledgeBaseMongoDocument>(input.tenantId),
+      },
+      {
+        $setOnInsert: {
+          id: input.id,
+          author: input.author,
+          authorName: input.authorName ?? '',
+          tenantId: input.tenantId,
+        },
+        $set: {
+          name: input.name.trim(),
+          description: input.description ?? '',
+          provider: input.provider,
+          externalId: input.externalId,
+          externalSpaceId: input.externalSpaceId,
+          externalShareId: input.externalShareId ?? '',
+          documentCount: input.documentCount ?? 0,
+          readyDocumentCount: input.readyDocumentCount ?? 0,
+          failedDocumentCount: input.failedDocumentCount ?? 0,
+          processingDocumentCount: input.processingDocumentCount ?? 0,
+          lastIndexedAt: input.lastIndexedAt ?? null,
+        },
+      },
+      { new: true, upsert: true, runValidators: true },
+    ).lean<IKnowledgeBase>();
+
+    if (!knowledgeBase) {
+      throw new Error('Failed to upsert external knowledge base');
+    }
+
+    return knowledgeBase;
   }
 
   async function findKnowledgeBasesByResourceIds(
@@ -348,6 +414,8 @@ export function createKnowledgeBaseMethods(
   return {
     createKnowledgeBase,
     findKnowledgeBaseById,
+    findKnowledgeBaseByExternalId,
+    upsertExternalKnowledgeBase,
     findKnowledgeBasesByResourceIds,
     updateKnowledgeBase,
     createKnowledgeBaseDocument,

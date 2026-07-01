@@ -69,6 +69,47 @@ describe('KnowledgeBase methods', () => {
     expect(readKb?.author).toBe('user-1');
   });
 
+  it('upserts a WeKnora knowledge base by provider and external id', async () => {
+    const created = await methods.upsertExternalKnowledgeBase({
+      id: 'kb_weknora_shanghai',
+      name: '上海致拓',
+      description: '',
+      author: 'system',
+      authorName: 'System',
+      tenantId: 'tenant-a',
+      provider: 'weknora',
+      externalId: '2a2da502-5549-44e7-b98c-ff5b9417b208',
+      externalSpaceId: '3c6805d0-88c3-46dd-8d20-3a90dd51d63d',
+      externalShareId: '003cff10-6084-4602-84c3-86d3b9e3fa74',
+      documentCount: 22,
+      readyDocumentCount: 22,
+      failedDocumentCount: 0,
+      processingDocumentCount: 0,
+    });
+
+    const updated = await methods.upsertExternalKnowledgeBase({
+      id: 'kb_weknora_shanghai_ignored',
+      name: '上海致拓更新',
+      description: '更新',
+      author: 'system',
+      tenantId: 'tenant-a',
+      provider: 'weknora',
+      externalId: '2a2da502-5549-44e7-b98c-ff5b9417b208',
+      externalSpaceId: '3c6805d0-88c3-46dd-8d20-3a90dd51d63d',
+      documentCount: 23,
+      readyDocumentCount: 22,
+      failedDocumentCount: 1,
+      processingDocumentCount: 0,
+    });
+
+    expect(updated.id).toBe(created.id);
+    expect(updated.name).toBe('上海致拓更新');
+    expect(updated.provider).toBe('weknora');
+    expect(updated.externalId).toBe('2a2da502-5549-44e7-b98c-ff5b9417b208');
+    expect(updated.documentCount).toBe(23);
+    expect(updated.failedDocumentCount).toBe(1);
+  });
+
   it('updates total, ready, and failed document counts', async () => {
     await methods.createKnowledgeBase({
       id: 'kb-counts',
