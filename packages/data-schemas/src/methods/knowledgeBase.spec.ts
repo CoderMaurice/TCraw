@@ -110,6 +110,97 @@ describe('KnowledgeBase methods', () => {
     expect(updated.failedDocumentCount).toBe(1);
   });
 
+  it('enforces unique external knowledge base identity without constraining local records', async () => {
+    await methods.createKnowledgeBase({
+      id: 'kb-local-1',
+      name: 'Local 1',
+      author: 'user-1',
+      tenantId: 'tenant-a',
+    });
+    await methods.createKnowledgeBase({
+      id: 'kb-local-2',
+      name: 'Local 2',
+      author: 'user-1',
+      tenantId: 'tenant-a',
+    });
+    await methods.createKnowledgeBase({
+      id: 'kb-external-tenant-a',
+      name: 'External Tenant A',
+      author: 'system',
+      tenantId: 'tenant-a',
+      provider: 'weknora',
+      externalId: 'external-shared',
+      externalSpaceId: 'space-a',
+    });
+    await methods.createKnowledgeBase({
+      id: 'kb-external-tenant-b',
+      name: 'External Tenant B',
+      author: 'system',
+      tenantId: 'tenant-b',
+      provider: 'weknora',
+      externalId: 'external-shared',
+      externalSpaceId: 'space-b',
+    });
+
+    await expect(
+      methods.createKnowledgeBase({
+        id: 'kb-external-duplicate',
+        name: 'External Duplicate',
+        author: 'system',
+        tenantId: 'tenant-a',
+        provider: 'weknora',
+        externalId: 'external-shared',
+        externalSpaceId: 'space-duplicate',
+      }),
+    ).rejects.toMatchObject({ code: 11000 });
+  });
+
+  it('finds external knowledge bases by provider and external id within the requested tenant', async () => {
+    await methods.upsertExternalKnowledgeBase({
+      id: 'kb-external-tenant-a',
+      name: 'External Tenant A',
+      author: 'system',
+      tenantId: 'tenant-a',
+      provider: 'weknora',
+      externalId: 'external-tenant-isolated',
+      externalSpaceId: 'space-a',
+    });
+    await methods.upsertExternalKnowledgeBase({
+      id: 'kb-external-tenant-b',
+      name: 'External Tenant B',
+      author: 'system',
+      tenantId: 'tenant-b',
+      provider: 'weknora',
+      externalId: 'external-tenant-isolated',
+      externalSpaceId: 'space-b',
+    });
+
+    const tenantA = await methods.findKnowledgeBaseByExternalId(
+      'weknora',
+      'external-tenant-isolated',
+      'tenant-a',
+    );
+    const tenantB = await methods.findKnowledgeBaseByExternalId(
+      'weknora',
+      'external-tenant-isolated',
+      'tenant-b',
+    );
+    const wrongTenant = await methods.findKnowledgeBaseByExternalId(
+      'weknora',
+      'external-tenant-isolated',
+      'tenant-c',
+    );
+    const unscoped = await methods.findKnowledgeBaseByExternalId(
+      'weknora',
+      'external-tenant-isolated',
+    );
+
+    expect(tenantA?.id).toBe('kb-external-tenant-a');
+    expect(tenantB?.id).toBe('kb-external-tenant-b');
+    expect(wrongTenant).toBeNull();
+    expect(unscoped).toBeNull();
+  });
+
   it('updates total, ready, and failed document counts', async () => {
     await methods.createKnowledgeBase({
       id: 'kb-counts',

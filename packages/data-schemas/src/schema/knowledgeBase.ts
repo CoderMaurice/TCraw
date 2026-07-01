@@ -78,6 +78,15 @@ const knowledgeBaseSchema: Schema<IKnowledgeBaseMongoDocument> =
 
 knowledgeBaseSchema.index({ tenantId: 1, name: 1 });
 knowledgeBaseSchema.index({ tenantId: 1, updatedAt: -1 });
-knowledgeBaseSchema.index({ tenantId: 1, provider: 1, externalId: 1 });
+knowledgeBaseSchema.index(
+  { tenantId: 1, provider: 1, externalId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      provider: { $exists: true, $type: 'string' },
+      externalId: { $exists: true, $type: 'string' },
+    },
+  },
+);
 
 export default knowledgeBaseSchema;

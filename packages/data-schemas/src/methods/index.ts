@@ -56,6 +56,7 @@ export type {
   DeleteKnowledgeBaseWithDocumentsResult,
   ReadyKnowledgeBaseDocumentFileId,
   UpdateKnowledgeBaseInput,
+  UpsertExternalKnowledgeBaseInput,
 } from './knowledgeBase';
 /* Tier 3 — Complex (heavier injection) */
 import {
