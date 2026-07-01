@@ -95,6 +95,23 @@ const parseListQuery = (query) => {
   return parsed;
 };
 
+const parseDocumentListQuery = (query) => {
+  const parsed = {};
+  const cursor = firstQueryValue(query.cursor);
+  const limitValue = firstQueryValue(query.limit);
+  const limit = Number(limitValue);
+
+  if (typeof cursor === 'string') {
+    parsed.cursor = cursor;
+  }
+
+  if (Number.isInteger(limit) && limit > 0) {
+    parsed.limit = limit;
+  }
+
+  return parsed;
+};
+
 const sendServiceError = (res, error) => {
   if (Number.isInteger(error?.statusCode) && error.statusCode >= 400 && error.statusCode < 500) {
     return res.status(error.statusCode).json({ message: error.message });
@@ -285,6 +302,7 @@ router.get('/:id/documents', async (req, res) => {
     const result = await listKnowledgeBaseDocumentsForUser(
       authFromRequest(req),
       req.params.id,
+      parseDocumentListQuery(req.query),
       deps,
     );
     return res.json(result);

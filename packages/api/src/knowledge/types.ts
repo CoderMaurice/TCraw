@@ -68,6 +68,11 @@ export interface ListKnowledgeBaseDocumentsForUserResult {
   nextCursor?: string;
 }
 
+export interface ListKnowledgeBaseDocumentsForUserInput {
+  cursor?: string;
+  limit?: number;
+}
+
 export interface CreateKnowledgeBaseDocumentForUserInput {
   file_id: string;
   filename: string;
@@ -202,6 +207,16 @@ export interface MappedWeKnoraDocument {
   error: string;
 }
 
+export interface ListWeKnoraDocumentsInput {
+  cursor?: string;
+  limit?: number;
+}
+
+export interface ListWeKnoraDocumentsResult {
+  data: MappedWeKnoraDocument[];
+  nextCursor?: string;
+}
+
 export interface MappedWeKnoraSearchResult {
   externalDocumentId: string;
   externalKnowledgeBaseId: string;
@@ -224,7 +239,10 @@ export interface UploadWeKnoraDocumentFile {
 
 export interface WeKnoraClient {
   listSharedKnowledgeBases(): Promise<MappedWeKnoraKnowledgeBase[]>;
-  listDocuments(externalKnowledgeBaseId: string): Promise<MappedWeKnoraDocument[]>;
+  listDocuments(
+    externalKnowledgeBaseId: string,
+    input?: ListWeKnoraDocumentsInput,
+  ): Promise<ListWeKnoraDocumentsResult>;
   createKnowledgeBase(input: CreateWeKnoraKnowledgeBaseInput): Promise<MappedWeKnoraKnowledgeBase>;
   uploadDocument(
     externalKnowledgeBaseId: string,

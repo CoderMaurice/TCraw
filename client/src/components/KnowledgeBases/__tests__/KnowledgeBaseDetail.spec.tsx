@@ -197,6 +197,7 @@ describe('KnowledgeBaseDetail', () => {
     expect(screen.getByText('Ready')).toBeInTheDocument();
     expect(screen.getByText('indexing.md')).toBeInTheDocument();
     expect(screen.getAllByText('Processing')).toHaveLength(1);
+    expect(screen.queryAllByRole('button', { name: 'Delete document' })).toHaveLength(0);
 
     await userEvent.click(screen.getByRole('button', { name: 'Access' }));
 

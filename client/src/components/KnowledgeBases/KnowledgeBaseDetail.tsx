@@ -169,6 +169,7 @@ export function KnowledgeBaseDetail() {
               id={knowledgeBase.id}
               documents={documents}
               isLoading={isDocumentsLoading}
+              provider={knowledgeBase.provider}
             />
           ) : null}
           {activeTab === 'access' ? (

@@ -884,8 +884,9 @@ export function deleteKnowledgeBase(id: string): Promise<{ acknowledged: true }>
 
 export function listKnowledgeBaseDocuments(
   id: string,
+  params?: kb.ListKnowledgeBaseDocumentsRequest,
 ): Promise<kb.ListKnowledgeBaseDocumentsResponse> {
-  return request.get(endpoints.knowledgeBaseDocuments(id));
+  return request.get(endpoints.knowledgeBaseDocuments(id, params));
 }
 
 export function uploadKnowledgeBaseDocuments(

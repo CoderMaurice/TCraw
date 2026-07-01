@@ -13,6 +13,7 @@ const {
   resolveKnowledgeBaseFileIdsForAgent,
   resolveAgentScopedSkillIds,
   resolveModelSpecSkillIds,
+  buildWeKnoraKnowledgeContext,
   createWeKnoraClient,
   buildAgentContextAttachmentsByAgentId,
 } = require('@librechat/api');
@@ -48,62 +49,6 @@ const AgentClient = require('~/server/controllers/agents/client');
 const { processAddedConvo } = require('./addedConvo');
 const { logViolation } = require('~/cache');
 const db = require('~/models');
-
-const getWeKnoraSearchResultTitle = (result, index) =>
-  result?.title ??
-  result?.filename ??
-  result?.metadata?.title ??
-  result?.metadata?.filename ??
-  result?.externalDocumentId ??
-  `知识库结果 ${index + 1}`;
-
-const formatWeKnoraKnowledgeResults = (results) => {
-  if (!Array.isArray(results) || results.length === 0) {
-    return '';
-  }
-
-  return results
-    .map((result, index) => {
-      const title = getWeKnoraSearchResultTitle(result, index);
-      const content = result?.content ?? '';
-      return `【知识库 ${index + 1}】${title}\n${content}`;
-    })
-    .join('\n\n');
-};
-
-const buildWeKnoraKnowledgeContext = async ({
-  query,
-  knowledgeBaseIds,
-  tenantId,
-  findKnowledgeBaseById,
-  weknoraClient,
-}) => {
-  if (
-    !weknoraClient ||
-    typeof weknoraClient.search !== 'function' ||
-    typeof query !== 'string' ||
-    !query ||
-    !Array.isArray(knowledgeBaseIds) ||
-    knowledgeBaseIds.length === 0 ||
-    typeof findKnowledgeBaseById !== 'function'
-  ) {
-    return '';
-  }
-
-  const knowledgeBases = await Promise.all(
-    knowledgeBaseIds.map((id) => findKnowledgeBaseById(id, tenantId)),
-  );
-  const externalIds = knowledgeBases
-    .filter((kb) => kb?.provider === 'weknora' && kb.externalId)
-    .map((kb) => kb.externalId);
-
-  if (externalIds.length === 0) {
-    return '';
-  }
-
-  const results = await weknoraClient.search(query, externalIds);
-  return formatWeKnoraKnowledgeResults(results);
-};
 
 const getKnowledgeBaseIds = (agent) => {
   if (!Array.isArray(agent?.knowledge_base_ids)) {
@@ -568,13 +513,23 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
   const agentKnowledgeBaseIds = getKnowledgeBaseIds(primaryAgent);
   const knowledgeBaseIds =
     configKnowledgeBaseIds.length > 0 ? configKnowledgeBaseIds : agentKnowledgeBaseIds;
-  const weknoraKnowledgeContext = await buildWeKnoraKnowledgeContext({
-    query,
-    knowledgeBaseIds,
-    tenantId: primaryAgent?.tenantId ?? req.user?.tenantId,
-    findKnowledgeBaseById: db.findKnowledgeBaseById,
-    weknoraClient: createWeKnoraClient(process.env),
-  });
+  const weknoraKnowledgeContext = await buildWeKnoraKnowledgeContext(
+    {
+      userId: req.user.id,
+      name: req.user.name,
+      role: req.user.role,
+      tenantId: primaryAgent?.tenantId ?? req.user?.tenantId,
+    },
+    {
+      query,
+      knowledgeBaseIds,
+    },
+    {
+      findKnowledgeBaseById: db.findKnowledgeBaseById,
+      checkPermission,
+      weknoraClient: createWeKnoraClient(process.env),
+    },
+  );
   const knowledgeSystemText = weknoraKnowledgeContext
     ? `以下内容来自已绑定知识库，回答时优先参考：\n\n${weknoraKnowledgeContext}`
     : '';
@@ -1147,4 +1102,4 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
   return { client, userMCPAuthMap };
 };
 
-module.exports = { initializeClient, buildWeKnoraKnowledgeContext };
+module.exports = { initializeClient };

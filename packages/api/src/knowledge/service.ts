@@ -10,6 +10,7 @@ import type {
   KnowledgeAuthContext,
   KnowledgeBaseAckResult,
   KnowledgeBaseDocumentRecord,
+  ListKnowledgeBaseDocumentsForUserInput,
   KnowledgeBaseRecord,
   KnowledgeBaseServiceDependencies,
   KnowledgeBaseServiceError,
@@ -23,6 +24,7 @@ import type {
   UpdateKnowledgeBaseDocumentForUserInput,
   UpdateKnowledgeBaseForUserInput,
 } from './types';
+export { buildWeKnoraKnowledgeContext } from './context';
 
 function createServiceError(message: string, statusCode: number): KnowledgeBaseServiceError {
   const error = new Error(message) as KnowledgeBaseServiceError;
@@ -87,6 +89,13 @@ export async function syncWeKnoraKnowledgeBasesForUser(
   const externalKnowledgeBases = await weknoraClient.listSharedKnowledgeBases();
   return await Promise.all(
     externalKnowledgeBases.map(async (externalKnowledgeBase) => {
+      const existingKnowledgeBase = deps.findKnowledgeBaseByExternalId
+        ? await deps.findKnowledgeBaseByExternalId(
+            'weknora',
+            externalKnowledgeBase.externalId,
+            auth.tenantId,
+          )
+        : null;
       const knowledgeBase = await upsertExternalKnowledgeBase({
         id: `kb_${randomUUID()}`,
         name: externalKnowledgeBase.name,
@@ -108,12 +117,25 @@ export async function syncWeKnoraKnowledgeBasesForUser(
         throw createServiceError('Failed to sync WeKnora knowledge base', 500);
       }
 
+      const resourceId = getMongoResourceId(knowledgeBase);
+      const preservesOwner =
+        existingKnowledgeBase != null &&
+        (await deps.checkPermission({
+          userId: auth.userId,
+          role: auth.role,
+          resourceType: ResourceType.KNOWLEDGE_BASE,
+          resourceId,
+          requiredPermission: PermissionBits.SHARE,
+        }));
+
       await deps.grantPermission({
         principalType: PrincipalType.USER,
         principalId: auth.userId,
         resourceType: ResourceType.KNOWLEDGE_BASE,
-        resourceId: getMongoResourceId(knowledgeBase),
-        accessRoleId: AccessRoleIds.KNOWLEDGE_BASE_OWNER,
+        resourceId,
+        accessRoleId: preservesOwner
+          ? AccessRoleIds.KNOWLEDGE_BASE_OWNER
+          : AccessRoleIds.KNOWLEDGE_BASE_VIEWER,
         grantedBy: auth.userId,
       });
 
@@ -252,6 +274,7 @@ export async function deleteKnowledgeBaseForUser(
 export async function listKnowledgeBaseDocumentsForUser(
   auth: KnowledgeAuthContext,
   id: string,
+  input: ListKnowledgeBaseDocumentsForUserInput,
   deps: KnowledgeBaseServiceDependencies,
 ): Promise<ListKnowledgeBaseDocumentsForUserResult> {
   const kb = await requireKnowledgeBasePermission(auth, id, PermissionBits.VIEW, deps);
@@ -265,10 +288,9 @@ export async function listKnowledgeBaseDocumentsForUser(
       throw createServiceError('WeKnora client is not configured', 500);
     }
 
-    const data = (await deps.weknoraClient.listDocuments(kb.externalId)).map((document) =>
-      mapWeKnoraDocumentToRecord(document, kb, auth),
-    );
-    return { data, nextCursor: undefined };
+    const result = await deps.weknoraClient.listDocuments(kb.externalId, input);
+    const data = result.data.map((document) => mapWeKnoraDocumentToRecord(document, kb, auth));
+    return { data, nextCursor: result.nextCursor };
   }
 
   const data = await deps.findKnowledgeBaseDocuments(id, auth.tenantId);

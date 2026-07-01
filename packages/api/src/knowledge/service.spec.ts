@@ -6,6 +6,7 @@ import {
 } from 'librechat-data-provider';
 
 import {
+  buildWeKnoraKnowledgeContext,
   createKnowledgeBaseForUser,
   createKnowledgeBaseDocumentForUser,
   deleteKnowledgeBaseDocumentForUser,
@@ -50,6 +51,8 @@ function makeDeps(): jest.Mocked<KnowledgeBaseServiceDependencies> {
   return {
     createKnowledgeBase: jest.fn(),
     findKnowledgeBaseById: jest.fn(),
+    findKnowledgeBaseByExternalId: jest.fn(),
+    upsertExternalKnowledgeBase: jest.fn(),
     findKnowledgeBasesByResourceIds: jest.fn(),
     updateKnowledgeBase: jest.fn(),
     createKnowledgeBaseDocument: jest.fn(),
@@ -276,6 +279,7 @@ describe('knowledge base service', () => {
     const auth = makeAuth();
     const deps = makeDeps();
 
+    deps.findKnowledgeBaseByExternalId = jest.fn().mockResolvedValue(null);
     deps.weknoraClient = {
       listSharedKnowledgeBases: jest.fn().mockResolvedValue([
         {
@@ -332,11 +336,57 @@ describe('knowledge base service', () => {
       principalId: auth.userId,
       resourceType: ResourceType.KNOWLEDGE_BASE,
       resourceId: '64f1f77bcf86cd799439099',
-      accessRoleId: AccessRoleIds.KNOWLEDGE_BASE_OWNER,
+      accessRoleId: AccessRoleIds.KNOWLEDGE_BASE_VIEWER,
       grantedBy: auth.userId,
     });
     expect(result.data[0].id).toBe('kb_mirrored');
     expect(result.data[0].id).not.toBe('2a2da502-5549-44e7-b98c-ff5b9417b208');
+  });
+
+  it('preserves owner access for WeKnora knowledge bases that the user already owns', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+    const existing = makeKnowledgeBase({
+      _id: mongoId('64f1f77bcf86cd799439099'),
+      id: 'kb_created',
+      provider: 'weknora',
+      externalId: 'wk_kb_1',
+    });
+
+    deps.findKnowledgeBaseByExternalId = jest.fn().mockResolvedValue(existing);
+    deps.checkPermission.mockResolvedValue(true);
+    deps.weknoraClient = {
+      listSharedKnowledgeBases: jest.fn().mockResolvedValue([
+        {
+          externalId: 'wk_kb_1',
+          externalSpaceId: 'space_1',
+          externalShareId: 'share_1',
+          name: 'Created KB',
+          description: '',
+          documentCount: 1,
+          readyDocumentCount: 1,
+          failedDocumentCount: 0,
+          processingDocumentCount: 0,
+        },
+      ]),
+    } as unknown as WeKnoraClient;
+    deps.upsertExternalKnowledgeBase = jest.fn().mockResolvedValue(existing);
+    deps.grantPermission.mockResolvedValue(null);
+    deps.findAccessibleResources.mockResolvedValue(['64f1f77bcf86cd799439099']);
+    deps.findKnowledgeBasesByResourceIds.mockResolvedValue([existing]);
+
+    await listKnowledgeBasesForUser(auth, {}, deps);
+
+    expect(deps.checkPermission).toHaveBeenCalledWith({
+      userId: auth.userId,
+      role: auth.role,
+      resourceType: ResourceType.KNOWLEDGE_BASE,
+      resourceId: '64f1f77bcf86cd799439099',
+      requiredPermission: PermissionBits.SHARE,
+    });
+    expect(deps.grantPermission).toHaveBeenCalledWith(
+      expect.objectContaining({ accessRoleId: AccessRoleIds.KNOWLEDGE_BASE_OWNER }),
+    );
   });
 
   it('does not query knowledge base records when no accessible resources exist', async () => {
@@ -440,7 +490,7 @@ describe('knowledge base service', () => {
     deps.checkPermission.mockResolvedValue(true);
     deps.findKnowledgeBaseDocuments.mockResolvedValue([document]);
 
-    const result = await listKnowledgeBaseDocumentsForUser(auth, 'kb_allowed', deps);
+    const result = await listKnowledgeBaseDocumentsForUser(auth, 'kb_allowed', {}, deps);
 
     expect(result).toEqual({ data: [document], nextCursor: undefined });
     expect(deps.findKnowledgeBaseDocuments).toHaveBeenCalledWith('kb_allowed', auth.tenantId);
@@ -450,18 +500,21 @@ describe('knowledge base service', () => {
     const auth = makeAuth();
     const deps = makeDeps();
     deps.weknoraClient = {
-      listDocuments: jest.fn().mockResolvedValue([
-        {
-          externalId: 'wk_doc_1',
-          externalKnowledgeBaseId: 'wk_kb_1',
-          fileId: 'file_1',
-          filename: 'guide.pdf',
-          bytes: 123,
-          mimeType: 'application/pdf',
-          status: 'ready',
-          error: '',
-        },
-      ]),
+      listDocuments: jest.fn().mockResolvedValue({
+        data: [
+          {
+            externalId: 'wk_doc_1',
+            externalKnowledgeBaseId: 'wk_kb_1',
+            fileId: 'file_1',
+            filename: 'guide.pdf',
+            bytes: 123,
+            mimeType: 'application/pdf',
+            status: 'ready',
+            error: '',
+          },
+        ],
+        nextCursor: '3',
+      }),
     } as unknown as WeKnoraClient;
 
     deps.findKnowledgeBaseById.mockResolvedValue(
@@ -473,7 +526,12 @@ describe('knowledge base service', () => {
     );
     deps.checkPermission.mockResolvedValue(true);
 
-    const result = await listKnowledgeBaseDocumentsForUser(auth, 'kb_weknora', deps);
+    const result = await listKnowledgeBaseDocumentsForUser(
+      auth,
+      'kb_weknora',
+      { cursor: '2', limit: 50 },
+      deps,
+    );
 
     expect(result).toEqual({
       data: [
@@ -490,9 +548,12 @@ describe('knowledge base service', () => {
           tenantId: auth.tenantId,
         },
       ],
-      nextCursor: undefined,
+      nextCursor: '3',
     });
-    expect(deps.weknoraClient.listDocuments).toHaveBeenCalledWith('wk_kb_1');
+    expect(deps.weknoraClient.listDocuments).toHaveBeenCalledWith('wk_kb_1', {
+      cursor: '2',
+      limit: 50,
+    });
     expect(deps.findKnowledgeBaseDocuments).not.toHaveBeenCalled();
   });
 
@@ -511,11 +572,11 @@ describe('knowledge base service', () => {
     );
     deps.checkPermission.mockResolvedValue(true);
 
-    await expect(listKnowledgeBaseDocumentsForUser(auth, 'kb_weknora', deps)).rejects.toMatchObject(
-      {
-        statusCode: 500,
-      },
-    );
+    await expect(
+      listKnowledgeBaseDocumentsForUser(auth, 'kb_weknora', {}, deps),
+    ).rejects.toMatchObject({
+      statusCode: 500,
+    });
     expect(deps.weknoraClient.listDocuments).not.toHaveBeenCalled();
     expect(deps.findKnowledgeBaseDocuments).not.toHaveBeenCalled();
   });
@@ -533,12 +594,47 @@ describe('knowledge base service', () => {
     );
     deps.checkPermission.mockResolvedValue(true);
 
-    await expect(listKnowledgeBaseDocumentsForUser(auth, 'kb_weknora', deps)).rejects.toMatchObject(
-      {
-        statusCode: 500,
-      },
-    );
+    await expect(
+      listKnowledgeBaseDocumentsForUser(auth, 'kb_weknora', {}, deps),
+    ).rejects.toMatchObject({
+      statusCode: 500,
+    });
     expect(deps.findKnowledgeBaseDocuments).not.toHaveBeenCalled();
+  });
+
+  it('skips WeKnora search when the current user lacks VIEW on a bound knowledge base', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+    deps.findKnowledgeBaseById.mockResolvedValue(
+      makeKnowledgeBase({
+        id: 'kb_weknora',
+        provider: 'weknora',
+        externalId: 'wk_kb_1',
+      }),
+    );
+    deps.checkPermission.mockResolvedValue(false);
+    deps.weknoraClient = {
+      search: jest.fn(),
+    } as unknown as WeKnoraClient;
+
+    const context = await buildWeKnoraKnowledgeContext(
+      auth,
+      {
+        query: '怎么报销',
+        knowledgeBaseIds: ['kb_weknora'],
+      },
+      deps,
+    );
+
+    expect(context).toBe('');
+    expect(deps.checkPermission).toHaveBeenCalledWith({
+      userId: auth.userId,
+      role: auth.role,
+      resourceType: ResourceType.KNOWLEDGE_BASE,
+      resourceId: '64f1f77bcf86cd799439011',
+      requiredPermission: PermissionBits.VIEW,
+    });
+    expect(deps.weknoraClient.search).not.toHaveBeenCalled();
   });
 
   it('creates a ready document and refreshes counts after EDIT permission succeeds', async () => {

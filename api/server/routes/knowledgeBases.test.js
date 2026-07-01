@@ -377,16 +377,20 @@ describe('knowledge base routes', () => {
   });
 
   it('lists documents for a knowledge base', async () => {
-    const serviceResult = { data: [{ id: 'kbdoc_1', filename: 'handbook.pdf' }] };
+    const serviceResult = {
+      data: [{ id: 'kbdoc_1', filename: 'handbook.pdf' }],
+      nextCursor: '2',
+    };
     mockListKnowledgeBaseDocumentsForUser.mockResolvedValue(serviceResult);
 
-    const response = await request(app).get('/knowledge-bases/kb_1/documents');
+    const response = await request(app).get('/knowledge-bases/kb_1/documents?cursor=2&limit=25');
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual(serviceResult);
     expect(mockListKnowledgeBaseDocumentsForUser).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 'user_1' }),
       'kb_1',
+      { cursor: '2', limit: 25 },
       expect.objectContaining({ findKnowledgeBaseDocuments: db.findKnowledgeBaseDocuments }),
     );
   });

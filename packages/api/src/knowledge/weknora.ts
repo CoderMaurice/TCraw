@@ -1,6 +1,8 @@
 import type { KnowledgeBaseDocumentStatus } from 'librechat-data-provider';
 import type {
   CreateWeKnoraKnowledgeBaseInput,
+  ListWeKnoraDocumentsInput,
+  ListWeKnoraDocumentsResult,
   MappedWeKnoraDocument,
   MappedWeKnoraKnowledgeBase,
   MappedWeKnoraSearchResult,
@@ -11,6 +13,8 @@ import type {
 } from './types';
 
 const DEFAULT_SEARCH_TOP_K = 5;
+const DEFAULT_DOCUMENT_PAGE = 1;
+const DEFAULT_DOCUMENT_PAGE_SIZE = 100;
 
 type JsonObject = { [key: string]: JsonValue };
 type JsonValue = string | number | boolean | null | JsonObject | JsonValue[];
@@ -116,6 +120,49 @@ function parseSearchTopK(value?: string): number {
 
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_SEARCH_TOP_K;
+}
+
+function parsePageCursor(cursor?: string): number {
+  if (!cursor) {
+    return DEFAULT_DOCUMENT_PAGE;
+  }
+
+  const parsed = Number(cursor);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_DOCUMENT_PAGE;
+}
+
+function parsePageSize(limit?: number): number {
+  return Number.isInteger(limit) && limit > 0 ? limit : DEFAULT_DOCUMENT_PAGE_SIZE;
+}
+
+function nextDocumentCursor(
+  response: JsonValue,
+  page: number,
+  pageSize: number,
+  resultCount: number,
+): string | undefined {
+  const responseObject = getObject(response);
+  const hasMore = responseObject.has_more;
+  if (typeof hasMore === 'boolean') {
+    return hasMore ? String(page + 1) : undefined;
+  }
+
+  const nextPage = numberField(responseObject, ['next_page', 'nextPage'], 0);
+  if (nextPage > page) {
+    return String(nextPage);
+  }
+
+  const totalPages = numberField(responseObject, ['total_pages', 'totalPages'], 0);
+  if (totalPages > page) {
+    return String(page + 1);
+  }
+
+  const totalCount = numberField(responseObject, ['total_count', 'totalCount', 'count'], 0);
+  if (totalCount > page * pageSize) {
+    return String(page + 1);
+  }
+
+  return resultCount === pageSize ? String(page + 1) : undefined;
 }
 
 async function requestJson<T extends JsonValue>(
@@ -268,16 +315,27 @@ export function createWeKnoraClient(env: NodeJS.ProcessEnv = process.env): WeKno
       return getArray(response).map(mapKnowledgeBase);
     },
 
-    async listDocuments(externalKnowledgeBaseId: string): Promise<MappedWeKnoraDocument[]> {
+    async listDocuments(
+      externalKnowledgeBaseId: string,
+      input: ListWeKnoraDocumentsInput = {},
+    ): Promise<ListWeKnoraDocumentsResult> {
+      const page = parsePageCursor(input.cursor);
+      const pageSize = parsePageSize(input.limit);
       const response = await requestJson<JsonValue>(
         config,
         ['knowledge-bases', externalKnowledgeBaseId, 'knowledge'],
         {
           method: 'GET',
-          query: { page: '1', page_size: '100' },
+          query: { page: String(page), page_size: String(pageSize) },
         },
       );
-      return getArray(response).map((document) => mapDocument(document, externalKnowledgeBaseId));
+      const data = getArray(response).map((document) =>
+        mapDocument(document, externalKnowledgeBaseId),
+      );
+      return {
+        data,
+        nextCursor: nextDocumentCursor(response, page, pageSize, data.length),
+      };
     },
 
     async createKnowledgeBase(

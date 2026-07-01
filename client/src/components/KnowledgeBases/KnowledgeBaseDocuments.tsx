@@ -14,6 +14,7 @@ type KnowledgeBaseDocumentsProps = {
   id: string;
   documents: KnowledgeBaseDocument[];
   isLoading: boolean;
+  provider?: 'local' | 'weknora';
 };
 
 function formatBytes(bytes: number) {
@@ -39,6 +40,7 @@ export default function KnowledgeBaseDocuments({
   id,
   documents,
   isLoading,
+  provider = 'local',
 }: KnowledgeBaseDocumentsProps) {
   const localize = useLocalize();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -48,6 +50,7 @@ export default function KnowledgeBaseDocuments({
   const uploadDocuments = useUploadKnowledgeBaseDocumentsMutation(id);
   const deleteDocument = useDeleteKnowledgeBaseDocumentMutation(id);
   const { showToast } = useToastContext();
+  const canDeleteDocuments = provider !== 'weknora';
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     setFile(event.target.files?.[0] ?? null);
@@ -173,16 +176,20 @@ export default function KnowledgeBaseDocuments({
                   </Button>
                 ) : null}
               </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={localize('com_ui_delete_document')}
-                disabled={deleteDocument.isLoading}
-                onClick={() => handleDelete(document.id)}
-              >
-                <Trash2 className="h-4 w-4" aria-hidden="true" />
-              </Button>
+              {canDeleteDocuments ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={localize('com_ui_delete_document')}
+                  disabled={deleteDocument.isLoading}
+                  onClick={() => handleDelete(document.id)}
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              ) : (
+                <span aria-hidden="true" />
+              )}
             </div>
           ))}
         </div>

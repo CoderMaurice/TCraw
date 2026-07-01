@@ -152,8 +152,13 @@ export const knowledgeBases = () => knowledgeBasesRoot;
 
 export const knowledgeBase = (id: string) => `${knowledgeBasesRoot}/${encodeURIComponent(id)}`;
 
-export const knowledgeBaseDocuments = (id: string) =>
-  `${knowledgeBase(id)}/documents`;
+export const knowledgeBaseDocuments = (
+  id: string,
+  params?: {
+    cursor?: string;
+    limit?: number;
+  },
+) => `${knowledgeBase(id)}/documents${buildQuery(params ?? {})}`;
 
 export const knowledgeBaseDocument = (id: string, documentId: string) =>
   `${knowledgeBaseDocuments(id)}/${encodeURIComponent(documentId)}`;

@@ -106,8 +106,8 @@ describe('WeKnora adapter', () => {
     );
   });
 
-  it('lists documents and maps parse status values', async () => {
-    mockFetch(
+  it('lists documents with cursor pagination and maps parse status values', async () => {
+    const fetch = mockFetch(
       mockJsonResponse({
         data: [
           {
@@ -131,28 +131,41 @@ describe('WeKnora adapter', () => {
 
     const client = createWeKnoraClient(env);
 
-    await expect(client?.listDocuments('wk_kb_1')).resolves.toEqual([
+    await expect(client?.listDocuments('wk_kb_1', { cursor: '3', limit: 2 })).resolves.toEqual({
+      data: [
+        {
+          externalId: 'knowledge_1',
+          externalKnowledgeBaseId: 'wk_kb_1',
+          fileId: 'file_1',
+          filename: 'Guide.pdf',
+          bytes: 1024,
+          mimeType: 'application/pdf',
+          status: 'ready',
+          error: '',
+        },
+        {
+          externalId: 'knowledge_2',
+          externalKnowledgeBaseId: 'wk_kb_1',
+          fileId: 'knowledge_2',
+          filename: 'Failed.txt',
+          bytes: 20,
+          mimeType: '',
+          status: 'failed',
+          error: 'parse failed',
+        },
+      ],
+      nextCursor: '4',
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      'https://weknora.example.com/api/knowledge-bases/wk_kb_1/knowledge?page=3&page_size=2',
       {
-        externalId: 'knowledge_1',
-        externalKnowledgeBaseId: 'wk_kb_1',
-        fileId: 'file_1',
-        filename: 'Guide.pdf',
-        bytes: 1024,
-        mimeType: 'application/pdf',
-        status: 'ready',
-        error: '',
+        method: 'GET',
+        headers: {
+          'X-API-Key': 'test-api-key',
+          Accept: 'application/json',
+        },
       },
-      {
-        externalId: 'knowledge_2',
-        externalKnowledgeBaseId: 'wk_kb_1',
-        fileId: 'knowledge_2',
-        filename: 'Failed.txt',
-        bytes: 20,
-        mimeType: '',
-        status: 'failed',
-        error: 'parse failed',
-      },
-    ]);
+    );
   });
 
   it('uses JSON headers for creating and sharing a knowledge base', async () => {

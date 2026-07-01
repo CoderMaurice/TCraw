@@ -59,6 +59,11 @@ export type UpdateKnowledgeBaseRequest = {
   description?: string;
 };
 
+export type ListKnowledgeBaseDocumentsRequest = {
+  cursor?: string;
+  limit?: number;
+};
+
 export type ListKnowledgeBaseDocumentsResponse = {
   data: KnowledgeBaseDocument[];
   nextCursor?: string;
