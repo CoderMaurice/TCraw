@@ -105,6 +105,22 @@ describe('Multer Configuration', () => {
         storage.getFilename(mockReq, encodedFile, cb);
       });
 
+      it('should repair utf8 filenames decoded as latin1 by multer', (done) => {
+        const mojibakeFile = {
+          ...mockFile,
+          originalname: Buffer.from('人工智能与AI发展报告.docx', 'utf8').toString('latin1'),
+        };
+
+        const cb = jest.fn((err, filename) => {
+          expect(err).toBeNull();
+          expect(mojibakeFile.originalname).toBe('人工智能与AI发展报告.docx');
+          expect(filename).toBe('人工智能与AI发展报告.docx');
+          done();
+        });
+
+        storage.getFilename(mockReq, mojibakeFile, cb);
+      });
+
       it('should call real sanitizeFilename with properly encoded filename', (done) => {
         // Test with a properly URI-encoded filename that needs sanitization
         const unsafeFile = {

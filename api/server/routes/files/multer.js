@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const multer = require('multer');
-const { sanitizeFilename } = require('@librechat/api');
+const { normalizeUploadedFilename, sanitizeFilename } = require('@librechat/api');
 const {
   mergeFileConfig,
   inferMimeType,
@@ -22,7 +22,7 @@ const storage = multer.diskStorage({
   },
   filename: function (req, file, cb) {
     req.file_id = crypto.randomUUID();
-    file.originalname = decodeURIComponent(file.originalname);
+    file.originalname = normalizeUploadedFilename(file.originalname);
     const sanitizedFilename = sanitizeFilename(file.originalname);
     cb(null, sanitizedFilename);
   },

@@ -12,6 +12,38 @@ const USER_FACING_UPLOAD_ERRORS = [
 const ASCII_FILENAME_SAFE_PATTERN = /^[a-zA-Z0-9._-]$/;
 const UNSAFE_UNICODE_FILENAME_PATTERN = /[^\p{L}\p{M}\p{N}\p{Emoji}\u200d._-]/gu;
 const FILENAME_SEGMENT_MAX_BYTES = 255;
+const MOJIBAKE_MARKER_PATTERN = /[\u0080-\u009f]|[ÃÂÐÑ][\u00a0-\u00ff]|[äåæçèé][\u0080-\u00bf]/u;
+
+function safeDecodeURIComponent(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function mojibakeScore(value: string): number {
+  return Array.from(value.matchAll(new RegExp(MOJIBAKE_MARKER_PATTERN, 'gu'))).length;
+}
+
+/**
+ * Normalizes filenames produced by multipart parsers before sanitization.
+ * Some clients send UTF-8 filenames that arrive as latin1-decoded mojibake.
+ */
+export function normalizeUploadedFilename(inputName: string): string {
+  const decoded = safeDecodeURIComponent(inputName);
+  const repaired = Buffer.from(decoded, 'latin1').toString('utf8');
+
+  if (
+    repaired !== decoded &&
+    !repaired.includes('\uFFFD') &&
+    mojibakeScore(decoded) > mojibakeScore(repaired)
+  ) {
+    return repaired;
+  }
+
+  return decoded;
+}
 
 function sanitizeFilenameSegment(segment: string): string {
   const asciiSanitized = Array.from(segment.normalize('NFC'), (char) => {

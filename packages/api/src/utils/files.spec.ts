@@ -1,5 +1,6 @@
 import {
   sanitizeFilename,
+  normalizeUploadedFilename,
   sanitizeArtifactPath,
   flattenArtifactPath,
   resolveUploadErrorMessage,
@@ -25,6 +26,22 @@ function expectedHexSuffix(input: string): string {
 function utf8ByteLength(input: string): number {
   return Buffer.byteLength(input, 'utf8');
 }
+
+describe('normalizeUploadedFilename', () => {
+  test('decodes browser URI encoded filenames', () => {
+    expect(normalizeUploadedFilename(encodeURIComponent('市场 分析.docx'))).toBe('市场 分析.docx');
+  });
+
+  test('repairs UTF-8 filenames decoded as latin1 by multipart parsers', () => {
+    const mojibake = Buffer.from('人工智能与AI发展报告.docx', 'utf8').toString('latin1');
+
+    expect(normalizeUploadedFilename(mojibake)).toBe('人工智能与AI发展报告.docx');
+  });
+
+  test('keeps regular unicode filenames intact', () => {
+    expect(normalizeUploadedFilename('résumé-данные.csv')).toBe('résumé-данные.csv');
+  });
+});
 
 describe('sanitizeFilename', () => {
   test('removes directory components (1/2)', () => {
