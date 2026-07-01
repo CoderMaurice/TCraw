@@ -8,8 +8,6 @@ const mockGetKnowledgeBaseForUser = jest.fn();
 const mockUpdateKnowledgeBaseForUser = jest.fn();
 const mockDeleteKnowledgeBaseForUser = jest.fn();
 const mockListKnowledgeBaseDocumentsForUser = jest.fn();
-const mockCreateKnowledgeBaseDocumentForUser = jest.fn();
-const mockUpdateKnowledgeBaseDocumentForUser = jest.fn();
 const mockDeleteKnowledgeBaseDocumentForUser = jest.fn();
 const mockRequireKnowledgeBasePermission = jest.fn();
 const mockMapWeKnoraDocumentToRecord = jest.fn((document, kb, auth) => ({
@@ -24,7 +22,6 @@ const mockMapWeKnoraDocumentToRecord = jest.fn((document, kb, auth) => ({
   createdBy: auth.userId,
   tenantId: auth.tenantId,
 }));
-const mockGetStorageMetadata = jest.fn();
 const mockSanitizeFilename = jest.fn((filename) => filename.trim());
 const mockWeKnoraClient = {
   listSharedKnowledgeBases: jest.fn(),
@@ -54,12 +51,6 @@ const mockCreateMulterInstance = jest.fn(() =>
     single: mockSingleUpload,
   }),
 );
-const mockGetFileStrategy = jest.fn(() => 'local');
-const mockHandleFileUpload = jest.fn();
-const mockGetStrategyFunctions = jest.fn(() => ({
-  handleFileUpload: mockHandleFileUpload,
-}));
-const mockUploadVectors = jest.fn();
 
 jest.mock('@librechat/api', () => ({
   listKnowledgeBasesForUser: mockListKnowledgeBasesForUser,
@@ -68,12 +59,9 @@ jest.mock('@librechat/api', () => ({
   updateKnowledgeBaseForUser: mockUpdateKnowledgeBaseForUser,
   deleteKnowledgeBaseForUser: mockDeleteKnowledgeBaseForUser,
   listKnowledgeBaseDocumentsForUser: mockListKnowledgeBaseDocumentsForUser,
-  createKnowledgeBaseDocumentForUser: mockCreateKnowledgeBaseDocumentForUser,
-  updateKnowledgeBaseDocumentForUser: mockUpdateKnowledgeBaseDocumentForUser,
   deleteKnowledgeBaseDocumentForUser: mockDeleteKnowledgeBaseDocumentForUser,
   requireKnowledgeBasePermission: mockRequireKnowledgeBasePermission,
   mapWeKnoraDocumentToRecord: mockMapWeKnoraDocumentToRecord,
-  getStorageMetadata: mockGetStorageMetadata,
   sanitizeFilename: mockSanitizeFilename,
   createWeKnoraClient: mockCreateWeKnoraClient,
   generateCheckAccess: jest.fn((config) => {
@@ -120,18 +108,6 @@ jest.mock('./files/multer', () => ({
   createMulterInstance: mockCreateMulterInstance,
 }));
 
-jest.mock('~/server/utils/getFileStrategy', () => ({
-  getFileStrategy: mockGetFileStrategy,
-}));
-
-jest.mock('~/server/services/Files/strategies', () => ({
-  getStrategyFunctions: mockGetStrategyFunctions,
-}));
-
-jest.mock('~/server/services/Files/VectorDB/crud', () => ({
-  uploadVectors: mockUploadVectors,
-}));
-
 jest.mock('~/models', () => ({
   createKnowledgeBase: jest.fn(),
   findKnowledgeBaseById: jest.fn(),
@@ -171,20 +147,13 @@ describe('knowledge base routes', () => {
     mockUpdateKnowledgeBaseForUser.mockReset();
     mockDeleteKnowledgeBaseForUser.mockReset();
     mockListKnowledgeBaseDocumentsForUser.mockReset();
-    mockCreateKnowledgeBaseDocumentForUser.mockReset();
-    mockUpdateKnowledgeBaseDocumentForUser.mockReset();
     mockDeleteKnowledgeBaseDocumentForUser.mockReset();
     mockRequireKnowledgeBasePermission.mockReset();
     mockMapWeKnoraDocumentToRecord.mockClear();
-    mockGetStorageMetadata.mockReset();
     mockSanitizeFilename.mockClear();
     mockUploadMiddleware.mockClear();
     mockSingleUpload.mockClear();
     mockCreateMulterInstance.mockClear();
-    mockGetFileStrategy.mockClear();
-    mockHandleFileUpload.mockReset();
-    mockGetStrategyFunctions.mockClear();
-    mockUploadVectors.mockReset();
     mockWeKnoraClient.uploadDocument.mockReset();
     mockReadFile.mockReset();
     mockUnlink.mockReset();
@@ -192,19 +161,6 @@ describe('knowledge base routes', () => {
     mockKnowledgeBaseCreateMiddleware.mockClear();
     logger.error.mockClear();
 
-    mockGetStorageMetadata.mockReturnValue({ storageKey: 'stored/key' });
-    mockHandleFileUpload.mockResolvedValue({
-      bytes: 1234,
-      filename: 'handbook.pdf',
-      filepath: '/uploads/user_1/file_route__handbook.pdf',
-      storageKey: 'stored/key',
-      storageRegion: 'us-east-1',
-    });
-    mockUploadVectors.mockResolvedValue({
-      bytes: 1234,
-      filename: 'handbook.pdf',
-      embedded: true,
-    });
     mockRequireKnowledgeBasePermission.mockResolvedValue({ id: 'kb_1' });
 
     app = express();
@@ -395,102 +351,41 @@ describe('knowledge base routes', () => {
     );
   });
 
-  it('creates a processing document record before embedding finishes', async () => {
-    const serviceResult = { id: 'kbdoc_1', file_id: 'file_route', status: 'processing' };
-    mockCreateKnowledgeBaseDocumentForUser.mockResolvedValue(serviceResult);
-    mockUpdateKnowledgeBaseDocumentForUser.mockResolvedValue({
-      ...serviceResult,
-      status: 'ready',
+  it('rejects document uploads for local RAG knowledge bases', async () => {
+    mockRequireKnowledgeBasePermission.mockResolvedValue({
+      id: 'kb_1',
+      provider: 'local',
     });
 
     const response = await request(app)
       .post('/knowledge-bases/kb_1/documents')
       .attach('file', Buffer.from('hello'), 'handbook.pdf');
 
-    expect(response.status).toBe(201);
-    expect(response.body).toEqual(serviceResult);
+    expect(response.status).toBe(410);
+    expect(response.body).toEqual({ message: 'Local RAG knowledge bases are no longer supported' });
     expect(mockRequireKnowledgeBasePermission).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 'user_1' }),
       'kb_1',
       PermissionBits.EDIT,
       expect.any(Object),
     );
-    expect(mockHandleFileUpload).toHaveBeenCalledWith(
-      expect.objectContaining({
-        file_id: 'file_route',
-        entity_id: 'kb_1',
-        basePath: 'uploads',
-      }),
-    );
-    expect(mockUploadVectors).toHaveBeenCalledWith({
-      req: expect.any(Object),
-      file: expect.objectContaining({ originalname: 'handbook.pdf' }),
-      file_id: 'file_route',
-      entity_id: 'kb_1',
-      storageMetadata: { storageKey: 'stored/key' },
-    });
-    expect(mockCreateKnowledgeBaseDocumentForUser).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: 'user_1' }),
-      'kb_1',
-      {
-        file_id: 'file_route',
-        filename: 'handbook.pdf',
-        bytes: 1234,
-        mimeType: 'application/pdf',
-        status: 'processing',
-      },
-      expect.objectContaining({ createKnowledgeBaseDocument: db.createKnowledgeBaseDocument }),
-    );
-    expect(mockRequireKnowledgeBasePermission.mock.invocationCallOrder[0]).toBeLessThan(
-      mockCreateKnowledgeBaseDocumentForUser.mock.invocationCallOrder[0],
-    );
-    expect(mockCreateKnowledgeBaseDocumentForUser.mock.invocationCallOrder[0]).toBeLessThan(
-      mockHandleFileUpload.mock.invocationCallOrder[0],
-    );
-    await new Promise(process.nextTick);
-    expect(mockUpdateKnowledgeBaseDocumentForUser).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: 'user_1' }),
-      'kb_1',
-      'kbdoc_1',
-      {
-        filename: 'handbook.pdf',
-        bytes: 1234,
-        mimeType: 'application/pdf',
-        status: 'ready',
-        error: '',
-      },
-      expect.objectContaining({ updateKnowledgeBaseDocument: db.updateKnowledgeBaseDocument }),
-    );
+    expect(mockUnlink).toHaveBeenCalledWith('/tmp/handbook.pdf');
+    expect(mockWeKnoraClient.uploadDocument).not.toHaveBeenCalled();
   });
 
-  it('updates the processing document as failed when embedding fails', async () => {
-    const vectorError = new Error('RAG failed');
-    const serviceResult = { id: 'kbdoc_1', file_id: 'file_route', status: 'processing' };
-    mockUploadVectors.mockRejectedValue(vectorError);
-    mockCreateKnowledgeBaseDocumentForUser.mockResolvedValue(serviceResult);
-    mockUpdateKnowledgeBaseDocumentForUser.mockResolvedValue({
-      ...serviceResult,
-      status: 'failed',
-      error: 'RAG failed',
+  it('rejects document uploads for knowledge bases without a WeKnora provider', async () => {
+    mockRequireKnowledgeBasePermission.mockResolvedValue({
+      id: 'kb_1',
     });
 
     const response = await request(app)
       .post('/knowledge-bases/kb_1/documents')
       .attach('file', Buffer.from('hello'), 'handbook.pdf');
 
-    expect(response.status).toBe(201);
-    expect(response.body).toEqual(serviceResult);
-    await new Promise(process.nextTick);
-    expect(mockUpdateKnowledgeBaseDocumentForUser).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: 'user_1' }),
-      'kb_1',
-      'kbdoc_1',
-      expect.objectContaining({
-        status: 'failed',
-        error: 'RAG failed',
-      }),
-      expect.any(Object),
-    );
+    expect(response.status).toBe(410);
+    expect(response.body).toEqual({ message: 'Local RAG knowledge bases are no longer supported' });
+    expect(mockUnlink).toHaveBeenCalledWith('/tmp/handbook.pdf');
+    expect(mockWeKnoraClient.uploadDocument).not.toHaveBeenCalled();
   });
 
   it('uploads documents directly to WeKnora for WeKnora-backed knowledge bases', async () => {
@@ -562,11 +457,6 @@ describe('knowledge base routes', () => {
       },
       expect.objectContaining({ userId: 'user_1' }),
     );
-    expect(mockCreateKnowledgeBaseDocumentForUser).not.toHaveBeenCalled();
-    expect(mockHandleFileUpload).not.toHaveBeenCalled();
-    expect(mockUploadVectors).not.toHaveBeenCalled();
-    await new Promise(process.nextTick);
-    expect(mockUpdateKnowledgeBaseDocumentForUser).not.toHaveBeenCalled();
   });
 
   it('cleans up WeKnora temp files when upload fails', async () => {

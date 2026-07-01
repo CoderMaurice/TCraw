@@ -129,48 +129,29 @@ export async function createKnowledgeBaseForUser(
   input: CreateKnowledgeBaseForUserInput,
   deps: KnowledgeBaseServiceDependencies,
 ): Promise<KnowledgeBaseRecord> {
-  if (deps.weknoraClient && deps.upsertExternalKnowledgeBase) {
-    const external = await deps.weknoraClient.createKnowledgeBase({
-      name: input.name.trim(),
-      description: normalizeOptionalDescription(input.description) ?? '',
-    });
-    const created = await deps.upsertExternalKnowledgeBase({
-      id: `kb_${randomUUID()}`,
-      name: external.name,
-      description: external.description,
-      author: auth.userId,
-      authorName: auth.name,
-      tenantId: auth.tenantId,
-      provider: 'weknora',
-      externalId: external.externalId,
-      externalSpaceId: external.externalSpaceId,
-      externalShareId: external.externalShareId,
-      documentCount: external.documentCount,
-      readyDocumentCount: external.readyDocumentCount,
-      failedDocumentCount: external.failedDocumentCount,
-      processingDocumentCount: external.processingDocumentCount,
-    });
-    const resourceId = getMongoResourceId(created);
-
-    await deps.grantPermission({
-      principalType: PrincipalType.USER,
-      principalId: auth.userId,
-      resourceType: ResourceType.KNOWLEDGE_BASE,
-      resourceId,
-      accessRoleId: AccessRoleIds.KNOWLEDGE_BASE_OWNER,
-      grantedBy: auth.userId,
-    });
-
-    return created;
+  if (!deps.weknoraClient || !deps.upsertExternalKnowledgeBase) {
+    throw createServiceError('WeKnora knowledge service is not configured', 500);
   }
 
-  const created = await deps.createKnowledgeBase({
-    id: `kb_${randomUUID()}`,
+  const external = await deps.weknoraClient.createKnowledgeBase({
     name: input.name.trim(),
-    description: normalizeOptionalDescription(input.description),
+    description: normalizeOptionalDescription(input.description) ?? '',
+  });
+  const created = await deps.upsertExternalKnowledgeBase({
+    id: `kb_${randomUUID()}`,
+    name: external.name,
+    description: external.description,
     author: auth.userId,
     authorName: auth.name,
     tenantId: auth.tenantId,
+    provider: 'weknora',
+    externalId: external.externalId,
+    externalSpaceId: external.externalSpaceId,
+    externalShareId: external.externalShareId,
+    documentCount: external.documentCount,
+    readyDocumentCount: external.readyDocumentCount,
+    failedDocumentCount: external.failedDocumentCount,
+    processingDocumentCount: external.processingDocumentCount,
   });
   const resourceId = getMongoResourceId(created);
 
@@ -204,7 +185,9 @@ export async function listKnowledgeBasesForUser(
     return { data: [], nextCursor: undefined };
   }
 
-  const data = await deps.findKnowledgeBasesByResourceIds(resourceIds, auth.tenantId);
+  const data = (await deps.findKnowledgeBasesByResourceIds(resourceIds, auth.tenantId)).filter(
+    (knowledgeBase) => knowledgeBase.provider === 'weknora',
+  );
   return { data, nextCursor: undefined };
 }
 

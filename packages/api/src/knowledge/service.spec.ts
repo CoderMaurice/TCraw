@@ -106,51 +106,23 @@ function makeDocument(auth = makeAuth()): KnowledgeBaseDocumentRecord {
 }
 
 describe('knowledge base service', () => {
-  it('creates a knowledge base and grants owner permission using Mongo _id as resourceId', async () => {
+  it('rejects knowledge base creation when WeKnora is not configured', async () => {
     const auth = makeAuth();
     const deps = makeDeps();
-    const created = {
-      _id: mongoId('64f1f77bcf86cd799439011'),
-      id: 'kb_created',
-      name: 'Product Docs',
-      description: 'Shared support knowledge',
-      author: auth.userId,
-      authorName: auth.name,
-      tenantId: auth.tenantId,
-      documentCount: 0,
-      readyDocumentCount: 0,
-      failedDocumentCount: 0,
-    };
 
-    deps.createKnowledgeBase.mockResolvedValue(created);
-    deps.grantPermission.mockResolvedValue(null);
-
-    const result = await createKnowledgeBaseForUser(
-      auth,
-      { name: ' Product Docs ', description: ' Shared support knowledge ' },
-      deps,
-    );
-
-    expect(result).toBe(created);
-    expect(deps.createKnowledgeBase).toHaveBeenCalledWith({
-      id: expect.stringMatching(/^kb_[0-9a-f-]+$/),
-      name: 'Product Docs',
-      description: 'Shared support knowledge',
-      author: auth.userId,
-      authorName: auth.name,
-      tenantId: auth.tenantId,
+    await expect(
+      createKnowledgeBaseForUser(
+        auth,
+        { name: ' Product Docs ', description: ' Shared support knowledge ' },
+        deps,
+      ),
+    ).rejects.toMatchObject({
+      message: 'WeKnora knowledge service is not configured',
+      statusCode: 500,
     });
-    expect(deps.grantPermission).toHaveBeenCalledWith({
-      principalType: PrincipalType.USER,
-      principalId: auth.userId,
-      resourceType: ResourceType.KNOWLEDGE_BASE,
-      resourceId: '64f1f77bcf86cd799439011',
-      accessRoleId: AccessRoleIds.KNOWLEDGE_BASE_OWNER,
-      grantedBy: auth.userId,
-    });
-    expect(deps.grantPermission).not.toHaveBeenCalledWith(
-      expect.objectContaining({ resourceId: created.id }),
-    );
+
+    expect(deps.createKnowledgeBase).not.toHaveBeenCalled();
+    expect(deps.grantPermission).not.toHaveBeenCalled();
   });
 
   it('creates knowledge bases in WeKnora and mirrors them locally', async () => {
@@ -225,7 +197,7 @@ describe('knowledge base service', () => {
     expect(result.id).toBe('kb_new');
   });
 
-  it('lists accessible knowledge base records with VIEW by default', async () => {
+  it('lists only WeKnora-backed accessible knowledge base records with VIEW by default', async () => {
     const auth = makeAuth();
     const deps = makeDeps();
     const firstResourceId = mongoId('64f1f77bcf86cd799439011');
@@ -251,6 +223,8 @@ describe('knowledge base service', () => {
         author: auth.userId,
         authorName: auth.name,
         tenantId: auth.tenantId,
+        provider: 'weknora',
+        externalId: 'wk_second',
         documentCount: 1,
         readyDocumentCount: 1,
         failedDocumentCount: 0,
@@ -262,7 +236,7 @@ describe('knowledge base service', () => {
 
     const result = await listKnowledgeBasesForUser(auth, {}, deps);
 
-    expect(result).toEqual({ data: records, nextCursor: undefined });
+    expect(result).toEqual({ data: [records[1]], nextCursor: undefined });
     expect(deps.findAccessibleResources).toHaveBeenCalledWith({
       userId: auth.userId,
       role: auth.role,

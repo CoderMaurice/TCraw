@@ -1,9 +1,7 @@
-const crypto = require('crypto');
 const { readFile, unlink } = require('fs/promises');
 const express = require('express');
 const { logger } = require('@librechat/data-schemas');
 const {
-  getStorageMetadata,
   sanitizeFilename,
   generateCheckAccess,
   getKnowledgeBaseForUser,
@@ -13,8 +11,6 @@ const {
   mapWeKnoraDocumentToRecord,
   requireKnowledgeBasePermission,
   listKnowledgeBaseDocumentsForUser,
-  createKnowledgeBaseDocumentForUser,
-  updateKnowledgeBaseDocumentForUser,
   deleteKnowledgeBaseDocumentForUser,
   listKnowledgeBasesForUser,
   createWeKnoraClient,
@@ -23,9 +19,6 @@ const { Permissions, PermissionBits, PermissionTypes } = require('librechat-data
 const requireJwtAuth = require('~/server/middleware/requireJwtAuth');
 const configMiddleware = require('~/server/middleware/config/app');
 const PermissionService = require('~/server/services/PermissionService');
-const { getFileStrategy } = require('~/server/utils/getFileStrategy');
-const { getStrategyFunctions } = require('~/server/services/Files/strategies');
-const { uploadVectors } = require('~/server/services/Files/VectorDB/crud');
 const db = require('~/models');
 const { createMulterInstance } = require('./files/multer');
 
@@ -161,103 +154,6 @@ const uploadDocumentMiddleware = async (req, res, next) => {
   }
 };
 
-const getUploadFileId = (req) => req.file_id || crypto.randomUUID();
-
-const buildProcessingDocumentInput = ({ req, fileId }) => ({
-  file_id: fileId,
-  filename: sanitizeFilename(req.file.originalname),
-  bytes: req.file.size ?? 0,
-  mimeType: req.file.mimetype,
-  status: 'processing',
-});
-
-const buildFailedDocumentUpdateInput = ({ req, error }) => ({
-  filename: sanitizeFilename(req.file.originalname),
-  bytes: req.file.size ?? 0,
-  mimeType: req.file.mimetype,
-  status: 'failed',
-  error: error?.message || 'Knowledge base document upload failed',
-});
-
-const processKnowledgeBaseDocumentUpload = async ({ req, knowledgeBaseId, fileId }) => {
-  const isImage = req.file.mimetype.startsWith('image');
-  const source = getFileStrategy(req.config, { isImage });
-  const { handleFileUpload } = getStrategyFunctions(source);
-  const file = {
-    ...req.file,
-    originalname: sanitizeFilename(req.file.originalname),
-  };
-  const storageResult = await handleFileUpload({
-    req,
-    file,
-    file_id: fileId,
-    basePath: 'uploads',
-    entity_id: knowledgeBaseId,
-  });
-  const storageMetadata = getStorageMetadata({
-    filepath: storageResult.filepath,
-    source,
-    storageKey: storageResult.storageKey,
-    storageRegion: storageResult.storageRegion,
-  });
-  const embeddingResult = await uploadVectors({
-    req,
-    file,
-    file_id: fileId,
-    entity_id: knowledgeBaseId,
-    storageMetadata,
-  });
-
-  return {
-    file_id: fileId,
-    filename: embeddingResult.filename || storageResult.filename || file.originalname,
-    bytes: embeddingResult.bytes ?? storageResult.bytes ?? req.file.size ?? 0,
-    mimeType: req.file.mimetype,
-    status: 'ready',
-  };
-};
-
-const finalizeKnowledgeBaseDocumentUpload = async ({
-  auth,
-  knowledgeBaseId,
-  documentId,
-  req,
-  fileId,
-}) => {
-  try {
-    const documentInput = await processKnowledgeBaseDocumentUpload({
-      req,
-      knowledgeBaseId,
-      fileId,
-    });
-    await updateKnowledgeBaseDocumentForUser(
-      auth,
-      knowledgeBaseId,
-      documentId,
-      {
-        filename: documentInput.filename,
-        bytes: documentInput.bytes,
-        mimeType: documentInput.mimeType,
-        status: 'ready',
-        error: '',
-      },
-      deps,
-    );
-  } catch (error) {
-    try {
-      await updateKnowledgeBaseDocumentForUser(
-        auth,
-        knowledgeBaseId,
-        documentId,
-        buildFailedDocumentUpdateInput({ req, error }),
-        deps,
-      );
-    } catch (updateError) {
-      logger.error('[knowledgeBases] Failed to mark document upload as failed:', updateError);
-    }
-  }
-};
-
 router.use(requireJwtAuth);
 router.use(configMiddleware);
 router.use(checkKnowledgeBaseAccess);
@@ -329,47 +225,31 @@ router.post('/:id/documents', uploadDocumentMiddleware, async (req, res) => {
       deps,
     );
 
-    if (kb.provider === 'weknora') {
-      try {
-        if (!kb.externalId) {
-          throw createRouteError('WeKnora knowledge base is missing an external id', 500);
-        }
-
-        if (!deps.weknoraClient) {
-          throw createRouteError('WeKnora client is not configured', 500);
-        }
-
-        const fileBytes = await readFile(req.file.path);
-        const document = await deps.weknoraClient.uploadDocument(kb.externalId, {
-          filename: sanitizeFilename(req.file.originalname),
-          data: fileBytes,
-          mimeType: req.file.mimetype,
-          bytes: req.file.size ?? 0,
-        });
-
-        return res.status(201).json(mapWeKnoraDocumentToRecord(document, kb, auth));
-      } finally {
-        await cleanupTempUpload(req.file.path);
+    try {
+      if (kb.provider !== 'weknora') {
+        throw createRouteError('Local RAG knowledge bases are no longer supported', 410);
       }
+
+      if (!kb.externalId) {
+        throw createRouteError('WeKnora knowledge base is missing an external id', 500);
+      }
+
+      if (!deps.weknoraClient) {
+        throw createRouteError('WeKnora client is not configured', 500);
+      }
+
+      const fileBytes = await readFile(req.file.path);
+      const document = await deps.weknoraClient.uploadDocument(kb.externalId, {
+        filename: sanitizeFilename(req.file.originalname),
+        data: fileBytes,
+        mimeType: req.file.mimetype,
+        bytes: req.file.size ?? 0,
+      });
+
+      return res.status(201).json(mapWeKnoraDocumentToRecord(document, kb, auth));
+    } finally {
+      await cleanupTempUpload(req.file.path);
     }
-
-    const fileId = getUploadFileId(req);
-    const result = await createKnowledgeBaseDocumentForUser(
-      auth,
-      knowledgeBaseId,
-      buildProcessingDocumentInput({ req, fileId }),
-      deps,
-    );
-
-    void finalizeKnowledgeBaseDocumentUpload({
-      auth,
-      knowledgeBaseId,
-      documentId: result.id,
-      req,
-      fileId,
-    });
-
-    return res.status(201).json(result);
   } catch (error) {
     return sendServiceError(res, error);
   }
