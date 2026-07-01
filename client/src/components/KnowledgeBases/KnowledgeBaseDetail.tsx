@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { ArrowLeft, Database } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Clock3, Database, FileText, Timer } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Spinner } from '@librechat/client';
+import type { KnowledgeBase } from 'librechat-data-provider';
 import { useKnowledgeBaseDocumentsQuery, useKnowledgeBaseQuery } from '~/data-provider';
 import { useLocalize } from '~/hooks';
 import type { TranslationKeys } from '~/hooks';
@@ -17,6 +18,26 @@ const tabs: Array<{ id: KnowledgeBaseTab; labelKey: TranslationKeys }> = [
   { id: 'access', labelKey: 'com_ui_knowledge_base_access' },
   { id: 'settings', labelKey: 'com_ui_knowledge_base_settings' },
 ];
+
+const providerLabelKeys: Record<NonNullable<KnowledgeBase['provider']>, TranslationKeys> = {
+  local: 'com_ui_knowledge_base_provider_local',
+  weknora: 'com_ui_knowledge_base_provider_weknora',
+};
+
+function formatKnowledgeBaseDate(dateString?: string) {
+  if (!dateString) {
+    return '';
+  }
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+  return date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
 
 export function KnowledgeBaseDetail() {
   const localize = useLocalize();
@@ -50,6 +71,13 @@ export function KnowledgeBaseDetail() {
     );
   }
 
+  const totalDocuments = knowledgeBase.documentCount ?? 0;
+  const processingDocuments = knowledgeBase.processingDocumentCount ?? 0;
+  const failedDocuments = knowledgeBase.failedDocumentCount ?? 0;
+  const updatedDate = formatKnowledgeBaseDate(knowledgeBase.updatedAt);
+  const providerLabelKey = providerLabelKeys[knowledgeBase.provider ?? 'local'];
+  const providerLabel = localize(providerLabelKey);
+
   return (
     <main className="flex h-full min-h-0 flex-col overflow-y-auto bg-surface-primary text-text-primary">
       <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-4 pb-10 pt-4 md:px-6 lg:pt-8">
@@ -75,10 +103,44 @@ export function KnowledgeBaseDetail() {
                 {knowledgeBase.description}
               </p>
             ) : null}
-            <p className="mt-2 text-sm text-text-secondary">
-              {knowledgeBase.readyDocumentCount} / {knowledgeBase.documentCount}{' '}
-              {localize('com_ui_ready')}
-            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-text-secondary">
+              <span
+                aria-label={localize('com_ui_knowledge_base_source', { 0: providerLabel })}
+                className="rounded-full border border-border-light px-2 py-0.5 text-xs font-medium text-text-secondary"
+              >
+                {providerLabel}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <FileText className="h-4 w-4" aria-hidden="true" />
+                {localize('com_ui_knowledge_base_documents_count', {
+                  0: String(totalDocuments),
+                })}
+              </span>
+              {processingDocuments > 0 ? (
+                <span className="flex items-center gap-1.5">
+                  <Timer className="h-4 w-4" aria-hidden="true" />
+                  {localize('com_ui_knowledge_base_status_processing_count', {
+                    0: String(processingDocuments),
+                  })}
+                </span>
+              ) : null}
+              {failedDocuments > 0 ? (
+                <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400">
+                  <AlertCircle className="h-4 w-4" aria-hidden="true" />
+                  {localize('com_ui_knowledge_base_status_failed_count', {
+                    0: String(failedDocuments),
+                  })}
+                </span>
+              ) : null}
+              <span className="flex min-w-0 items-center gap-1.5">
+                <Clock3 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span className="truncate">
+                  {updatedDate
+                    ? localize('com_ui_knowledge_base_updated', { 0: updatedDate })
+                    : localize('com_ui_unknown')}
+                </span>
+              </span>
+            </div>
           </div>
         </header>
 

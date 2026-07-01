@@ -2,6 +2,7 @@ export type KnowledgeBaseStatusCounts = {
   documentCount: number;
   readyDocumentCount: number;
   failedDocumentCount: number;
+  processingDocumentCount?: number;
 };
 
 export type KnowledgeBase = KnowledgeBaseStatusCounts & {
@@ -9,6 +10,7 @@ export type KnowledgeBase = KnowledgeBaseStatusCounts & {
   id: string;
   name: string;
   description?: string;
+  provider?: 'local' | 'weknora';
   author: string;
   authorName?: string;
   tenantId?: string;
@@ -64,7 +66,14 @@ export type ListKnowledgeBaseDocumentsResponse = {
 
 export type KnowledgeBaseSelectorItem = Pick<
   KnowledgeBase,
-  'id' | 'name' | 'description' | 'documentCount' | 'readyDocumentCount' | 'failedDocumentCount'
+  | 'id'
+  | 'name'
+  | 'description'
+  | 'provider'
+  | 'documentCount'
+  | 'readyDocumentCount'
+  | 'failedDocumentCount'
+  | 'processingDocumentCount'
 >;
 
 export type KnowledgeBaseSelectorResponse = {

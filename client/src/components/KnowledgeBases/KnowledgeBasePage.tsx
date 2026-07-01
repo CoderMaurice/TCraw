@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useState } from 'react';
-import { Clock3, Database, FileText, Plus, Search } from 'lucide-react';
+import { AlertCircle, Clock3, Database, FileText, Plus, Search, Timer } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Input, Spinner, useMediaQuery } from '@librechat/client';
 import type { KnowledgeBase } from 'librechat-data-provider';
@@ -16,7 +16,15 @@ const accessLabelKeys: Record<NonNullable<KnowledgeBase['access']>, TranslationK
   team: 'com_ui_knowledge_base_access_team',
 };
 
-function formatKnowledgeBaseDate(dateString: string) {
+const providerLabelKeys: Record<NonNullable<KnowledgeBase['provider']>, TranslationKeys> = {
+  local: 'com_ui_knowledge_base_provider_local',
+  weknora: 'com_ui_knowledge_base_provider_weknora',
+};
+
+function formatKnowledgeBaseDate(dateString?: string) {
+  if (!dateString) {
+    return '';
+  }
   const date = new Date(dateString);
   if (Number.isNaN(date.getTime())) {
     return '';
@@ -87,9 +95,13 @@ export function KnowledgeBasePage() {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {knowledgeBases.map((knowledgeBase) => {
-              const totalDocuments = knowledgeBase.documentCount;
+              const totalDocuments = knowledgeBase.documentCount ?? 0;
+              const processingDocuments = knowledgeBase.processingDocumentCount ?? 0;
+              const failedDocuments = knowledgeBase.failedDocumentCount ?? 0;
               const updatedDate = formatKnowledgeBaseDate(knowledgeBase.updatedAt);
               const accessLabelKey = accessLabelKeys[knowledgeBase.access ?? 'owned'];
+              const providerLabelKey = providerLabelKeys[knowledgeBase.provider ?? 'local'];
+              const providerLabel = localize(providerLabelKey);
 
               return (
                 <button
@@ -116,15 +128,43 @@ export function KnowledgeBasePage() {
                         </span>
                       </span>
                     </span>
-                    <span className="shrink-0 rounded-full border border-border-light px-2 py-0.5 text-xs font-medium text-text-secondary">
-                      {localize(accessLabelKey)}
+                    <span className="flex shrink-0 flex-col items-end gap-1">
+                      <span
+                        aria-label={localize('com_ui_knowledge_base_source', {
+                          0: providerLabel,
+                        })}
+                        className="rounded-full border border-border-light px-2 py-0.5 text-xs font-medium text-text-secondary"
+                      >
+                        {providerLabel}
+                      </span>
+                      <span className="text-xs text-text-secondary">{localize(accessLabelKey)}</span>
                     </span>
                   </span>
 
-                  <span className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-border-light pt-3 text-xs text-text-secondary">
-                    <span className="flex items-center gap-1.5">
-                      <FileText className="h-3.5 w-3.5" aria-hidden="true" />
-                      {totalDocuments} {localize('com_ui_knowledge_base_documents')}
+                  <span className="mt-auto flex flex-col gap-2 border-t border-border-light pt-3 text-xs text-text-secondary">
+                    <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                      <span className="flex items-center gap-1.5">
+                        <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+                        {localize('com_ui_knowledge_base_documents_count', {
+                          0: String(totalDocuments),
+                        })}
+                      </span>
+                      {processingDocuments > 0 ? (
+                        <span className="flex items-center gap-1.5">
+                          <Timer className="h-3.5 w-3.5" aria-hidden="true" />
+                          {localize('com_ui_knowledge_base_status_processing_count', {
+                            0: String(processingDocuments),
+                          })}
+                        </span>
+                      ) : null}
+                      {failedDocuments > 0 ? (
+                        <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400">
+                          <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                          {localize('com_ui_knowledge_base_status_failed_count', {
+                            0: String(failedDocuments),
+                          })}
+                        </span>
+                      ) : null}
                     </span>
                     <span className="flex min-w-0 items-center gap-1.5">
                       <Clock3 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />

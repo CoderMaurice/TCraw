@@ -28,14 +28,23 @@ jest.mock('~/components/Chat/Menus/OpenSidebar', () => ({
 }));
 
 jest.mock('~/hooks', () => ({
-  useLocalize: () => (key: string) => {
+  useLocalize: () => (key: string, values?: Record<string, string>) => {
     const labels: Record<string, string> = {
       com_ui_create_knowledge_base: 'Create knowledge base',
       com_ui_search_knowledge_bases: 'Search knowledge bases',
       com_ui_knowledge_bases: 'Knowledge Bases',
+      com_ui_knowledge_base_documents_count: '{{0}} documents',
+      com_ui_knowledge_base_provider_local: 'Local',
+      com_ui_knowledge_base_provider_weknora: 'WeKnora',
+      com_ui_knowledge_base_source: 'Source: {{0}}',
+      com_ui_knowledge_base_status_failed: 'Failed',
+      com_ui_knowledge_base_status_failed_count: 'Failed: {{0}}',
+      com_ui_knowledge_base_status_processing: 'Processing',
+      com_ui_knowledge_base_status_processing_count: 'Processing: {{0}}',
+      com_ui_knowledge_base_updated: 'Updated {{0}}',
       com_ui_ready: 'ready',
     };
-    return labels[key] ?? key;
+    return (labels[key] ?? key).replaceAll('{{0}}', values?.[0] ?? '');
   },
 }));
 
@@ -53,7 +62,7 @@ describe('KnowledgeBasePage', () => {
     });
   });
 
-  it('renders searchable knowledge bases with ready document counts', () => {
+  it('renders searchable knowledge bases with WeKnora source and compact status counts', () => {
     (useKnowledgeBasesQuery as jest.Mock).mockReturnValue({
       data: {
         data: [
@@ -61,9 +70,12 @@ describe('KnowledgeBasePage', () => {
             id: 'kb_1',
             name: 'Support',
             description: 'Support playbooks',
-            documentCount: 2,
-            readyDocumentCount: 1,
-            failedDocumentCount: 0,
+            provider: 'weknora',
+            documentCount: 22,
+            readyDocumentCount: 19,
+            processingDocumentCount: 2,
+            failedDocumentCount: 1,
+            updatedAt: '2026-01-02T03:04:05.000Z',
           },
         ],
       },
@@ -81,6 +93,10 @@ describe('KnowledgeBasePage', () => {
     expect(screen.getByRole('button', { name: 'Create knowledge base' })).toBeInTheDocument();
     expect(screen.getByText('Support')).toBeInTheDocument();
     expect(screen.getByText('Support playbooks')).toBeInTheDocument();
-    expect(screen.getByText('1 / 2 ready')).toBeInTheDocument();
+    expect(screen.getByText('WeKnora')).toBeInTheDocument();
+    expect(screen.getByText('22 documents')).toBeInTheDocument();
+    expect(screen.getByText('Processing: 2')).toBeInTheDocument();
+    expect(screen.getByText('Failed: 1')).toBeInTheDocument();
+    expect(screen.getByText(/Updated/)).toBeInTheDocument();
   });
 });

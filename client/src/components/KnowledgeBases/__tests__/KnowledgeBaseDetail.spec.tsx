@@ -70,12 +70,22 @@ jest.mock('~/components/Sharing', () => ({
 }));
 
 jest.mock('~/hooks', () => ({
-  useLocalize: () => (key: string) => {
+  useLocalize: () => (key: string, values?: Record<string, string>) => {
     const labels: Record<string, string> = {
       com_ui_all_knowledge_bases: 'All knowledge bases',
       com_ui_knowledge_base_documents: 'Documents',
       com_ui_knowledge_base_access: 'Access',
       com_ui_knowledge_base_settings: 'Settings',
+      com_ui_knowledge_base_documents_count: '{{0}} documents',
+      com_ui_knowledge_base_provider_local: 'Local',
+      com_ui_knowledge_base_provider_weknora: 'WeKnora',
+      com_ui_knowledge_base_source: 'Source: {{0}}',
+      com_ui_knowledge_base_status_failed: 'Failed',
+      com_ui_knowledge_base_status_failed_count: 'Failed: {{0}}',
+      com_ui_knowledge_base_status_processing: 'Processing',
+      com_ui_knowledge_base_status_processing_count: 'Processing: {{0}}',
+      com_ui_knowledge_base_status_ready: 'Ready',
+      com_ui_knowledge_base_updated: 'Updated {{0}}',
       com_ui_ready: 'ready',
       com_ui_share: 'Share',
       com_ui_delete_document: 'Delete document',
@@ -87,7 +97,7 @@ jest.mock('~/hooks', () => ({
       com_ui_knowledge_base_delete_confirm: 'Delete this knowledge base?',
       com_ui_confirm_delete_knowledge_base: 'Confirm delete',
     };
-    return labels[key] ?? key;
+    return (labels[key] ?? key).replaceAll('{{0}}', values?.[0] ?? '');
   },
 }));
 
@@ -111,9 +121,12 @@ describe('KnowledgeBaseDetail', () => {
         id: 'kb_1',
         name: 'Support',
         description: 'Support playbooks',
-        documentCount: 2,
-        readyDocumentCount: 1,
-        failedDocumentCount: 0,
+        provider: 'weknora',
+        documentCount: 22,
+        readyDocumentCount: 19,
+        processingDocumentCount: 2,
+        failedDocumentCount: 1,
+        updatedAt: '2026-01-02T03:04:05.000Z',
       },
       isLoading: false,
     });
@@ -127,6 +140,14 @@ describe('KnowledgeBaseDetail', () => {
             filename: 'runbook.pdf',
             bytes: 2048,
             status: 'ready',
+          },
+          {
+            id: 'doc_processing',
+            knowledgeBaseId: 'kb_1',
+            file_id: 'file_processing',
+            filename: 'indexing.md',
+            bytes: 1024,
+            status: 'processing',
           },
         ],
       },
@@ -167,8 +188,15 @@ describe('KnowledgeBaseDetail', () => {
     );
     expect(screen.getByText('Support')).toBeInTheDocument();
     expect(screen.getByText('Support playbooks')).toBeInTheDocument();
-    expect(screen.getByText('1 / 2 ready')).toBeInTheDocument();
+    expect(screen.getByText('WeKnora')).toBeInTheDocument();
+    expect(screen.getByText('22 documents')).toBeInTheDocument();
+    expect(screen.getByText('Processing: 2')).toBeInTheDocument();
+    expect(screen.getByText('Failed: 1')).toBeInTheDocument();
+    expect(screen.getByText(/Updated/)).toBeInTheDocument();
     expect(screen.getByText('runbook.pdf')).toBeInTheDocument();
+    expect(screen.getByText('Ready')).toBeInTheDocument();
+    expect(screen.getByText('indexing.md')).toBeInTheDocument();
+    expect(screen.getAllByText('Processing')).toHaveLength(1);
 
     await userEvent.click(screen.getByRole('button', { name: 'Access' }));
 
@@ -229,6 +257,7 @@ describe('KnowledgeBaseDetail', () => {
       await userEvent.click(screen.getByRole('button', { name: 'View reason' }));
 
       expect(screen.getByText('Failure reason')).toBeInTheDocument();
+      expect(screen.getByText('Failed')).toBeInTheDocument();
       expect(screen.getByText('Embedding model is not configured')).toBeInTheDocument();
 
       await userEvent.click(screen.getByRole('button', { name: 'Re-upload' }));
