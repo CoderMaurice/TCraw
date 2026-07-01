@@ -150,6 +150,78 @@ describe('knowledge base service', () => {
     );
   });
 
+  it('creates knowledge bases in WeKnora and mirrors them locally', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+
+    deps.createKnowledgeBase.mockResolvedValue(makeKnowledgeBase({ id: 'kb_local' }));
+    deps.weknoraClient = {
+      createKnowledgeBase: jest.fn().mockResolvedValue({
+        externalId: 'wk_new',
+        externalSpaceId: '3c6805d0-88c3-46dd-8d20-3a90dd51d63d',
+        externalShareId: 'share_new',
+        name: '销售资料',
+        description: '销售常用文档',
+        documentCount: 0,
+        readyDocumentCount: 0,
+        failedDocumentCount: 0,
+        processingDocumentCount: 0,
+      }),
+    } as unknown as WeKnoraClient;
+    deps.upsertExternalKnowledgeBase = jest.fn().mockResolvedValue(
+      makeKnowledgeBase({
+        _id: mongoId('64f1f77bcf86cd799439088'),
+        id: 'kb_new',
+        provider: 'weknora',
+        externalId: 'wk_new',
+        externalShareId: 'share_new',
+        name: '销售资料',
+      }),
+    );
+    deps.grantPermission.mockResolvedValue(null);
+
+    const result = await createKnowledgeBaseForUser(
+      auth,
+      { name: ' 销售资料 ', description: ' 销售常用文档 ' },
+      deps,
+    );
+
+    expect(deps.weknoraClient.createKnowledgeBase).toHaveBeenCalledWith({
+      name: '销售资料',
+      description: '销售常用文档',
+    });
+    expect(deps.createKnowledgeBase).not.toHaveBeenCalled();
+    expect(deps.upsertExternalKnowledgeBase).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'weknora',
+        externalId: 'wk_new',
+        externalSpaceId: '3c6805d0-88c3-46dd-8d20-3a90dd51d63d',
+        externalShareId: 'share_new',
+        name: '销售资料',
+        description: '销售常用文档',
+        documentCount: 0,
+        readyDocumentCount: 0,
+        failedDocumentCount: 0,
+        processingDocumentCount: 0,
+        author: auth.userId,
+        authorName: auth.name,
+        tenantId: auth.tenantId,
+      }),
+    );
+    expect(deps.grantPermission).toHaveBeenCalledWith({
+      principalType: PrincipalType.USER,
+      principalId: auth.userId,
+      resourceType: ResourceType.KNOWLEDGE_BASE,
+      resourceId: '64f1f77bcf86cd799439088',
+      accessRoleId: AccessRoleIds.KNOWLEDGE_BASE_OWNER,
+      grantedBy: auth.userId,
+    });
+    expect(deps.grantPermission).not.toHaveBeenCalledWith(
+      expect.objectContaining({ resourceId: 'wk_new' }),
+    );
+    expect(result.id).toBe('kb_new');
+  });
+
   it('lists accessible knowledge base records with VIEW by default', async () => {
     const auth = makeAuth();
     const deps = makeDeps();
