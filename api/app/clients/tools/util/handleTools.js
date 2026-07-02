@@ -43,6 +43,7 @@ const {
 } = require('~/server/services/MCP');
 const { getMCPRequestContext } = require('~/server/services/MCPRequestContext');
 const { createFileSearchTool, primeFiles: primeSearchFiles } = require('./fileSearch');
+const { KNOWLEDGE_SEARCH_TOOL, createKnowledgeSearchTool } = require('./knowledgeSearch');
 const { primeFiles: primeCodeFiles } = require('~/server/services/Files/Code/process');
 const { getUserPluginAuthValue } = require('~/server/services/PluginService');
 const { loadAuthValues } = require('~/server/services/Tools/credentials');
@@ -336,6 +337,14 @@ const loadTools = async ({
           fileCitations,
         });
       };
+      continue;
+    } else if (tool === KNOWLEDGE_SEARCH_TOOL) {
+      requestedTools[tool] = async () =>
+        createKnowledgeSearchTool({
+          req: options.req,
+          agent,
+          knowledgeBaseIds: agent?.knowledge_base_ids,
+        });
       continue;
     } else if (tool === Tools.web_search) {
       const result = await loadWebSearchAuth({

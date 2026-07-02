@@ -265,6 +265,32 @@ describe('definitions.ts', () => {
         expect(fileSearchDef?.parameters?.required).toContain('query');
       });
 
+      it('should include parameters for knowledge_search native tool', async () => {
+        mockIsBuiltInTool.mockImplementation((name) => name === 'knowledge_search');
+
+        const params: LoadToolDefinitionsParams = {
+          userId: 'user-123',
+          agentId: 'agent-123',
+          tools: ['knowledge_search'],
+        };
+
+        const deps: LoadToolDefinitionsDeps = {
+          getOrFetchMCPServerTools: mockGetOrFetchMCPServerTools,
+          isBuiltInTool: mockIsBuiltInTool,
+        };
+
+        const result = await loadToolDefinitions(params, deps);
+
+        const knowledgeSearchDef = result.toolDefinitions.find(
+          (d) => d.name === 'knowledge_search',
+        );
+        expect(knowledgeSearchDef).toBeDefined();
+        expect(knowledgeSearchDef?.parameters).toBeDefined();
+        expect(knowledgeSearchDef?.parameters?.properties).toHaveProperty('query');
+        expect(knowledgeSearchDef?.parameters?.required).toContain('query');
+        expect(result.toolRegistry.has('knowledge_search')).toBe(true);
+      });
+
       it('should skip built-in tools without registry definitions', async () => {
         mockIsBuiltInTool.mockImplementation((name) => name === 'unknown_tool');
 

@@ -94,6 +94,7 @@ jest.spyOn(logger, 'warn').mockImplementation(() => {});
 const PRIMARY_ID = 'agent_primary';
 const TARGET_ID = 'agent_target';
 const AUTHORIZED_ID = 'agent_authorized';
+const KNOWLEDGE_SEARCH_TOOL = 'knowledge_search';
 
 describe('initializeClient — processAgent ACL gate', () => {
   let mongoServer;
@@ -188,7 +189,7 @@ describe('initializeClient — processAgent ACL gate', () => {
     expect(agentClientArgs.agent.edges).toEqual([]);
   });
 
-  it('does not merge knowledge bases into legacy file search resources', async () => {
+  it('exposes knowledge bases as the runtime knowledge search tool without legacy file search resources', async () => {
     const endpointOption = makeEndpointOption();
     endpointOption.agent = Promise.resolve({
       id: PRIMARY_ID,
@@ -213,7 +214,7 @@ describe('initializeClient — processAgent ACL gate', () => {
       endpointOption,
     });
 
-    expect(mockInitializeAgent.mock.calls[0][0].agent.tools).toEqual([]);
+    expect(mockInitializeAgent.mock.calls[0][0].agent.tools).toEqual([KNOWLEDGE_SEARCH_TOOL]);
     expect(mockInitializeAgent.mock.calls[0][0].agent.tool_resources.file_search.file_ids).toEqual([
       'file_existing',
     ]);
@@ -223,7 +224,7 @@ describe('initializeClient — processAgent ACL gate', () => {
     ]);
   });
 
-  it('uses request text for WeKnora search and appends results to primary additional instructions', async () => {
+  it('does not automatically search WeKnora or append knowledge results to primary instructions', async () => {
     const endpointOption = makeEndpointOption();
     endpointOption.agent = Promise.resolve({
       id: PRIMARY_ID,
@@ -255,30 +256,10 @@ describe('initializeClient — processAgent ACL gate', () => {
       endpointOption,
     });
 
-    expect(mockCreateWeKnoraClient).toHaveBeenCalledWith(process.env);
-    expect(mockBuildWeKnoraKnowledgeContext).toHaveBeenCalledWith(
-      {
-        userId: testUser._id.toString(),
-        name: undefined,
-        role: 'USER',
-        tenantId: 'tenant-a',
-      },
-      {
-        query: '怎么报销',
-        knowledgeBaseIds: ['kb_weknora'],
-      },
-      expect.objectContaining({
-        findKnowledgeBaseById: models.findKnowledgeBaseById,
-        checkPermission: expect.any(Function),
-        weknoraClient,
-      }),
-    );
-    expect(agentClientArgs.agent.additional_instructions).toContain('Existing instructions');
-    expect(agentClientArgs.agent.additional_instructions).toContain(
-      '以下内容来自已绑定知识库，回答时优先参考',
-    );
-    expect(agentClientArgs.agent.additional_instructions).toContain('报销制度.pdf');
-    expect(agentClientArgs.agent.additional_instructions).toContain('报销需要在审批系统提交。');
+    expect(mockInitializeAgent.mock.calls[0][0].agent.tools).toEqual([KNOWLEDGE_SEARCH_TOOL]);
+    expect(mockCreateWeKnoraClient).not.toHaveBeenCalled();
+    expect(mockBuildWeKnoraKnowledgeContext).not.toHaveBeenCalled();
+    expect(agentClientArgs.agent.additional_instructions).toBe('Existing instructions');
   });
 
   it('resolves shared agent knowledge bases without checking direct knowledge base ACL', async () => {
@@ -356,6 +337,7 @@ describe('initializeClient — processAgent ACL gate', () => {
       endpointOption,
     });
 
+    expect(mockInitializeAgent.mock.calls[1][0].agent.tools).toEqual([KNOWLEDGE_SEARCH_TOOL]);
     expect(agentClientArgs.agentConfigs.get(addedAgentId).tools).toEqual([]);
     expect(
       agentClientArgs.agentConfigs.get(addedAgentId).tool_resources.file_search.file_ids,
@@ -788,6 +770,7 @@ describe('initializeClient — subagent loading', () => {
     }
 
     expect(mockInitializeAgent.mock.calls[1][0].agent.knowledge_base_ids).toEqual(['kb_sub']);
+    expect(mockInitializeAgent.mock.calls[1][0].agent.tools).toEqual([KNOWLEDGE_SEARCH_TOOL]);
     expect(agentClientArgs.agent.subagentAgentConfigs[0].tools).toEqual([]);
     expect(
       agentClientArgs.agent.subagentAgentConfigs[0].tool_resources.file_search.file_ids,

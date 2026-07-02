@@ -350,6 +350,20 @@ export const fileSearchSchema: ExtendedJsonSchema = {
   required: ['query'],
 };
 
+/** Knowledge Search tool JSON schema */
+export const knowledgeSearchSchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: {
+    query: {
+      type: 'string',
+      minLength: 1,
+      description:
+        'A natural language query to search the enterprise knowledge bases bound to the current agent.',
+    },
+  },
+  required: ['query'],
+};
+
 /** Tool definitions registry - maps tool names to their definitions */
 export const toolDefinitions: Record<string, ToolRegistryDefinition> = {
   google: {
@@ -423,6 +437,13 @@ export const toolDefinitions: Record<string, ToolRegistryDefinition> = {
     schema: fileSearchSchema,
     toolType: 'builtin',
     responseFormat: 'content_and_artifact',
+  },
+  knowledge_search: {
+    name: 'knowledge_search',
+    description:
+      'Searches only the enterprise knowledge bases bound to the current agent. Use this when the user asks about internal documents, policies, product manuals, procedures, or other private company knowledge that may not be in the model.',
+    schema: knowledgeSearchSchema,
+    toolType: 'builtin',
   },
   image_gen_oai: {
     name: oaiToolkit.image_gen_oai.name,

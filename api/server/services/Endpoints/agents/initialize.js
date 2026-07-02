@@ -12,8 +12,6 @@ const {
   resolveAgentTokenConfig,
   resolveAgentScopedSkillIds,
   resolveModelSpecSkillIds,
-  buildWeKnoraKnowledgeContext,
-  createWeKnoraClient,
   buildAgentContextAttachmentsByAgentId,
 } = require('@librechat/api');
 const {
@@ -48,6 +46,8 @@ const { processAddedConvo } = require('./addedConvo');
 const { logViolation } = require('~/cache');
 const db = require('~/models');
 
+const KNOWLEDGE_SEARCH_TOOL = 'knowledge_search';
+
 const getKnowledgeBaseIds = (agent) => {
   if (!Array.isArray(agent?.knowledge_base_ids)) {
     return [];
@@ -63,6 +63,20 @@ const getKnowledgeBaseIds = (agent) => {
     }
   }
   return Array.from(ids);
+};
+
+const addKnowledgeSearchTool = (agent) => {
+  if (getKnowledgeBaseIds(agent).length === 0) {
+    return agent;
+  }
+  const tools = Array.isArray(agent.tools) ? agent.tools : [];
+  if (tools.includes(KNOWLEDGE_SEARCH_TOOL)) {
+    return agent;
+  }
+  return {
+    ...agent,
+    tools: [...tools, KNOWLEDGE_SEARCH_TOOL],
+  };
 };
 
 /**
@@ -99,8 +113,9 @@ function createToolLoader(signal, streamId = null, definitionsOnly = false) {
     provider,
     tool_options,
     tool_resources,
+    knowledge_base_ids,
   }) {
-    const agent = { id: agentId, tools, provider, model, tool_options };
+    const agent = { id: agentId, tools, provider, model, tool_options, knowledge_base_ids };
     try {
       return await loadAgentTools({
         req,
@@ -331,7 +346,13 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
   const parentMessageId = req.body.parentMessageId;
 
   const initializeAgentWithKnowledgeBases = async (params, dbMethods) => {
-    const config = await initializeAgent(params, dbMethods);
+    const config = await initializeAgent(
+      {
+        ...params,
+        agent: addKnowledgeSearchTool(params.agent),
+      },
+      dbMethods,
+    );
     return config;
   };
 
@@ -433,38 +454,6 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
    *  custom-endpoint agents reflect configured rates (mirrors the AgentClient
    *  spending path, which reads the same config). */
   usageCost.endpointTokenConfig = primaryConfig.endpointTokenConfig;
-
-  const query = typeof req.body?.text === 'string' ? req.body.text : '';
-  const configKnowledgeBaseIds = getKnowledgeBaseIds(primaryConfig);
-  const agentKnowledgeBaseIds = getKnowledgeBaseIds(primaryAgent);
-  const knowledgeBaseIds =
-    configKnowledgeBaseIds.length > 0 ? configKnowledgeBaseIds : agentKnowledgeBaseIds;
-  const weknoraKnowledgeContext = await buildWeKnoraKnowledgeContext(
-    {
-      userId: req.user.id,
-      name: req.user.name,
-      role: req.user.role,
-      tenantId: primaryAgent?.tenantId ?? req.user?.tenantId,
-    },
-    {
-      query,
-      knowledgeBaseIds,
-    },
-    {
-      findKnowledgeBaseById: db.findKnowledgeBaseById,
-      checkPermission,
-      weknoraClient: createWeKnoraClient(process.env),
-    },
-  );
-  const knowledgeSystemText = weknoraKnowledgeContext
-    ? `以下内容来自已绑定知识库，回答时优先参考：\n\n${weknoraKnowledgeContext}`
-    : '';
-  primaryConfig.additional_instructions = [
-    primaryConfig.additional_instructions,
-    knowledgeSystemText,
-  ]
-    .filter(Boolean)
-    .join('\n\n');
 
   logger.debug(
     `[initializeClient] Storing tool context for ${primaryConfig.id}: ${primaryConfig.toolDefinitions?.length ?? 0} tools, registry size: ${primaryConfig.toolRegistry?.size ?? '0'}`,

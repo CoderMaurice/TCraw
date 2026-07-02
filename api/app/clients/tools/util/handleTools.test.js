@@ -391,6 +391,25 @@ describe('Tool Handlers', () => {
       );
     });
 
+    it('loads the bound knowledge search tool', async () => {
+      const result = await loadTools({
+        user: fakeUser._id.toString(),
+        agent: {
+          id: 'agent_with_kb',
+          knowledge_base_ids: ['kb_1'],
+        },
+        tools: ['knowledge_search'],
+        options: {
+          req: {
+            user: { id: fakeUser._id.toString(), role: 'USER' },
+          },
+        },
+      });
+
+      expect(result.loadedTools).toHaveLength(1);
+      expect(result.loadedTools[0].name).toBe('knowledge_search');
+    });
+
     it('reuses discovered request-scoped MCP tool definitions within a server loop', async () => {
       const serverName = 'body-scoped';
       const firstToolKey = `search${Constants.mcp_delimiter}${serverName}`;
