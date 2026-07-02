@@ -178,7 +178,7 @@ describe('KnowledgeBaseDetail', () => {
     });
   });
 
-  it('renders documents and exposes access controls inside settings', async () => {
+  it('renders documents and grants access for the knowledge base resource', async () => {
     const router = createMemoryRouter(
       [{ path: '/knowledge/:id', element: <KnowledgeBaseDetail /> }],
       {
@@ -207,13 +207,12 @@ describe('KnowledgeBaseDetail', () => {
     expect(screen.getByText('indexing.md')).toBeInTheDocument();
     expect(screen.getAllByText('Processing')).toHaveLength(1);
     expect(screen.queryAllByRole('button', { name: 'Delete document' })).toHaveLength(0);
-    expect(screen.queryByRole('button', { name: 'Access' })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Load more' }));
 
     expect(fetchNextPage).toHaveBeenCalledTimes(1);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Access' }));
 
     const access = screen.getByTestId('knowledge-base-access');
     expect(access).toHaveAttribute('data-resource-db-id', 'mongo_kb_1');

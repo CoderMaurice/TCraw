@@ -9,6 +9,7 @@ import type { AgentForm } from '~/common';
 import {
   useLocalize,
   useAuthContext,
+  useDebounce,
   useCategories,
   useHasAccess,
   useSkillFavorites,
@@ -180,6 +181,7 @@ function SkillSelectDialog({ isOpen, setIsOpen }: SkillSelectDialogProps) {
   const { user } = useAuthContext();
   const { control, setValue } = useFormContext<AgentForm>();
   const [searchValue, setSearchValue] = useState('');
+  const debouncedSearchValue = useDebounce(searchValue, 250);
   const [activeFilter, setActiveFilter] = useState<string>(SystemCategories.ALL);
   const { isFavorite: isFavoriteSkill, toggle: toggleFavoriteSkill } = useSkillFavorites();
 
@@ -188,7 +190,10 @@ function SkillSelectDialog({ isOpen, setIsOpen }: SkillSelectDialogProps) {
     permission: Permissions.CREATE,
   });
 
-  const { data: skillsData } = useListSkillsQuery(LIST_QUERY_OPTIONS);
+  const { data: skillsData } = useListSkillsQuery({
+    ...LIST_QUERY_OPTIONS,
+    search: debouncedSearchValue.trim() || undefined,
+  });
   const { categories } = useCategories({ className: 'size-4', hasAccess: true });
   const typedCategories = categories as SkillCategory[] | undefined;
 

@@ -7,13 +7,15 @@ import { useInfiniteKnowledgeBaseDocumentsQuery, useKnowledgeBaseQuery } from '~
 import { useLocalize } from '~/hooks';
 import type { TranslationKeys } from '~/hooks';
 import { cn } from '~/utils';
+import KnowledgeBaseAccess from './KnowledgeBaseAccess';
 import KnowledgeBaseDocuments from './KnowledgeBaseDocuments';
 import KnowledgeBaseSettings from './KnowledgeBaseSettings';
 
-type KnowledgeBaseTab = 'documents' | 'settings';
+type KnowledgeBaseTab = 'documents' | 'access' | 'settings';
 
 const tabs: Array<{ id: KnowledgeBaseTab; labelKey: TranslationKeys }> = [
   { id: 'documents', labelKey: 'com_ui_knowledge_base_documents' },
+  { id: 'access', labelKey: 'com_ui_knowledge_base_access' },
   { id: 'settings', labelKey: 'com_ui_knowledge_base_settings' },
 ];
 
@@ -169,6 +171,9 @@ export function KnowledgeBaseDetail() {
               onLoadMore={() => fetchNextPage()}
               provider={knowledgeBase.provider}
             />
+          ) : null}
+          {activeTab === 'access' ? (
+            <KnowledgeBaseAccess resourceDbId={knowledgeBase._id} name={knowledgeBase.name} />
           ) : null}
           {activeTab === 'settings' ? (
             <KnowledgeBaseSettings
