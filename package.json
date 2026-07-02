@@ -25,6 +25,7 @@
     "update:sudo": "node config/update.js --sudo",
     "update:deployed": "node config/deployed-update.js",
     "rebase:deployed": "node config/deployed-update.js --rebase",
+    "deploy:sync-avatar-assets": "bash scripts/sync-agent-avatar-assets-to-zt.sh",
     "start:deployed": "docker compose -f ./deploy-compose.yml up -d || docker-compose -f ./deploy-compose.yml up -d",
     "stop:deployed": "docker compose -f ./deploy-compose.yml down || docker-compose -f ./deploy-compose.yml down",
     "upgrade": "node config/upgrade.js",

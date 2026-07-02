@@ -54,16 +54,24 @@ const LazyAgentAvatar = ({
   url,
   alt,
   imgClass,
+  fallback,
 }: {
   url: string;
   alt: string;
   imgClass: string;
+  fallback: React.ReactNode;
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
     setIsLoaded(false);
+    setHasError(false);
   }, [url]);
+
+  if (hasError) {
+    return <>{fallback}</>;
+  }
 
   return (
     <>
@@ -73,7 +81,10 @@ const LazyAgentAvatar = ({
         className={imgClass}
         loading="lazy"
         onLoad={() => setIsLoaded(true)}
-        onError={() => setIsLoaded(false)}
+        onError={() => {
+          setIsLoaded(false);
+          setHasError(true);
+        }}
         style={{
           opacity: isLoaded ? 1 : 0,
           transition: 'opacity 0.2s ease-in-out',
@@ -136,6 +147,9 @@ export const renderAgentAvatar = (
           url={avatarUrl}
           alt={`${agent?.name || 'Agent'} avatar`}
           imgClass={`${sizeClasses[size]} rounded-full object-cover shadow-lg ${borderClasses}`}
+          fallback={
+            <Feather className={`text-text-primary ${iconSizeClasses[size]}`} strokeWidth={1.5} />
+          }
         />
       </div>
     );

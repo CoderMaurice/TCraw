@@ -1,8 +1,9 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { getAgentAvatarUrl, renderAgentAvatar, getContactDisplayName } from '../agents';
-import type t from 'librechat-data-provider';
+
+type TestAgent = Parameters<typeof getAgentAvatarUrl>[0];
 
 // Mock the Feather icon from lucide-react
 jest.mock('lucide-react', () => ({
@@ -29,7 +30,7 @@ describe('Agent Utilities', () => {
     });
 
     it('should return null for agent without avatar', () => {
-      const agent = { id: '1', name: 'Test Agent' } as t.Agent;
+      const agent = { id: '1', name: 'Test Agent' } as TestAgent;
       expect(getAgentAvatarUrl(agent)).toBeNull();
     });
 
@@ -38,7 +39,7 @@ describe('Agent Utilities', () => {
         id: '1',
         name: 'Test Agent',
         avatar: '/path/to/avatar.png',
-      } as unknown as t.Agent;
+      } as TestAgent;
       expect(getAgentAvatarUrl(agent)).toBe('/path/to/avatar.png');
     });
 
@@ -47,7 +48,7 @@ describe('Agent Utilities', () => {
         id: '1',
         name: 'Test Agent',
         avatar: { filepath: '/path/to/object-avatar.png' },
-      } as t.Agent;
+      } as TestAgent;
       expect(getAgentAvatarUrl(agent)).toBe('/path/to/object-avatar.png');
     });
 
@@ -60,7 +61,7 @@ describe('Agent Utilities', () => {
         id: '1',
         name: 'Test Agent',
         avatar: { filepath: '/images/user/avatar.png?manual=false' },
-      } as t.Agent;
+      } as TestAgent;
 
       try {
         expect(getAgentAvatarUrl(agent)).toBe('/tcraw/images/user/avatar.png?manual=false');
@@ -85,7 +86,7 @@ describe('Agent Utilities', () => {
         id: '1',
         name: 'Test Agent',
         avatar: '/test-avatar.png',
-      } as unknown as t.Agent;
+      } as TestAgent;
 
       render(<div>{renderAgentAvatar(agent)}</div>);
 
@@ -99,9 +100,25 @@ describe('Agent Utilities', () => {
       const agent = {
         id: '1',
         name: 'Test Agent',
-      } as t.Agent;
+      } as TestAgent;
 
       render(<div>{renderAgentAvatar(agent)}</div>);
+
+      const featherIcon = screen.getByTestId('feather-icon');
+      expect(featherIcon).toBeInTheDocument();
+      expect(featherIcon).toHaveAttribute('data-stroke-width', '1.5');
+    });
+
+    it('should render Feather icon fallback when avatar image fails to load', () => {
+      const agent = {
+        id: '1',
+        name: 'Test Agent',
+        avatar: '/missing-avatar.png',
+      } as TestAgent;
+
+      render(<div>{renderAgentAvatar(agent)}</div>);
+
+      fireEvent.error(screen.getByAltText('Test Agent avatar'));
 
       const featherIcon = screen.getByTestId('feather-icon');
       expect(featherIcon).toBeInTheDocument();
@@ -113,7 +130,7 @@ describe('Agent Utilities', () => {
         id: '1',
         name: 'Test Agent',
         avatar: '/test-avatar.png',
-      } as unknown as t.Agent;
+      } as TestAgent;
 
       const { rerender } = render(<div>{renderAgentAvatar(agent, { size: 'sm' })}</div>);
       expect(screen.getByAltText('Test Agent avatar')).toHaveClass('h-12', 'w-12');
@@ -130,7 +147,7 @@ describe('Agent Utilities', () => {
         id: '1',
         name: 'Test Agent',
         avatar: '/test-avatar.png',
-      } as unknown as t.Agent;
+      } as TestAgent;
 
       render(<div>{renderAgentAvatar(agent, { className: 'custom-class' })}</div>);
 
@@ -143,7 +160,7 @@ describe('Agent Utilities', () => {
         id: '1',
         name: 'Test Agent',
         avatar: '/test-avatar.png',
-      } as unknown as t.Agent;
+      } as TestAgent;
 
       const { rerender } = render(<div>{renderAgentAvatar(agent, { showBorder: true })}</div>);
       expect(screen.getByAltText('Test Agent avatar')).toHaveClass('border-1');
