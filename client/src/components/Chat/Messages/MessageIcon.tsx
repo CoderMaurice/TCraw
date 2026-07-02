@@ -4,7 +4,8 @@ import type { Assistant, Agent } from 'librechat-data-provider';
 import type { TMessageIcon } from '~/common';
 import ConvoIconURL from '~/components/Endpoints/ConvoIconURL';
 import { useGetEndpointsQuery } from '~/data-provider';
-import { getIconEndpoint, resolveAppAssetUrl } from '~/utils';
+import { getIconEndpoint } from '~/utils';
+import { resolveAppAssetUrl } from '~/utils/agents';
 import { isImageURL } from '~/utils/icons';
 import Icon from '~/components/Endpoints/Icon';
 

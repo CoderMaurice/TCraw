@@ -30,6 +30,79 @@ export const resolveAppAssetUrl = (url: string): string => {
   return `${basePath}${url}`;
 };
 
+type AppAvatarImageProps = Omit<
+  React.ImgHTMLAttributes<HTMLImageElement>,
+  'src' | 'onError' | 'onLoad'
+> & {
+  src: string;
+  fallback?: React.ReactNode;
+  showSkeleton?: boolean;
+  skeletonClassName?: string;
+  onLoad?: React.ReactEventHandler<HTMLImageElement>;
+  onError?: React.ReactEventHandler<HTMLImageElement>;
+};
+
+export const AppAvatarImage = ({
+  src,
+  fallback = null,
+  showSkeleton = false,
+  skeletonClassName = 'absolute inset-0 rounded-full',
+  style,
+  onLoad,
+  onError,
+  ...imgProps
+}: AppAvatarImageProps) => {
+  const resolvedSrc = resolveAppAssetUrl(src);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [retryUrl, setRetryUrl] = useState(resolvedSrc);
+  const [retryCount, setRetryCount] = useState(0);
+
+  useEffect(() => {
+    setIsLoaded(false);
+    setHasError(false);
+    setRetryUrl(resolvedSrc);
+    setRetryCount(0);
+  }, [resolvedSrc]);
+
+  if (hasError) {
+    return <>{fallback}</>;
+  }
+
+  return (
+    <>
+      <img
+        {...imgProps}
+        src={retryUrl}
+        onLoad={(event) => {
+          setIsLoaded(true);
+          onLoad?.(event);
+        }}
+        onError={(event) => {
+          setIsLoaded(false);
+          if (retryCount === 0) {
+            const separator = resolvedSrc.includes('?') ? '&' : '?';
+            setRetryUrl(`${resolvedSrc}${separator}avatar_retry=${Date.now()}`);
+            setRetryCount(1);
+            return;
+          }
+          setHasError(true);
+          onError?.(event);
+        }}
+        style={{
+          ...style,
+          ...(showSkeleton
+            ? { opacity: isLoaded ? 1 : 0, transition: 'opacity 0.2s ease-in-out' }
+            : null),
+        }}
+      />
+      {showSkeleton && !isLoaded && (
+        <Skeleton className={skeletonClassName} aria-hidden="true" />
+      )}
+    </>
+  );
+};
+
 /**
  * Extracts the avatar URL from an agent's avatar property
  * Handles both string and object formats
@@ -61,47 +134,15 @@ const LazyAgentAvatar = ({
   imgClass: string;
   fallback: React.ReactNode;
 }) => {
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [hasError, setHasError] = useState(false);
-  const [retryUrl, setRetryUrl] = useState(url);
-  const [retryCount, setRetryCount] = useState(0);
-
-  useEffect(() => {
-    setIsLoaded(false);
-    setHasError(false);
-    setRetryUrl(url);
-    setRetryCount(0);
-  }, [url]);
-
-  if (hasError) {
-    return <>{fallback}</>;
-  }
-
   return (
-    <>
-      <img
-        src={retryUrl}
-        alt={alt}
-        className={imgClass}
-        loading="lazy"
-        onLoad={() => setIsLoaded(true)}
-        onError={() => {
-          setIsLoaded(false);
-          if (retryCount === 0) {
-            const separator = url.includes('?') ? '&' : '?';
-            setRetryUrl(`${url}${separator}avatar_retry=${Date.now()}`);
-            setRetryCount(1);
-            return;
-          }
-          setHasError(true);
-        }}
-        style={{
-          opacity: isLoaded ? 1 : 0,
-          transition: 'opacity 0.2s ease-in-out',
-        }}
-      />
-      {!isLoaded && <Skeleton className="absolute inset-0 rounded-full" aria-hidden="true" />}
-    </>
+    <AppAvatarImage
+      src={url}
+      alt={alt}
+      className={imgClass}
+      loading="lazy"
+      fallback={fallback}
+      showSkeleton
+    />
   );
 };
 

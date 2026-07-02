@@ -16,6 +16,7 @@ import {
 import UnknownIcon from '~/hooks/Endpoint/UnknownIcon';
 import { IconProps } from '~/common';
 import { cn } from '~/utils';
+import { AppAvatarImage } from '~/utils/agents';
 
 type EndpointIcon = {
   icon: React.ReactNode | React.JSX.Element;
@@ -70,11 +71,12 @@ const MessageEndpointIcon: React.FC<IconProps> = (props) => {
           }}
           className={cn('overflow-hidden rounded-full', props.className ?? '')}
         >
-          <img
+          <AppAvatarImage
             className="shadow-stroke h-full w-full object-cover"
             src={iconURL}
             alt={assistantName}
             style={{ height: '80', width: '80' }}
+            fallback={<AssistantIcon className="h-2/3 w-2/3 text-gray-400" />}
           />
         </div>
       </div>
@@ -99,11 +101,12 @@ const MessageEndpointIcon: React.FC<IconProps> = (props) => {
           }}
           className={cn('overflow-hidden rounded-full', props.className ?? '')}
         >
-          <img
+          <AppAvatarImage
             className="shadow-stroke h-full w-full object-cover"
             src={iconURL}
             alt={agentName}
             style={{ height: '80', width: '80' }}
+            fallback={<Feather className="h-2/3 w-2/3 text-gray-400" aria-hidden="true" />}
           />
         </div>
       </div>

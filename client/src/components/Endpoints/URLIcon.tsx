@@ -1,6 +1,7 @@
 import React, { memo, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { icons } from '~/hooks/Endpoint/Icons';
+import { AppAvatarImage } from '~/utils/agents';
 
 export const URLIcon = memo(
   ({
@@ -47,7 +48,7 @@ export const URLIcon = memo(
 
     return (
       <div className={className} style={containerStyle}>
-        <img
+        <AppAvatarImage
           src={iconURL}
           alt={altName ?? 'Icon'}
           style={imageStyle}

@@ -3,6 +3,7 @@ import { EModelEndpoint, KnownEndpoints } from 'librechat-data-provider';
 import { CustomMinimalIcon, XAIcon, MoonshotIcon } from '@librechat/client';
 import { IconContext } from '~/common';
 import { cn } from '~/utils';
+import { AppAvatarImage } from '~/utils/agents';
 
 const knownEndpointAssets: Record<string, string> = {
   [KnownEndpoints.anyscale]: 'assets/anyscale.png',
@@ -99,7 +100,14 @@ function UnknownIcon({
   }
 
   if (iconURL) {
-    return <img className={className} src={iconURL} alt={`${endpoint} Icon`} />;
+    return (
+      <AppAvatarImage
+        className={className}
+        src={iconURL}
+        alt={`${endpoint} Icon`}
+        fallback={<CustomMinimalIcon className={className} />}
+      />
+    );
   }
 
   const assetPath = getKnownEndpointAsset(currentEndpoint);
