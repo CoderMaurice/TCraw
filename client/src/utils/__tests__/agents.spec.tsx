@@ -109,7 +109,7 @@ describe('Agent Utilities', () => {
       expect(featherIcon).toHaveAttribute('data-stroke-width', '1.5');
     });
 
-    it('should render Feather icon fallback when avatar image fails to load', () => {
+    it('should retry with cache busting before rendering fallback when avatar image fails', () => {
       const agent = {
         id: '1',
         name: 'Test Agent',
@@ -117,6 +117,15 @@ describe('Agent Utilities', () => {
       } as TestAgent;
 
       render(<div>{renderAgentAvatar(agent)}</div>);
+
+      const img = screen.getByAltText('Test Agent avatar');
+      fireEvent.error(img);
+
+      expect(screen.getByAltText('Test Agent avatar')).toHaveAttribute(
+        'src',
+        expect.stringMatching(/^\/missing-avatar\.png\?avatar_retry=\d+$/),
+      );
+      expect(screen.queryByTestId('feather-icon')).not.toBeInTheDocument();
 
       fireEvent.error(screen.getByAltText('Test Agent avatar'));
 

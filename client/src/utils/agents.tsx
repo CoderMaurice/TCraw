@@ -63,10 +63,14 @@ const LazyAgentAvatar = ({
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [retryUrl, setRetryUrl] = useState(url);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     setIsLoaded(false);
     setHasError(false);
+    setRetryUrl(url);
+    setRetryCount(0);
   }, [url]);
 
   if (hasError) {
@@ -76,13 +80,19 @@ const LazyAgentAvatar = ({
   return (
     <>
       <img
-        src={url}
+        src={retryUrl}
         alt={alt}
         className={imgClass}
         loading="lazy"
         onLoad={() => setIsLoaded(true)}
         onError={() => {
           setIsLoaded(false);
+          if (retryCount === 0) {
+            const separator = url.includes('?') ? '&' : '?';
+            setRetryUrl(`${url}${separator}avatar_retry=${Date.now()}`);
+            setRetryCount(1);
+            return;
+          }
           setHasError(true);
         }}
         style={{
