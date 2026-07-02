@@ -12,7 +12,6 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 
 const mockInitializeAgent = jest.fn();
 const mockValidateAgentModel = jest.fn();
-const mockResolveKnowledgeBaseFileIdsForAgent = jest.fn();
 const mockCreateWeKnoraClient = jest.fn(() => null);
 const mockBuildWeKnoraKnowledgeContext = jest.fn();
 const mockCheckPermission = jest.fn();
@@ -31,8 +30,6 @@ jest.mock('@librechat/api', () => ({
   ...jest.requireActual('@librechat/api'),
   initializeAgent: (...args) => mockInitializeAgent(...args),
   validateAgentModel: (...args) => mockValidateAgentModel(...args),
-  resolveKnowledgeBaseFileIdsForAgent: (...args) =>
-    mockResolveKnowledgeBaseFileIdsForAgent(...args),
   createWeKnoraClient: (...args) => mockCreateWeKnoraClient(...args),
   buildWeKnoraKnowledgeContext: (...args) => mockBuildWeKnoraKnowledgeContext(...args),
   GenerationJobManager: { setCollectedUsage: jest.fn() },
@@ -124,7 +121,6 @@ describe('initializeClient — processAgent ACL gate', () => {
     mockFindAccessibleResources.mockImplementation((...args) =>
       actualPermissionService.findAccessibleResources(...args),
     );
-    mockResolveKnowledgeBaseFileIdsForAgent.mockResolvedValue([]);
     mockProcessAddedConvo.mockResolvedValue({ userMCPAuthMap: undefined });
 
     testUser = await User.create({
@@ -192,7 +188,7 @@ describe('initializeClient — processAgent ACL gate', () => {
     expect(agentClientArgs.agent.edges).toEqual([]);
   });
 
-  it('merges primary agent knowledge base files into file search resources', async () => {
+  it('does not merge knowledge bases into legacy file search resources', async () => {
     const endpointOption = makeEndpointOption();
     endpointOption.agent = Promise.resolve({
       id: PRIMARY_ID,
@@ -209,11 +205,6 @@ describe('initializeClient — processAgent ACL gate', () => {
       tool_resources: { file_search: { file_ids: ['file_existing'] } },
     };
     mockInitializeAgent.mockResolvedValue(primaryConfig);
-    mockResolveKnowledgeBaseFileIdsForAgent.mockResolvedValue([
-      'file_kb_1',
-      'file_kb_2',
-      'file_existing',
-    ]);
 
     await initializeClient({
       req: makeReq(),
@@ -222,22 +213,13 @@ describe('initializeClient — processAgent ACL gate', () => {
       endpointOption,
     });
 
-    expect(mockResolveKnowledgeBaseFileIdsForAgent).toHaveBeenCalledWith(
-      ['kb_1'],
-      { findReadyKnowledgeBaseDocumentFileIds: expect.any(Function) },
-      undefined,
-    );
-    expect(mockInitializeAgent.mock.calls[0][0].agent.tools).toContain('file_search');
+    expect(mockInitializeAgent.mock.calls[0][0].agent.tools).toEqual([]);
     expect(mockInitializeAgent.mock.calls[0][0].agent.tool_resources.file_search.file_ids).toEqual([
       'file_existing',
-      'file_kb_1',
-      'file_kb_2',
     ]);
-    expect(agentClientArgs.agent.tools).toContain('file_search');
+    expect(agentClientArgs.agent.tools).toEqual([]);
     expect(agentClientArgs.agent.tool_resources.file_search.file_ids).toEqual([
       'file_existing',
-      'file_kb_1',
-      'file_kb_2',
     ]);
   });
 
@@ -310,7 +292,6 @@ describe('initializeClient — processAgent ACL gate', () => {
       knowledge_base_ids: ['kb_shared'],
     });
     mockInitializeAgent.mockResolvedValue(makePrimaryConfig([]));
-    mockResolveKnowledgeBaseFileIdsForAgent.mockResolvedValue(['file_shared']);
 
     await initializeClient({
       req: makeReq(),
@@ -319,18 +300,12 @@ describe('initializeClient — processAgent ACL gate', () => {
       endpointOption,
     });
 
-    expect(mockResolveKnowledgeBaseFileIdsForAgent).toHaveBeenCalledWith(
-      ['kb_shared'],
-      { findReadyKnowledgeBaseDocumentFileIds: expect.any(Function) },
-      undefined,
-    );
-    expect(agentClientArgs.agent.tool_resources.file_search.file_ids).toEqual(['file_shared']);
     expect(mockCheckPermission).not.toHaveBeenCalledWith(
       expect.objectContaining({ resourceType: ResourceType.KNOWLEDGE_BASE }),
     );
   });
 
-  it('merges added parallel agent knowledge base files through the injected initializer', async () => {
+  it('initializes added parallel agent knowledge bases without legacy file search resources', async () => {
     const addedAgentId = 'agent_added_parallel';
     const addedConfig = {
       id: addedAgentId,
@@ -345,7 +320,6 @@ describe('initializeClient — processAgent ACL gate', () => {
     mockInitializeAgent.mockImplementation(({ agent }) =>
       Promise.resolve(agent.id === PRIMARY_ID ? makePrimaryConfig([]) : addedConfig),
     );
-    mockResolveKnowledgeBaseFileIdsForAgent.mockResolvedValue(['file_added', 'file_existing']);
     mockProcessAddedConvo.mockImplementationOnce(async (params) => {
       const config = await params.initializeAgent(
         {
@@ -382,15 +356,10 @@ describe('initializeClient — processAgent ACL gate', () => {
       endpointOption,
     });
 
-    expect(mockResolveKnowledgeBaseFileIdsForAgent).toHaveBeenCalledWith(
-      ['kb_added'],
-      { findReadyKnowledgeBaseDocumentFileIds: expect.any(Function) },
-      undefined,
-    );
-    expect(agentClientArgs.agentConfigs.get(addedAgentId).tools).toContain('file_search');
+    expect(agentClientArgs.agentConfigs.get(addedAgentId).tools).toEqual([]);
     expect(
       agentClientArgs.agentConfigs.get(addedAgentId).tool_resources.file_search.file_ids,
-    ).toEqual(['file_existing', 'file_added']);
+    ).toEqual(['file_existing']);
   });
 
   it('should initialize handoff agent and keep its edge when user has VIEW access', async () => {
@@ -576,7 +545,6 @@ describe('initializeClient — subagent loading', () => {
     mockFindAccessibleResources.mockImplementation((...args) =>
       actualPermissionService.findAccessibleResources(...args),
     );
-    mockResolveKnowledgeBaseFileIdsForAgent.mockResolvedValue([]);
 
     testUser = await User.create({
       email: 'subagent@example.com',
@@ -775,7 +743,7 @@ describe('initializeClient — subagent loading', () => {
     expect(arg.actionsEnabled).toBe(true);
   });
 
-  it('merges knowledge base files into subagent tool execution context', async () => {
+  it('does not merge knowledge base files into subagent tool execution context', async () => {
     const subAgent = await createAgent({
       id: SUBAGENT_ID,
       name: 'Explicit KB Subagent',
@@ -800,7 +768,6 @@ describe('initializeClient — subagent loading', () => {
     mockInitializeAgent.mockImplementation(() =>
       Promise.resolve(++call === 1 ? primaryConfig : subagentConfig),
     );
-    mockResolveKnowledgeBaseFileIdsForAgent.mockResolvedValue(['file_kb_sub', 'file_existing']);
     const getAgent = models.getAgent;
     jest.spyOn(models, 'getAgent').mockImplementation((filter) => {
       if (filter.id === SUBAGENT_ID) {
@@ -821,21 +788,16 @@ describe('initializeClient — subagent loading', () => {
     }
 
     expect(mockInitializeAgent.mock.calls[1][0].agent.knowledge_base_ids).toEqual(['kb_sub']);
-    expect(mockResolveKnowledgeBaseFileIdsForAgent).toHaveBeenCalledWith(
-      ['kb_sub'],
-      { findReadyKnowledgeBaseDocumentFileIds: expect.any(Function) },
-      undefined,
-    );
-    expect(agentClientArgs.agent.subagentAgentConfigs[0].tools).toContain('file_search');
+    expect(agentClientArgs.agent.subagentAgentConfigs[0].tools).toEqual([]);
     expect(
       agentClientArgs.agent.subagentAgentConfigs[0].tool_resources.file_search.file_ids,
-    ).toEqual(['file_existing', 'file_kb_sub']);
+    ).toEqual(['file_existing']);
 
     await capturedToolExecuteOptions.loadTools(['file_search'], SUBAGENT_ID);
 
     const arg = mockLoadToolsForExecution.mock.calls[0][0];
-    expect(arg.agent.tools).toContain('file_search');
-    expect(arg.tool_resources.file_search.file_ids).toEqual(['file_existing', 'file_kb_sub']);
+    expect(arg.agent.tools).toEqual([]);
+    expect(arg.tool_resources.file_search.file_ids).toEqual(['file_existing']);
   });
 
   it('threads run-scoped MCP tool definitions into ON_TOOL_EXECUTE loading', async () => {

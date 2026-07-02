@@ -362,7 +362,7 @@ describe('Agent Controllers - Mass Assignment Protection', () => {
       expect(await Agent.countDocuments()).toBe(0);
     });
 
-    test('should auto-enable file_search and persist validated knowledge base ids', async () => {
+    test('should persist validated knowledge base ids without auto-enabling file_search', async () => {
       mockReq.user.tenantId = 'tenant-a';
       mockReq.app.locals.knowledgeDeps = { source: 'test-deps' };
       validateKnowledgeBaseBindings.mockResolvedValueOnce(['kb_alpha', 'kb_beta']);
@@ -390,11 +390,11 @@ describe('Agent Controllers - Mass Assignment Protection', () => {
 
       const createdAgent = mockRes.json.mock.calls[0][0];
       expect(createdAgent.knowledge_base_ids).toEqual(['kb_alpha', 'kb_beta']);
-      expect(createdAgent.tools).toEqual(expect.arrayContaining(['web_search', Tools.file_search]));
+      expect(createdAgent.tools).toEqual(['web_search']);
 
       const agentInDb = await Agent.findOne({ id: createdAgent.id }).lean();
       expect(agentInDb.knowledge_base_ids).toEqual(['kb_alpha', 'kb_beta']);
-      expect(agentInDb.tools).toEqual(expect.arrayContaining(['web_search', Tools.file_search]));
+      expect(agentInDb.tools).toEqual(['web_search']);
     });
 
     test('should handle support_contact with empty strings', async () => {
@@ -691,7 +691,7 @@ describe('Agent Controllers - Mass Assignment Protection', () => {
       expect(updatedAgent.name).toBe('Admin Update');
     });
 
-    test('should validate updated knowledge bases and auto-enable file_search when tools are omitted', async () => {
+    test('should validate updated knowledge bases without auto-enabling file_search', async () => {
       validateKnowledgeBaseBindings.mockResolvedValueOnce(['kb_one', 'kb_two']);
       mockReq.app.locals.knowledgeDeps = { source: 'update-test-deps' };
 
@@ -721,7 +721,7 @@ describe('Agent Controllers - Mass Assignment Protection', () => {
 
       const agentInDb = await Agent.findOne({ id: existingAgentId }).lean();
       expect(agentInDb.knowledge_base_ids).toEqual(['kb_one', 'kb_two']);
-      expect(agentInDb.tools).toEqual(expect.arrayContaining(['web_search', Tools.file_search]));
+      expect(agentInDb.tools).toEqual(['web_search']);
     });
 
     test('should preserve existing knowledge bases when update omits knowledge_base_ids', async () => {
@@ -1216,11 +1216,11 @@ describe('Agent Controllers - Mass Assignment Protection', () => {
       );
       const { agent } = mockRes.json.mock.calls[0][0];
       expect(agent.knowledge_base_ids).toEqual(['kb_one', 'kb_two']);
-      expect(agent.tools).toEqual(expect.arrayContaining(['web_search', Tools.file_search]));
+      expect(agent.tools).toEqual(['web_search']);
 
       const agentInDb = await Agent.findOne({ id: agent.id }).lean();
       expect(agentInDb.knowledge_base_ids).toEqual(['kb_one', 'kb_two']);
-      expect(agentInDb.tools).toEqual(expect.arrayContaining(['web_search', Tools.file_search]));
+      expect(agentInDb.tools).toEqual(['web_search']);
     });
 
     test('duplicateAgentHandler should reject when the clone author cannot view source knowledge bases', async () => {

@@ -355,14 +355,6 @@ const getKnowledgeBaseDeps = (req) =>
     checkPermission,
   };
 
-const ensureFileSearchTool = (tools = []) => {
-  const nextTools = Array.isArray(tools) ? [...tools] : [];
-  if (!nextTools.includes(Tools.file_search)) {
-    nextTools.push(Tools.file_search);
-  }
-  return nextTools;
-};
-
 const validateAgentKnowledgeBaseBindings = async (req, payload) => {
   const requestedIds = Array.isArray(payload.knowledge_base_ids) ? payload.knowledge_base_ids : [];
   const knowledgeBaseIds = await validateKnowledgeBaseBindings(
@@ -376,10 +368,6 @@ const validateAgentKnowledgeBaseBindings = async (req, payload) => {
   );
 
   payload.knowledge_base_ids = knowledgeBaseIds;
-  if (knowledgeBaseIds.length > 0) {
-    payload.tools = ensureFileSearchTool(payload.tools);
-  }
-
   return knowledgeBaseIds;
 };
 
