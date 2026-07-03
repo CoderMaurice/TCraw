@@ -1,11 +1,11 @@
 import { useDeferredValue, useMemo, useState } from 'react';
 import { AlertCircle, ChevronLeft, ChevronRight, Search, UserRound } from 'lucide-react';
 import { Input, Spinner, useMediaQuery } from '@librechat/client';
-import { SystemRoles } from 'librechat-data-provider';
 import type { AdminUserListItem, AdminUserSearchResult } from 'librechat-data-provider';
 import OpenSidebar from '~/components/Chat/Menus/OpenSidebar';
 import { useAdminUserSearch, useAdminUsers } from '~/data-provider';
 import { useAuthContext, useLocalize } from '~/hooks';
+import { getResponseStatus } from '~/utils/errors';
 
 const PAGE_SIZE = 25;
 
@@ -71,7 +71,7 @@ function UserAvatar({ user }: { user: DisplayUser }) {
 
 export function AdminUsersPage() {
   const localize = useLocalize();
-  const { user } = useAuthContext();
+  const { isAuthenticated } = useAuthContext();
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
   const [search, setSearch] = useState('');
   const [offset, setOffset] = useState(0);
@@ -82,14 +82,14 @@ export function AdminUsersPage() {
   const listQuery = useAdminUsers(
     { limit: PAGE_SIZE, offset },
     {
-      enabled: user?.role === SystemRoles.ADMIN && !searching,
+      enabled: isAuthenticated && !searching,
     },
   );
 
   const searchQuery = useAdminUserSearch(
     { q: trimmedSearch, limit: PAGE_SIZE },
     {
-      enabled: user?.role === SystemRoles.ADMIN && searching,
+      enabled: isAuthenticated && searching,
     },
   );
 
@@ -102,18 +102,20 @@ export function AdminUsersPage() {
   const total = searching ? (searchQuery.data?.total ?? users.length) : (listQuery.data?.total ?? 0);
   const isLoading = searching ? searchQuery.isLoading : listQuery.isLoading;
   const isError = searching ? searchQuery.isError : listQuery.isError;
+  const activeError = searching ? searchQuery.error : listQuery.error;
+  const isPermissionError = [401, 403].includes(getResponseStatus(activeError) ?? -1);
   const refetch = searching ? searchQuery.refetch : listQuery.refetch;
   const pageStart = total === 0 ? 0 : offset + 1;
   const pageEnd = Math.min(offset + PAGE_SIZE, total);
   const canGoPrevious = !searching && offset > 0;
   const canGoNext = !searching && offset + PAGE_SIZE < total;
 
-  if (user?.role !== SystemRoles.ADMIN) {
+  if (!isAuthenticated) {
     return (
       <main className="flex h-full min-h-0 flex-col overflow-auto bg-surface-primary text-text-primary">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-6 md:px-6 lg:py-8">
-          <div className="rounded-lg border border-border-medium py-16 text-center text-sm text-text-secondary">
-            {localize('com_ui_admin_people_permission')}
+          <div className="flex min-h-52 items-center justify-center">
+            <Spinner className="text-text-primary" />
           </div>
         </div>
       </main>
@@ -163,17 +165,24 @@ export function AdminUsersPage() {
             <Spinner className="text-text-primary" />
           </div>
         ) : isError ? (
-          <div className="flex min-h-52 flex-col items-center justify-center gap-3 rounded-lg border border-border-medium text-sm text-text-secondary">
-            <AlertCircle className="h-5 w-5" aria-hidden="true" />
-            <p>{localize('com_ui_admin_people_load_error')}</p>
-            <button
-              type="button"
-              className="rounded-lg border border-border-medium px-3 py-2 text-text-primary hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring-primary"
-              onClick={() => refetch()}
-            >
-              {localize('com_ui_retry')}
-            </button>
-          </div>
+          isPermissionError ? (
+            <div className="flex min-h-52 flex-col items-center justify-center gap-3 rounded-lg border border-border-medium text-sm text-text-secondary">
+              <AlertCircle className="h-5 w-5" aria-hidden="true" />
+              <p>{localize('com_ui_admin_people_permission')}</p>
+            </div>
+          ) : (
+            <div className="flex min-h-52 flex-col items-center justify-center gap-3 rounded-lg border border-border-medium text-sm text-text-secondary">
+              <AlertCircle className="h-5 w-5" aria-hidden="true" />
+              <p>{localize('com_ui_admin_people_load_error')}</p>
+              <button
+                type="button"
+                className="rounded-lg border border-border-medium px-3 py-2 text-text-primary hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring-primary"
+                onClick={() => refetch()}
+              >
+                {localize('com_ui_retry')}
+              </button>
+            </div>
+          )
         ) : users.length === 0 ? (
           <div className="rounded-lg border border-border-medium bg-transparent py-16 text-center text-sm text-text-secondary">
             {searching

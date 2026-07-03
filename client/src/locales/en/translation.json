@@ -739,6 +739,7 @@
   "com_ui_admin_people_permission": "You do not have permission to view people.",
   "com_ui_admin_people_previous": "Previous page",
   "com_ui_admin_people_role": "Role",
+  "com_ui_admin_people_provider": "Provider",
   "com_ui_admin_people_search": "Search people",
   "com_ui_admin_people_search_empty": "No people match your search.",
   "com_ui_admin_people_search_hint": "Search by name, email, or username",
