@@ -191,7 +191,7 @@ describe('WeKnora adapter', () => {
     );
   });
 
-  it('uses JSON headers for creating and sharing a knowledge base', async () => {
+  it('uses JSON headers when creating a knowledge base', async () => {
     const fetch = mockFetch(
       mockJsonResponse({
         success: true,
@@ -202,10 +202,6 @@ describe('WeKnora adapter', () => {
           description: 'New description',
         },
       }),
-      mockJsonResponse({
-        success: true,
-        data: { id: 'share_new' },
-      }),
     );
 
     const client = createWeKnoraClient(env);
@@ -214,7 +210,7 @@ describe('WeKnora adapter', () => {
       client?.createKnowledgeBase({ name: ' New KB ', description: ' New description ' }),
     ).resolves.toMatchObject({
       externalId: 'wk_kb_new',
-      externalShareId: 'share_new',
+      externalShareId: '',
       externalSpaceId: 'space_new',
       permission: 'editor',
       name: 'New KB',
@@ -229,8 +225,23 @@ describe('WeKnora adapter', () => {
       },
       body: JSON.stringify({ name: 'New KB', description: 'New description' }),
     });
+  });
+
+  it('shares a knowledge base with the configured organization', async () => {
+    const fetch = mockFetch(
+      mockJsonResponse({
+        success: true,
+        data: { id: 'share_new' },
+      }),
+    );
+
+    const client = createWeKnoraClient(env);
+
+    await expect(client?.shareKnowledgeBase('wk_kb_new')).resolves.toEqual({
+      externalShareId: 'share_new',
+    });
     expect(fetch).toHaveBeenNthCalledWith(
-      2,
+      1,
       'https://weknora.example.com/api/knowledge-bases/wk_kb_new/shares',
       {
         method: 'POST',

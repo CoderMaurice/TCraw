@@ -10,6 +10,7 @@ const mockDeleteKnowledgeBaseForUser = jest.fn();
 const mockListKnowledgeBaseDocumentsForUser = jest.fn();
 const mockDeleteKnowledgeBaseDocumentForUser = jest.fn();
 const mockRequireKnowledgeBasePermission = jest.fn();
+const mockGetKnowledgeBaseCapabilities = jest.fn();
 const mockMapWeKnoraDocumentToRecord = jest.fn((document, kb, auth) => ({
   id: document.externalId,
   knowledgeBaseId: kb.id,
@@ -61,6 +62,7 @@ jest.mock('@librechat/api', () => ({
   listKnowledgeBaseDocumentsForUser: mockListKnowledgeBaseDocumentsForUser,
   deleteKnowledgeBaseDocumentForUser: mockDeleteKnowledgeBaseDocumentForUser,
   requireKnowledgeBasePermission: mockRequireKnowledgeBasePermission,
+  getKnowledgeBaseCapabilities: mockGetKnowledgeBaseCapabilities,
   mapWeKnoraDocumentToRecord: mockMapWeKnoraDocumentToRecord,
   sanitizeFilename: mockSanitizeFilename,
   createWeKnoraClient: mockCreateWeKnoraClient,
@@ -115,6 +117,7 @@ jest.mock('~/models', () => ({
   findKnowledgeBasesByResourceIds: jest.fn(),
   upsertExternalKnowledgeBase: jest.fn(),
   updateKnowledgeBase: jest.fn(),
+  updateKnowledgeBaseLifecycle: jest.fn(),
   createKnowledgeBaseDocument: jest.fn(),
   findKnowledgeBaseDocuments: jest.fn(),
   findReadyKnowledgeBaseDocumentFileIds: jest.fn(),
@@ -149,6 +152,7 @@ describe('knowledge base routes', () => {
     mockListKnowledgeBaseDocumentsForUser.mockReset();
     mockDeleteKnowledgeBaseDocumentForUser.mockReset();
     mockRequireKnowledgeBasePermission.mockReset();
+    mockGetKnowledgeBaseCapabilities.mockReset();
     mockMapWeKnoraDocumentToRecord.mockClear();
     mockSanitizeFilename.mockClear();
     mockUploadMiddleware.mockClear();
@@ -162,6 +166,15 @@ describe('knowledge base routes', () => {
     logger.error.mockClear();
 
     mockRequireKnowledgeBasePermission.mockResolvedValue({ id: 'kb_1' });
+    mockGetKnowledgeBaseCapabilities.mockReturnValue({
+      weknora: {
+        configured: true,
+        canCreate: true,
+        canUpload: true,
+        requiresTemplate: true,
+        templateConfigured: true,
+      },
+    });
 
     app = express();
     app.use(express.json());
@@ -213,6 +226,7 @@ describe('knowledge base routes', () => {
         findKnowledgeBasesByResourceIds: db.findKnowledgeBasesByResourceIds,
         upsertExternalKnowledgeBase: db.upsertExternalKnowledgeBase,
         updateKnowledgeBase: db.updateKnowledgeBase,
+        updateKnowledgeBaseLifecycle: db.updateKnowledgeBaseLifecycle,
         createKnowledgeBaseDocument: db.createKnowledgeBaseDocument,
         findKnowledgeBaseDocuments: db.findKnowledgeBaseDocuments,
         findReadyKnowledgeBaseDocumentFileIds: db.findReadyKnowledgeBaseDocumentFileIds,
@@ -224,6 +238,7 @@ describe('knowledge base routes', () => {
         findAccessibleResources: PermissionService.findAccessibleResources,
         checkPermission: PermissionService.checkPermission,
         weknoraClient: mockWeKnoraClient,
+        env: process.env,
       },
     );
   });
@@ -255,6 +270,27 @@ describe('knowledge base routes', () => {
       { search: 'support', requiredPermission: PermissionBits.VIEW },
       expect.objectContaining({
         findAccessibleResources: PermissionService.findAccessibleResources,
+      }),
+    );
+  });
+
+  it('returns knowledge base capabilities from route deps', async () => {
+    const response = await request(app).get('/knowledge-bases/capabilities');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      weknora: {
+        configured: true,
+        canCreate: true,
+        canUpload: true,
+        requiresTemplate: true,
+        templateConfigured: true,
+      },
+    });
+    expect(mockGetKnowledgeBaseCapabilities).toHaveBeenCalledWith(
+      expect.objectContaining({
+        weknoraClient: mockWeKnoraClient,
+        env: process.env,
       }),
     );
   });

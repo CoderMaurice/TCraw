@@ -274,7 +274,10 @@ function mapKnowledgeBase(raw: JsonObject): MappedWeKnoraKnowledgeBase {
   return {
     externalId,
     externalSpaceId: stringField(source, ['space_id', 'spaceId', 'external_space_id']),
-    externalShareId: stringField(raw, ['share_id', 'shareId', 'id']),
+    externalShareId: stringField(
+      raw,
+      Object.keys(nested).length > 0 ? ['share_id', 'shareId', 'id'] : ['share_id', 'shareId'],
+    ),
     permission: stringField(raw, ['permission'], stringField(source, ['permission'], 'viewer')),
     name: stringField(source, ['name'], externalId),
     description: stringField(source, ['description']),
@@ -408,19 +411,23 @@ export function createWeKnoraClient(env: NodeJS.ProcessEnv = process.env): WeKno
         throw new Error('WeKnora create knowledge base response is missing id');
       }
 
+      return mapKnowledgeBase({
+        ...knowledgeBase,
+        knowledge_base_id: externalId,
+        permission: 'editor',
+      });
+    },
+
+    async shareKnowledgeBase(externalKnowledgeBaseId: string): Promise<{ externalShareId: string }> {
       const share = unwrapObjectResponse(
-        await requestJson<JsonValue>(config, ['knowledge-bases', externalId, 'shares'], {
+        await requestJson<JsonValue>(config, ['knowledge-bases', externalKnowledgeBaseId, 'shares'], {
           method: 'POST',
           json: { organization_id: config.orgId, permission: 'editor' },
         }),
       );
-
-      return mapKnowledgeBase({
-        ...knowledgeBase,
-        id: stringField(share, ['id', 'share_id', 'shareId']),
-        knowledge_base_id: externalId,
-        permission: stringField(share, ['permission'], 'editor'),
-      });
+      return {
+        externalShareId: stringField(share, ['id', 'share_id', 'shareId']),
+      };
     },
 
     async uploadDocument(

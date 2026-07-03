@@ -11,6 +11,7 @@ import {
   createKnowledgeBaseDocumentForUser,
   deleteKnowledgeBaseDocumentForUser,
   deleteKnowledgeBaseForUser,
+  getKnowledgeBaseCapabilities,
   getKnowledgeBaseForUser,
   listKnowledgeBaseDocumentsForUser,
   listKnowledgeBasesForUser,
@@ -59,12 +60,14 @@ function makeDeps(): jest.Mocked<KnowledgeBaseServiceDependencies> {
     findKnowledgeBaseDocuments: jest.fn(),
     findReadyKnowledgeBaseDocumentFileIds: jest.fn(),
     updateKnowledgeBaseDocument: jest.fn(),
+    updateKnowledgeBaseLifecycle: jest.fn(),
     updateKnowledgeBaseCounts: jest.fn(),
     deleteKnowledgeBaseDocument: jest.fn(),
     deleteKnowledgeBaseWithDocuments: jest.fn(),
     grantPermission: jest.fn(),
     findAccessibleResources: jest.fn(),
     checkPermission: jest.fn(),
+    env: { WEKNORA_DEFAULT_CONFIG_KB_ID: 'wk_template' } as NodeJS.ProcessEnv,
   };
 }
 
@@ -134,7 +137,7 @@ describe('knowledge base service', () => {
       createKnowledgeBase: jest.fn().mockResolvedValue({
         externalId: 'wk_new',
         externalSpaceId: '3c6805d0-88c3-46dd-8d20-3a90dd51d63d',
-        externalShareId: 'share_new',
+        externalShareId: '',
         name: '销售资料',
         description: '销售常用文档',
         documentCount: 0,
@@ -142,6 +145,12 @@ describe('knowledge base service', () => {
         failedDocumentCount: 0,
         processingDocumentCount: 0,
       }),
+      copyInitializationConfig: jest.fn().mockResolvedValue({
+        complete: true,
+        embeddingConfigured: true,
+        chunkingConfigured: true,
+      }),
+      shareKnowledgeBase: jest.fn().mockResolvedValue({ externalShareId: 'share_new' }),
     } as unknown as WeKnoraClient;
     deps.upsertExternalKnowledgeBase = jest.fn().mockResolvedValue(
       makeKnowledgeBase({
@@ -149,8 +158,20 @@ describe('knowledge base service', () => {
         id: 'kb_new',
         provider: 'weknora',
         externalId: 'wk_new',
+        externalShareId: '',
+        name: '销售资料',
+        lifecycleStatus: 'initializing',
+      }),
+    );
+    deps.updateKnowledgeBaseLifecycle.mockResolvedValue(
+      makeKnowledgeBase({
+        _id: mongoId('64f1f77bcf86cd799439088'),
+        id: 'kb_new',
+        provider: 'weknora',
+        externalId: 'wk_new',
         externalShareId: 'share_new',
         name: '销售资料',
+        lifecycleStatus: 'ready',
       }),
     );
     deps.grantPermission.mockResolvedValue(null);
@@ -171,7 +192,11 @@ describe('knowledge base service', () => {
         provider: 'weknora',
         externalId: 'wk_new',
         externalSpaceId: '3c6805d0-88c3-46dd-8d20-3a90dd51d63d',
-        externalShareId: 'share_new',
+        externalShareId: '',
+        lifecycleStatus: 'initializing',
+        lifecycleStep: 'initializing',
+        lifecycleError: '',
+        configTemplateExternalId: 'wk_template',
         name: '销售资料',
         description: '销售常用文档',
         documentCount: 0,
@@ -194,7 +219,165 @@ describe('knowledge base service', () => {
     expect(deps.grantPermission).not.toHaveBeenCalledWith(
       expect.objectContaining({ resourceId: 'wk_new' }),
     );
+    expect(deps.weknoraClient.copyInitializationConfig).toHaveBeenCalledWith(
+      'wk_template',
+      'wk_new',
+    );
+    expect(deps.weknoraClient.shareKnowledgeBase).toHaveBeenCalledWith('wk_new');
     expect(result.id).toBe('kb_new');
+    expect(result.lifecycleStatus).toBe('ready');
+  });
+
+  it('reports WeKnora create capabilities from configured client and template env', () => {
+    const deps = makeDeps();
+    deps.weknoraClient = {
+      createKnowledgeBase: jest.fn(),
+    } as unknown as WeKnoraClient;
+
+    expect(getKnowledgeBaseCapabilities(deps)).toEqual({
+      weknora: {
+        configured: true,
+        canCreate: true,
+        canUpload: true,
+        requiresTemplate: true,
+        templateConfigured: true,
+      },
+    });
+  });
+
+  it('disables create capability when the WeKnora template is missing', () => {
+    const deps = makeDeps();
+    deps.env = {};
+    deps.weknoraClient = {
+      createKnowledgeBase: jest.fn(),
+    } as unknown as WeKnoraClient;
+
+    expect(getKnowledgeBaseCapabilities(deps)).toEqual({
+      weknora: {
+        configured: true,
+        canCreate: false,
+        canUpload: true,
+        requiresTemplate: true,
+        templateConfigured: false,
+      },
+    });
+  });
+
+  it('creates a WeKnora knowledge base through initialization lifecycle', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+
+    deps.weknoraClient = {
+      createKnowledgeBase: jest.fn().mockResolvedValue({
+        externalId: 'wk_new',
+        externalSpaceId: '3c6805d0-88c3-46dd-8d20-3a90dd51d63d',
+        externalShareId: '',
+        permission: 'editor',
+        name: 'New KB',
+        description: '',
+        documentCount: 0,
+        readyDocumentCount: 0,
+        failedDocumentCount: 0,
+        processingDocumentCount: 0,
+      }),
+      copyInitializationConfig: jest.fn().mockResolvedValue({
+        complete: true,
+        embeddingConfigured: true,
+        chunkingConfigured: true,
+      }),
+      shareKnowledgeBase: jest.fn().mockResolvedValue({ externalShareId: 'share_new' }),
+    } as unknown as WeKnoraClient;
+    deps.upsertExternalKnowledgeBase.mockResolvedValue(
+      makeKnowledgeBase({
+        _id: mongoId('64f1f77bcf86cd799439088'),
+        id: 'kb_new',
+        provider: 'weknora',
+        externalId: 'wk_new',
+        lifecycleStatus: 'initializing',
+      }),
+    );
+    deps.updateKnowledgeBaseLifecycle.mockResolvedValue(
+      makeKnowledgeBase({
+        _id: mongoId('64f1f77bcf86cd799439088'),
+        id: 'kb_new',
+        provider: 'weknora',
+        externalId: 'wk_new',
+        externalShareId: 'share_new',
+        lifecycleStatus: 'ready',
+      }),
+    );
+
+    const result = await createKnowledgeBaseForUser(auth, { name: 'New KB' }, deps);
+
+    expect(deps.weknoraClient.copyInitializationConfig).toHaveBeenCalledWith(
+      'wk_template',
+      'wk_new',
+    );
+    expect(deps.weknoraClient.shareKnowledgeBase).toHaveBeenCalledWith('wk_new');
+    expect(deps.updateKnowledgeBaseLifecycle).toHaveBeenCalledWith(
+      'kb_new',
+      auth.tenantId,
+      expect.objectContaining({
+        lifecycleStatus: 'ready',
+        lifecycleStep: 'ready',
+        lifecycleError: '',
+        externalShareId: 'share_new',
+      }),
+    );
+    expect(result.lifecycleStatus).toBe('ready');
+  });
+
+  it('marks a created external knowledge base failed when initialization fails', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+
+    deps.weknoraClient = {
+      createKnowledgeBase: jest.fn().mockResolvedValue({
+        externalId: 'wk_failed',
+        externalSpaceId: '3c6805d0-88c3-46dd-8d20-3a90dd51d63d',
+        externalShareId: '',
+        permission: 'editor',
+        name: 'Broken KB',
+        description: '',
+        documentCount: 0,
+        readyDocumentCount: 0,
+        failedDocumentCount: 0,
+        processingDocumentCount: 0,
+      }),
+      copyInitializationConfig: jest.fn().mockRejectedValue(new Error('copy failed')),
+      shareKnowledgeBase: jest.fn(),
+    } as unknown as WeKnoraClient;
+    deps.upsertExternalKnowledgeBase.mockResolvedValue(
+      makeKnowledgeBase({
+        _id: mongoId('64f1f77bcf86cd799439088'),
+        id: 'kb_failed',
+        provider: 'weknora',
+        externalId: 'wk_failed',
+        lifecycleStatus: 'initializing',
+      }),
+    );
+    deps.updateKnowledgeBaseLifecycle.mockResolvedValue(
+      makeKnowledgeBase({
+        id: 'kb_failed',
+        provider: 'weknora',
+        externalId: 'wk_failed',
+        lifecycleStatus: 'failed',
+      }),
+    );
+
+    await expect(createKnowledgeBaseForUser(auth, { name: 'Broken KB' }, deps)).rejects.toThrow(
+      'Knowledge base initialization failed',
+    );
+
+    expect(deps.updateKnowledgeBaseLifecycle).toHaveBeenCalledWith(
+      'kb_failed',
+      auth.tenantId,
+      expect.objectContaining({
+        lifecycleStatus: 'failed',
+        lifecycleStep: 'initializing',
+      }),
+    );
+    expect(deps.weknoraClient.shareKnowledgeBase).not.toHaveBeenCalled();
   });
 
   it('lists only WeKnora-backed accessible knowledge base records with VIEW by default', async () => {
@@ -236,7 +419,10 @@ describe('knowledge base service', () => {
 
     const result = await listKnowledgeBasesForUser(auth, {}, deps);
 
-    expect(result).toEqual({ data: [records[1]], nextCursor: undefined });
+    expect(result).toEqual({
+      data: [{ ...records[1], access: 'owned' }],
+      nextCursor: undefined,
+    });
     expect(deps.findAccessibleResources).toHaveBeenCalledWith({
       userId: auth.userId,
       role: auth.role,
@@ -249,17 +435,17 @@ describe('knowledge base service', () => {
     );
   });
 
-  it('syncs TCRAW shared WeKnora knowledge bases before listing accessible knowledge bases', async () => {
+  it('does not grant access to organization-shared WeKnora knowledge bases while listing', async () => {
     const auth = makeAuth();
     const deps = makeDeps();
 
-    deps.findKnowledgeBaseByExternalId = jest.fn().mockResolvedValue(null);
     deps.weknoraClient = {
       listSharedKnowledgeBases: jest.fn().mockResolvedValue([
         {
           externalId: '2a2da502-5549-44e7-b98c-ff5b9417b208',
           externalSpaceId: '3c6805d0-88c3-46dd-8d20-3a90dd51d63d',
           externalShareId: '003cff10-6084-4602-84c3-86d3b9e3fa74',
+          permission: 'editor',
           name: '上海致拓',
           description: '',
           documentCount: 22,
@@ -269,94 +455,45 @@ describe('knowledge base service', () => {
         },
       ]),
     } as unknown as WeKnoraClient;
-    deps.upsertExternalKnowledgeBase = jest.fn().mockResolvedValue(
-      makeKnowledgeBase({
-        _id: mongoId('64f1f77bcf86cd799439099'),
-        id: 'kb_mirrored',
-        provider: 'weknora',
-        externalId: '2a2da502-5549-44e7-b98c-ff5b9417b208',
-        name: '上海致拓',
-        documentCount: 22,
-      }),
-    );
-    deps.grantPermission.mockResolvedValue(null);
-    deps.findAccessibleResources.mockResolvedValue(['64f1f77bcf86cd799439099']);
+    deps.findAccessibleResources.mockResolvedValue([]);
+
+    const result = await listKnowledgeBasesForUser(auth, {}, deps);
+
+    expect(result).toEqual({ data: [], nextCursor: undefined });
+    expect(deps.weknoraClient.listSharedKnowledgeBases).not.toHaveBeenCalled();
+    expect(deps.upsertExternalKnowledgeBase).not.toHaveBeenCalled();
+    expect(deps.grantPermission).not.toHaveBeenCalled();
+  });
+
+  it('labels listed knowledge bases as owned or shared from the current user perspective', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+
+    deps.findAccessibleResources.mockResolvedValue([
+      '64f1f77bcf86cd799439099',
+      '64f1f77bcf86cd799439100',
+    ]);
     deps.findKnowledgeBasesByResourceIds.mockResolvedValue([
       makeKnowledgeBase({
         _id: mongoId('64f1f77bcf86cd799439099'),
-        id: 'kb_mirrored',
+        id: 'kb_owned',
         provider: 'weknora',
-        name: '上海致拓',
-        documentCount: 22,
+        author: auth.userId,
+      }),
+      makeKnowledgeBase({
+        _id: mongoId('64f1f77bcf86cd799439100'),
+        id: 'kb_shared',
+        provider: 'weknora',
+        author: 'other_user',
       }),
     ]);
 
     const result = await listKnowledgeBasesForUser(auth, {}, deps);
 
-    expect(deps.weknoraClient.listSharedKnowledgeBases).toHaveBeenCalledTimes(1);
-    expect(deps.upsertExternalKnowledgeBase).toHaveBeenCalledWith(
-      expect.objectContaining({
-        provider: 'weknora',
-        externalId: '2a2da502-5549-44e7-b98c-ff5b9417b208',
-        name: '上海致拓',
-        documentCount: 22,
-        author: auth.userId,
-        authorName: auth.name,
-        tenantId: auth.tenantId,
-      }),
-    );
-    expect(deps.grantPermission).toHaveBeenCalledWith({
-      principalType: PrincipalType.USER,
-      principalId: auth.userId,
-      resourceType: ResourceType.KNOWLEDGE_BASE,
-      resourceId: '64f1f77bcf86cd799439099',
-      accessRoleId: AccessRoleIds.KNOWLEDGE_BASE_VIEWER,
-      grantedBy: auth.userId,
-    });
-    expect(result.data[0].id).toBe('kb_mirrored');
-    expect(result.data[0].id).not.toBe('2a2da502-5549-44e7-b98c-ff5b9417b208');
-  });
-
-  it('does not upgrade passive WeKnora sync to owner when effective share permission exists', async () => {
-    const auth = makeAuth();
-    const deps = makeDeps();
-    const existing = makeKnowledgeBase({
-      _id: mongoId('64f1f77bcf86cd799439099'),
-      id: 'kb_created',
-      provider: 'weknora',
-      externalId: 'wk_kb_1',
-    });
-
-    deps.findKnowledgeBaseByExternalId = jest.fn().mockResolvedValue(existing);
-    deps.checkPermission.mockResolvedValue(true);
-    deps.weknoraClient = {
-      listSharedKnowledgeBases: jest.fn().mockResolvedValue([
-        {
-          externalId: 'wk_kb_1',
-          externalSpaceId: 'space_1',
-          externalShareId: 'share_1',
-          name: 'Created KB',
-          description: '',
-          documentCount: 1,
-          readyDocumentCount: 1,
-          failedDocumentCount: 0,
-          processingDocumentCount: 0,
-        },
-      ]),
-    } as unknown as WeKnoraClient;
-    deps.upsertExternalKnowledgeBase = jest.fn().mockResolvedValue(existing);
-    deps.grantPermission.mockResolvedValue(null);
-    deps.findAccessibleResources.mockResolvedValue(['64f1f77bcf86cd799439099']);
-    deps.findKnowledgeBasesByResourceIds.mockResolvedValue([existing]);
-
-    await listKnowledgeBasesForUser(auth, {}, deps);
-
-    expect(deps.checkPermission).not.toHaveBeenCalledWith(
-      expect.objectContaining({ requiredPermission: PermissionBits.SHARE }),
-    );
-    expect(deps.grantPermission).toHaveBeenCalledWith(
-      expect.objectContaining({ accessRoleId: AccessRoleIds.KNOWLEDGE_BASE_VIEWER }),
-    );
+    expect(result.data.map((knowledgeBase) => [knowledgeBase.id, knowledgeBase.access])).toEqual([
+      ['kb_owned', 'owned'],
+      ['kb_shared', 'shared'],
+    ]);
   });
 
   it('does not query knowledge base records when no accessible resources exist', async () => {

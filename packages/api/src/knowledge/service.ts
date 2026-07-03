@@ -48,6 +48,50 @@ function getMongoResourceId(kb: KnowledgeBaseRecord): string {
   return resourceId.toString();
 }
 
+function weknoraPermissionToAccessRole(permission: string): AccessRoleIds {
+  if (permission === 'editor' || permission === 'owner') {
+    return AccessRoleIds.KNOWLEDGE_BASE_EDITOR;
+  }
+  return AccessRoleIds.KNOWLEDGE_BASE_VIEWER;
+}
+
+function withAccessLabel(
+  knowledgeBase: KnowledgeBaseRecord,
+  auth: KnowledgeAuthContext,
+): KnowledgeBaseRecord {
+  const authorId = knowledgeBase.author?.toString?.() ?? knowledgeBase.author;
+  return {
+    ...knowledgeBase,
+    access: authorId === auth.userId ? 'owned' : 'shared',
+  };
+}
+
+export interface KnowledgeBaseCapabilities {
+  weknora: {
+    configured: boolean;
+    canCreate: boolean;
+    canUpload: boolean;
+    requiresTemplate: boolean;
+    templateConfigured: boolean;
+  };
+}
+
+export function getKnowledgeBaseCapabilities(
+  deps: Pick<KnowledgeBaseServiceDependencies, 'weknoraClient' | 'env'>,
+): KnowledgeBaseCapabilities {
+  const configured = Boolean(deps.weknoraClient);
+  const templateConfigured = Boolean(deps.env?.WEKNORA_DEFAULT_CONFIG_KB_ID?.trim());
+  return {
+    weknora: {
+      configured,
+      canCreate: configured && templateConfigured,
+      canUpload: configured,
+      requiresTemplate: true,
+      templateConfigured,
+    },
+  };
+}
+
 export function mapWeKnoraDocumentToRecord(
   document: MappedWeKnoraDocument,
   kb: KnowledgeBaseRecord,
@@ -115,7 +159,7 @@ export async function syncWeKnoraKnowledgeBasesForUser(
         principalId: auth.userId,
         resourceType: ResourceType.KNOWLEDGE_BASE,
         resourceId: getMongoResourceId(knowledgeBase),
-        accessRoleId: AccessRoleIds.KNOWLEDGE_BASE_VIEWER,
+        accessRoleId: weknoraPermissionToAccessRole(externalKnowledgeBase.permission),
         grantedBy: auth.userId,
       });
 
@@ -132,6 +176,10 @@ export async function createKnowledgeBaseForUser(
   if (!deps.weknoraClient || !deps.upsertExternalKnowledgeBase) {
     throw createServiceError('WeKnora knowledge service is not configured', 500);
   }
+  const templateExternalId = deps.env?.WEKNORA_DEFAULT_CONFIG_KB_ID?.trim();
+  if (!templateExternalId) {
+    throw createServiceError('WeKnora default configuration template is not configured', 500);
+  }
 
   const external = await deps.weknoraClient.createKnowledgeBase({
     name: input.name.trim(),
@@ -147,7 +195,11 @@ export async function createKnowledgeBaseForUser(
     provider: 'weknora',
     externalId: external.externalId,
     externalSpaceId: external.externalSpaceId,
-    externalShareId: external.externalShareId,
+    externalShareId: '',
+    lifecycleStatus: 'initializing',
+    lifecycleStep: 'initializing',
+    lifecycleError: '',
+    configTemplateExternalId: templateExternalId,
     documentCount: external.documentCount,
     readyDocumentCount: external.readyDocumentCount,
     failedDocumentCount: external.failedDocumentCount,
@@ -164,7 +216,39 @@ export async function createKnowledgeBaseForUser(
     grantedBy: auth.userId,
   });
 
-  return created;
+  try {
+    const status = await deps.weknoraClient.copyInitializationConfig(
+      templateExternalId,
+      external.externalId,
+    );
+    if (!status.complete) {
+      throw new Error('WeKnora initialization config is incomplete');
+    }
+
+    await deps.updateKnowledgeBaseLifecycle(created.id, auth.tenantId, {
+      lifecycleStatus: 'sharing',
+      lifecycleStep: 'sharing',
+      lifecycleError: '',
+    });
+    const share = await deps.weknoraClient.shareKnowledgeBase(external.externalId);
+    const ready = await deps.updateKnowledgeBaseLifecycle(created.id, auth.tenantId, {
+      externalShareId: share.externalShareId,
+      lifecycleStatus: 'ready',
+      lifecycleStep: 'ready',
+      lifecycleError: '',
+      initializedAt: new Date(),
+      lastSyncedAt: new Date(),
+    });
+    return ready ?? created;
+  } catch (error) {
+    await deps.updateKnowledgeBaseLifecycle(created.id, auth.tenantId, {
+      lifecycleStatus: 'failed',
+      lifecycleStep: 'initializing',
+      lifecycleError:
+        error instanceof Error ? error.message : 'Knowledge base initialization failed',
+    });
+    throw createServiceError('Knowledge base initialization failed', 500);
+  }
 }
 
 export async function listKnowledgeBasesForUser(
@@ -172,8 +256,6 @@ export async function listKnowledgeBasesForUser(
   input: ListKnowledgeBasesForUserInput,
   deps: KnowledgeBaseServiceDependencies,
 ): Promise<ListKnowledgeBasesForUserResult> {
-  await syncWeKnoraKnowledgeBasesForUser(auth, deps);
-
   const resourceIds = await deps.findAccessibleResources({
     userId: auth.userId,
     role: auth.role,
@@ -185,9 +267,9 @@ export async function listKnowledgeBasesForUser(
     return { data: [], nextCursor: undefined };
   }
 
-  const data = (await deps.findKnowledgeBasesByResourceIds(resourceIds, auth.tenantId)).filter(
-    (knowledgeBase) => knowledgeBase.provider === 'weknora',
-  );
+  const data = (await deps.findKnowledgeBasesByResourceIds(resourceIds, auth.tenantId))
+    .filter((knowledgeBase) => knowledgeBase.provider === 'weknora')
+    .map((knowledgeBase) => withAccessLabel(knowledgeBase, auth));
   return { data, nextCursor: undefined };
 }
 

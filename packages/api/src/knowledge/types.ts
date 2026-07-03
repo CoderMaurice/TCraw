@@ -16,6 +16,7 @@ import type {
   UpsertExternalKnowledgeBaseInput,
   UpdateKnowledgeBaseDocumentInput,
   UpdateKnowledgeBaseInput,
+  UpdateKnowledgeBaseLifecycleInput,
 } from '@librechat/data-schemas';
 
 export type MongoResourceId = {
@@ -135,6 +136,11 @@ export interface KnowledgeBaseServiceDependencies {
     tenantId: string | undefined,
     update: UpdateKnowledgeBaseInput,
   ): Promise<KnowledgeBaseRecord | null>;
+  updateKnowledgeBaseLifecycle(
+    id: string,
+    tenantId: string | undefined,
+    update: UpdateKnowledgeBaseLifecycleInput,
+  ): Promise<KnowledgeBaseRecord | null>;
   createKnowledgeBaseDocument(
     input: CreateKnowledgeBaseDocumentInput,
   ): Promise<KnowledgeBaseDocumentRecord>;
@@ -168,6 +174,7 @@ export interface KnowledgeBaseServiceDependencies {
   ): Promise<KnowledgeBaseResourceReference[]>;
   checkPermission(input: KnowledgeBasePermissionCheckInput): Promise<boolean>;
   weknoraClient?: WeKnoraClient | null;
+  env?: NodeJS.ProcessEnv;
 }
 
 export type KnowledgeBaseServiceError = Error & {
@@ -261,6 +268,7 @@ export interface WeKnoraClient {
     input?: ListWeKnoraDocumentsInput,
   ): Promise<ListWeKnoraDocumentsResult>;
   createKnowledgeBase(input: CreateWeKnoraKnowledgeBaseInput): Promise<MappedWeKnoraKnowledgeBase>;
+  shareKnowledgeBase(externalKnowledgeBaseId: string): Promise<{ externalShareId: string }>;
   uploadDocument(
     externalKnowledgeBaseId: string,
     file: UploadWeKnoraDocumentFile,

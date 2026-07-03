@@ -8,6 +8,7 @@ const {
   updateKnowledgeBaseForUser,
   deleteKnowledgeBaseForUser,
   createKnowledgeBaseForUser,
+  getKnowledgeBaseCapabilities,
   mapWeKnoraDocumentToRecord,
   requireKnowledgeBasePermission,
   listKnowledgeBaseDocumentsForUser,
@@ -33,6 +34,7 @@ const deps = {
   findKnowledgeBasesByResourceIds: db.findKnowledgeBasesByResourceIds,
   upsertExternalKnowledgeBase: db.upsertExternalKnowledgeBase,
   updateKnowledgeBase: db.updateKnowledgeBase,
+  updateKnowledgeBaseLifecycle: db.updateKnowledgeBaseLifecycle,
   createKnowledgeBaseDocument: db.createKnowledgeBaseDocument,
   findKnowledgeBaseDocuments: db.findKnowledgeBaseDocuments,
   findReadyKnowledgeBaseDocumentFileIds: db.findReadyKnowledgeBaseDocumentFileIds,
@@ -44,6 +46,7 @@ const deps = {
   findAccessibleResources: PermissionService.findAccessibleResources,
   checkPermission: PermissionService.checkPermission,
   weknoraClient,
+  env: process.env,
 };
 
 const checkKnowledgeBaseAccess = generateCheckAccess({
@@ -179,6 +182,14 @@ router.get('/selector', async (req, res) => {
       deps,
     );
     return res.json(result);
+  } catch (error) {
+    return sendServiceError(res, error);
+  }
+});
+
+router.get('/capabilities', async (_req, res) => {
+  try {
+    return res.json(getKnowledgeBaseCapabilities(deps));
   } catch (error) {
     return sendServiceError(res, error);
   }
