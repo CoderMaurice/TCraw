@@ -54,7 +54,12 @@ const resolveExternalKnowledgeBaseIds = async ({
 
   for (const id of resolvedKnowledgeBaseIds) {
     const knowledgeBase = await findKnowledgeBase(id, tenantId);
-    if (!knowledgeBase || knowledgeBase.provider !== 'weknora' || !knowledgeBase.externalId) {
+    if (
+      !knowledgeBase ||
+      knowledgeBase.provider !== 'weknora' ||
+      knowledgeBase.lifecycleStatus !== 'ready' ||
+      !knowledgeBase.externalId
+    ) {
       continue;
     }
     externalKnowledgeBaseIds.push(knowledgeBase.externalId);

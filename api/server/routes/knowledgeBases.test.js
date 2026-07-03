@@ -10,6 +10,7 @@ const mockDeleteKnowledgeBaseForUser = jest.fn();
 const mockListKnowledgeBaseDocumentsForUser = jest.fn();
 const mockDeleteKnowledgeBaseDocumentForUser = jest.fn();
 const mockRequireKnowledgeBasePermission = jest.fn();
+const mockAssertKnowledgeBaseUploadable = jest.fn();
 const mockGetKnowledgeBaseCapabilities = jest.fn();
 const mockMapWeKnoraDocumentToRecord = jest.fn((document, kb, auth) => ({
   id: document.externalId,
@@ -62,6 +63,7 @@ jest.mock('@librechat/api', () => ({
   listKnowledgeBaseDocumentsForUser: mockListKnowledgeBaseDocumentsForUser,
   deleteKnowledgeBaseDocumentForUser: mockDeleteKnowledgeBaseDocumentForUser,
   requireKnowledgeBasePermission: mockRequireKnowledgeBasePermission,
+  assertKnowledgeBaseUploadable: mockAssertKnowledgeBaseUploadable,
   getKnowledgeBaseCapabilities: mockGetKnowledgeBaseCapabilities,
   mapWeKnoraDocumentToRecord: mockMapWeKnoraDocumentToRecord,
   sanitizeFilename: mockSanitizeFilename,
@@ -152,6 +154,7 @@ describe('knowledge base routes', () => {
     mockListKnowledgeBaseDocumentsForUser.mockReset();
     mockDeleteKnowledgeBaseDocumentForUser.mockReset();
     mockRequireKnowledgeBasePermission.mockReset();
+    mockAssertKnowledgeBaseUploadable.mockReset();
     mockGetKnowledgeBaseCapabilities.mockReset();
     mockMapWeKnoraDocumentToRecord.mockClear();
     mockSanitizeFilename.mockClear();
@@ -166,6 +169,7 @@ describe('knowledge base routes', () => {
     logger.error.mockClear();
 
     mockRequireKnowledgeBasePermission.mockResolvedValue({ id: 'kb_1' });
+    mockAssertKnowledgeBaseUploadable.mockResolvedValue({ id: 'kb_1' });
     mockGetKnowledgeBaseCapabilities.mockReturnValue({
       weknora: {
         configured: true,
@@ -388,10 +392,9 @@ describe('knowledge base routes', () => {
   });
 
   it('rejects document uploads for local RAG knowledge bases', async () => {
-    mockRequireKnowledgeBasePermission.mockResolvedValue({
-      id: 'kb_1',
-      provider: 'local',
-    });
+    const error = new Error('Local RAG knowledge bases are no longer supported');
+    error.statusCode = 410;
+    mockAssertKnowledgeBaseUploadable.mockRejectedValue(error);
 
     const response = await request(app)
       .post('/knowledge-bases/kb_1/documents')
@@ -399,10 +402,9 @@ describe('knowledge base routes', () => {
 
     expect(response.status).toBe(410);
     expect(response.body).toEqual({ message: 'Local RAG knowledge bases are no longer supported' });
-    expect(mockRequireKnowledgeBasePermission).toHaveBeenCalledWith(
+    expect(mockAssertKnowledgeBaseUploadable).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 'user_1' }),
       'kb_1',
-      PermissionBits.EDIT,
       expect.any(Object),
     );
     expect(mockUnlink).toHaveBeenCalledWith('/tmp/handbook.pdf');
@@ -410,9 +412,9 @@ describe('knowledge base routes', () => {
   });
 
   it('rejects document uploads for knowledge bases without a WeKnora provider', async () => {
-    mockRequireKnowledgeBasePermission.mockResolvedValue({
-      id: 'kb_1',
-    });
+    const error = new Error('Local RAG knowledge bases are no longer supported');
+    error.statusCode = 410;
+    mockAssertKnowledgeBaseUploadable.mockRejectedValue(error);
 
     const response = await request(app)
       .post('/knowledge-bases/kb_1/documents')
@@ -438,7 +440,7 @@ describe('knowledge base routes', () => {
       createdBy: 'user_1',
       tenantId: 'tenant_1',
     };
-    mockRequireKnowledgeBasePermission.mockResolvedValue({
+    mockAssertKnowledgeBaseUploadable.mockResolvedValue({
       id: 'kb_weknora',
       provider: 'weknora',
       externalId: 'wk_kb_1',
@@ -461,10 +463,9 @@ describe('knowledge base routes', () => {
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual(weknoraDocument);
-    expect(mockRequireKnowledgeBasePermission).toHaveBeenCalledWith(
+    expect(mockAssertKnowledgeBaseUploadable).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 'user_1' }),
       'kb_weknora',
-      PermissionBits.EDIT,
       expect.any(Object),
     );
     expect(mockWeKnoraClient.uploadDocument).toHaveBeenCalledWith('wk_kb_1', {
@@ -498,7 +499,7 @@ describe('knowledge base routes', () => {
   it('cleans up WeKnora temp files when upload fails', async () => {
     const uploadError = new Error('WeKnora upload failed');
     uploadError.statusCode = 502;
-    mockRequireKnowledgeBasePermission.mockResolvedValue({
+    mockAssertKnowledgeBaseUploadable.mockResolvedValue({
       id: 'kb_weknora',
       provider: 'weknora',
       externalId: 'wk_kb_1',

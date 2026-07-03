@@ -1,4 +1,4 @@
-const { createKnowledgeSearchTool } = require('./knowledgeSearch');
+const { createKnowledgeSearchTool, resolveExternalKnowledgeBaseIds } = require('./knowledgeSearch');
 
 describe('knowledgeSearch tool', () => {
   it('searches only agent-bound WeKnora knowledge bases', async () => {
@@ -19,6 +19,7 @@ describe('knowledgeSearch tool', () => {
           tenantId,
           provider: 'weknora',
           externalId: 'wk_1',
+          lifecycleStatus: 'ready',
         };
       }
       return {
@@ -46,5 +47,30 @@ describe('knowledgeSearch tool', () => {
     expect(weknoraClient.search).toHaveBeenCalledWith('售后流程', ['wk_1']);
     expect(output).toContain('售后手册.pdf');
     expect(output).toContain('售后流程需要先创建工单。');
+  });
+
+  it('does not search non-ready WeKnora knowledge bases', async () => {
+    const findKnowledgeBaseById = jest
+      .fn()
+      .mockResolvedValueOnce({
+        id: 'kb_initializing',
+        provider: 'weknora',
+        externalId: 'wk_initializing',
+        lifecycleStatus: 'initializing',
+      })
+      .mockResolvedValueOnce({
+        id: 'kb_ready',
+        provider: 'weknora',
+        externalId: 'wk_ready',
+        lifecycleStatus: 'ready',
+      });
+
+    await expect(
+      resolveExternalKnowledgeBaseIds({
+        tenantId: 'tenant-a',
+        knowledgeBaseIds: ['kb_initializing', 'kb_ready'],
+        findKnowledgeBase: findKnowledgeBaseById,
+      }),
+    ).resolves.toEqual(['wk_ready']);
   });
 });

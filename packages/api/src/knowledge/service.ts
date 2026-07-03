@@ -377,6 +377,29 @@ export async function createKnowledgeBaseDocumentForUser(
   return created;
 }
 
+export async function assertKnowledgeBaseUploadable(
+  auth: KnowledgeAuthContext,
+  id: string,
+  deps: KnowledgeBaseServiceDependencies,
+): Promise<KnowledgeBaseRecord> {
+  const kb = await requireKnowledgeBasePermission(auth, id, PermissionBits.EDIT, deps);
+
+  if (kb.provider !== 'weknora') {
+    throw createServiceError('Local RAG knowledge bases are no longer supported', 410);
+  }
+  if (kb.lifecycleStatus !== 'ready') {
+    throw createServiceError('Knowledge base is not ready for uploads', 409);
+  }
+  if (!kb.externalId) {
+    throw createServiceError('WeKnora knowledge base is missing an external id', 500);
+  }
+  if (!deps.weknoraClient) {
+    throw createServiceError('WeKnora client is not configured', 500);
+  }
+
+  return kb;
+}
+
 export async function updateKnowledgeBaseDocumentForUser(
   auth: KnowledgeAuthContext,
   id: string,

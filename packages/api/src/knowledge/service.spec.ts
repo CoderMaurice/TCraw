@@ -15,6 +15,7 @@ import {
   getKnowledgeBaseForUser,
   listKnowledgeBaseDocumentsForUser,
   listKnowledgeBasesForUser,
+  assertKnowledgeBaseUploadable,
   requireKnowledgeBasePermission,
   resolveKnowledgeBaseFileIdsForAgent,
   updateKnowledgeBaseDocumentForUser,
@@ -707,6 +708,29 @@ describe('knowledge base service', () => {
       statusCode: 500,
     });
     expect(deps.findKnowledgeBaseDocuments).not.toHaveBeenCalled();
+  });
+
+  it('rejects uploading to a WeKnora knowledge base before it is ready', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+
+    deps.findKnowledgeBaseById.mockResolvedValue(
+      makeKnowledgeBase({
+        id: 'kb_initializing',
+        provider: 'weknora',
+        externalId: 'wk_initializing',
+        lifecycleStatus: 'initializing',
+      }),
+    );
+    deps.checkPermission.mockResolvedValue(true);
+    deps.weknoraClient = {
+      uploadDocument: jest.fn(),
+    } as unknown as WeKnoraClient;
+
+    await expect(assertKnowledgeBaseUploadable(auth, 'kb_initializing', deps)).rejects.toMatchObject({
+      statusCode: 409,
+      message: 'Knowledge base is not ready for uploads',
+    });
   });
 
   it('skips WeKnora search when the current user lacks VIEW on a bound knowledge base', async () => {
