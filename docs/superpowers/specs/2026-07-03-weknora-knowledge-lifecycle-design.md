@@ -133,6 +133,56 @@ The adapter must sanitize response handling:
 
 Verification should check for configured embedding, document splitting, and required model blocks. It should not compare or print secret values.
 
+## Template Selection
+
+Current WeKnora shared knowledge bases with complete initialization config:
+
+| Candidate | External id | Chunking | Notes |
+| --- | --- | --- | --- |
+| `上海致拓` | `2a2da502-5549-44e7-b98c-ff5b9417b208` | `chunkSize=2048`, `chunkOverlap=80`, 7 separators | Complete config, but it is a real business KB and uses larger chunks. Larger chunks are useful for long-form continuity, but less precise as a general enterprise Q&A default. |
+| `FY27-Q1考核规则` | `ad407e39-cfce-4bfc-8234-d3b9c567d054` | `chunkSize=512`, `chunkOverlap=80`, 7 separators | Complete config with the same model stack as `上海致拓`. The smaller chunk size is a better default for policy, process, FAQ, HR, sales, and operational knowledge retrieval. |
+
+Recommended decision:
+
+1. Do not use a business KB directly as the permanent template.
+2. Create a dedicated WeKnora KB named `TCraw默认知识库模板`.
+3. Seed that template by copying initialization config from `FY27-Q1考核规则`.
+4. Store the dedicated template id in `WEKNORA_DEFAULT_CONFIG_KB_ID`.
+5. All future TCraw-created knowledge bases copy config from `TCraw默认知识库模板`, not from a live business KB.
+
+The copied config should include only initialization sections:
+
+```text
+llm
+embedding
+documentSplitting
+multimodal
+nodeExtract
+rerank
+```
+
+The copied config must exclude file-state or content-derived fields:
+
+```text
+hasFiles
+document count
+knowledge records
+document ids
+parse results
+```
+
+The current complete shared configs use:
+
+```text
+embedding dimension = 4096
+chunkSize = 512 for the recommended default
+chunkOverlap = 80
+separators = ["\n\n", "\n", "。", "！", "？", ";", "；"]
+multimodal enabled = true
+node extraction enabled = false
+rerank enabled = false
+```
+
 ## Upload Flow
 
 Upload is allowed only when:
