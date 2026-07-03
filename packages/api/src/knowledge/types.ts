@@ -25,6 +25,7 @@ export type MongoResourceId = {
 export type KnowledgeBaseRecord = Omit<IKnowledgeBase, '_id'> & {
   _id?: MongoResourceId;
   resourceId?: MongoResourceId;
+  access?: 'owned' | 'shared' | 'team';
 };
 
 export type KnowledgeBaseDocumentRecord = Omit<IKnowledgeBaseDocument, '_id'> & {
@@ -188,6 +189,7 @@ export interface MappedWeKnoraKnowledgeBase {
   externalId: string;
   externalSpaceId: string;
   externalShareId: string;
+  permission: string;
   name: string;
   description: string;
   documentCount: number;
@@ -225,6 +227,21 @@ export interface MappedWeKnoraSearchResult {
   metadata: WeKnoraMetadata;
 }
 
+export interface WeKnoraInitializationStatus {
+  complete: boolean;
+  embeddingConfigured: boolean;
+  chunkingConfigured: boolean;
+}
+
+export type WeKnoraInitializationConfig = {
+  llm?: WeKnoraMetadataValue;
+  embedding?: WeKnoraMetadataValue;
+  documentSplitting?: WeKnoraMetadataValue;
+  multimodal?: WeKnoraMetadataValue;
+  nodeExtract?: WeKnoraMetadataValue;
+  rerank?: WeKnoraMetadataValue;
+};
+
 export interface CreateWeKnoraKnowledgeBaseInput {
   name: string;
   description?: string;
@@ -248,5 +265,12 @@ export interface WeKnoraClient {
     externalKnowledgeBaseId: string,
     file: UploadWeKnoraDocumentFile,
   ): Promise<MappedWeKnoraDocument>;
+  copyInitializationConfig(
+    sourceExternalKnowledgeBaseId: string,
+    targetExternalKnowledgeBaseId: string,
+  ): Promise<WeKnoraInitializationStatus>;
+  getInitializationStatus(
+    externalKnowledgeBaseId: string,
+  ): Promise<WeKnoraInitializationStatus>;
   search(query: string, externalKnowledgeBaseIds: string[]): Promise<MappedWeKnoraSearchResult[]>;
 }

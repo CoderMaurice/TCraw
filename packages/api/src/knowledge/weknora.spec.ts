@@ -66,14 +66,17 @@ describe('WeKnora adapter', () => {
       mockJsonResponse({
         data: [
           {
-            id: 'share_1',
-            knowledge_base_id: 'wk_kb_1',
-            space_id: 'space_1',
-            name: ' Product Docs ',
-            description: 'Support articles',
-            knowledge_count: 5,
-            completed_count: 3,
-            failed_count: 1,
+            share_id: 'share_1',
+            permission: 'editor',
+            knowledge_base: {
+              id: 'wk_kb_1',
+              space_id: 'space_1',
+              name: ' Product Docs ',
+              description: 'Support articles',
+              knowledge_count: 5,
+              completed_count: 3,
+              failed_count: 1,
+            },
           },
         ],
       }),
@@ -86,6 +89,7 @@ describe('WeKnora adapter', () => {
         externalId: 'wk_kb_1',
         externalShareId: 'share_1',
         externalSpaceId: 'space_1',
+        permission: 'editor',
         name: 'Product Docs',
         description: 'Support articles',
         documentCount: 5,
@@ -190,12 +194,18 @@ describe('WeKnora adapter', () => {
   it('uses JSON headers for creating and sharing a knowledge base', async () => {
     const fetch = mockFetch(
       mockJsonResponse({
-        id: 'wk_kb_new',
-        space_id: 'space_new',
-        name: 'New KB',
-        description: 'New description',
+        success: true,
+        data: {
+          id: 'wk_kb_new',
+          space_id: 'space_new',
+          name: 'New KB',
+          description: 'New description',
+        },
       }),
-      mockJsonResponse({ id: 'share_new' }),
+      mockJsonResponse({
+        success: true,
+        data: { id: 'share_new' },
+      }),
     );
 
     const client = createWeKnoraClient(env);
@@ -206,6 +216,7 @@ describe('WeKnora adapter', () => {
       externalId: 'wk_kb_new',
       externalShareId: 'share_new',
       externalSpaceId: 'space_new',
+      permission: 'editor',
       name: 'New KB',
       description: 'New description',
     });
@@ -228,9 +239,103 @@ describe('WeKnora adapter', () => {
           Accept: 'application/json',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ organization_id: 'org_123' }),
+        body: JSON.stringify({ organization_id: 'org_123', permission: 'editor' }),
       },
     );
+  });
+
+  it('copies only initialization config sections from a template knowledge base', async () => {
+    const fetch = mockFetch(
+      mockJsonResponse({
+        success: true,
+        data: {
+          hasFiles: true,
+          knowledge_count: 3,
+          llm: { source: 'remote', modelName: 'gpt-5.5', apiKey: 'secret-llm-key' },
+          embedding: {
+            source: 'remote',
+            modelName: 'Qwen/Qwen3-Embedding-8B',
+            apiKey: 'secret-embedding-key',
+            dimension: 4096,
+          },
+          documentSplitting: {
+            chunkSize: 512,
+            chunkOverlap: 80,
+            separators: ['\n\n', '\n', '。', '！', '？', ';', '；'],
+          },
+          multimodal: { enabled: true, vlm: { modelName: 'Qwen3-VL-235B-A22B-Instruct' } },
+          nodeExtract: { enabled: false },
+          rerank: { enabled: false },
+        },
+      }),
+      mockJsonResponse({ success: true, data: {} }),
+      mockJsonResponse({
+        success: true,
+        data: {
+          embedding: { modelName: 'Qwen/Qwen3-Embedding-8B' },
+          documentSplitting: {
+            chunkSize: 512,
+            chunkOverlap: 80,
+            separators: ['\n\n', '\n'],
+          },
+        },
+      }),
+    );
+
+    const client = createWeKnoraClient({
+      ...env,
+      WEKNORA_DEFAULT_CONFIG_KB_ID: 'wk_template',
+    });
+
+    await expect(client?.copyInitializationConfig('wk_template', 'wk_new')).resolves.toEqual({
+      complete: true,
+      embeddingConfigured: true,
+      chunkingConfigured: true,
+    });
+
+    expect(fetch).toHaveBeenNthCalledWith(
+      1,
+      'https://weknora.example.com/api/initialization/config/wk_template',
+      {
+        method: 'GET',
+        headers: {
+          'X-API-Key': 'test-api-key',
+          Accept: 'application/json',
+        },
+      },
+    );
+    expect(fetch).toHaveBeenNthCalledWith(
+      2,
+      'https://weknora.example.com/api/initialization/config/wk_new',
+      expect.objectContaining({
+        method: 'PUT',
+        headers: {
+          'X-API-Key': 'test-api-key',
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+      }),
+    );
+    const putBody = JSON.parse(fetch.mock.calls[1][1]?.body as string);
+    expect(putBody).toEqual({
+      llm: { source: 'remote', modelName: 'gpt-5.5', apiKey: 'secret-llm-key' },
+      embedding: {
+        source: 'remote',
+        modelName: 'Qwen/Qwen3-Embedding-8B',
+        apiKey: 'secret-embedding-key',
+        dimension: 4096,
+      },
+      documentSplitting: {
+        chunkSize: 512,
+        chunkOverlap: 80,
+        separators: ['\n\n', '\n', '。', '！', '？', ';', '；'],
+      },
+      multimodal: { enabled: true, vlm: { modelName: 'Qwen3-VL-235B-A22B-Instruct' } },
+      nodeExtract: { enabled: false },
+      rerank: { enabled: false },
+    });
+    expect(putBody.hasFiles).toBeUndefined();
+    expect(putBody.knowledge_count).toBeUndefined();
   });
 
   it('searches with configured topK and maps result metadata', async () => {

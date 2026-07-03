@@ -8,8 +8,8 @@ import type {
   MappedWeKnoraSearchResult,
   UploadWeKnoraDocumentFile,
   WeKnoraClient,
+  WeKnoraInitializationStatus,
   WeKnoraMetadata,
-  WeKnoraMetadataValue,
 } from './types';
 
 const DEFAULT_SEARCH_TOP_K = 5;
@@ -27,7 +27,7 @@ type FetchResponse = {
 };
 
 type FetchInit = {
-  method: 'GET' | 'POST' | 'DELETE';
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   headers: Record<string, string>;
   body?: string | FormData;
 };
@@ -42,12 +42,27 @@ type WeKnoraConfig = {
   fetch: FetchLike;
 };
 
+const INITIALIZATION_CONFIG_KEYS = [
+  'llm',
+  'embedding',
+  'documentSplitting',
+  'multimodal',
+  'nodeExtract',
+  'rerank',
+] as const;
+
 function isJsonObject(value: JsonValue | undefined): value is JsonObject {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function getObject(value: JsonValue | undefined): JsonObject {
   return isJsonObject(value) ? value : {};
+}
+
+function unwrapObjectResponse(response: JsonValue): JsonObject {
+  const object = getObject(response);
+  const data = getObject(object.data);
+  return Object.keys(data).length > 0 ? data : object;
 }
 
 function getArray(response: JsonValue): JsonObject[] {
@@ -94,6 +109,36 @@ function metadataField(source: JsonObject): WeKnoraMetadata {
     return {};
   }
   return metadata as WeKnoraMetadata;
+}
+
+function sanitizeInitializationConfig(raw: JsonValue): JsonObject {
+  const source = unwrapObjectResponse(raw);
+  return INITIALIZATION_CONFIG_KEYS.reduce<JsonObject>((config, key) => {
+    const value = source[key];
+    if (isJsonObject(value) || Array.isArray(value)) {
+      return { ...config, [key]: value };
+    }
+    return config;
+  }, {});
+}
+
+function summarizeInitializationConfig(raw: JsonValue): WeKnoraInitializationStatus {
+  const source = unwrapObjectResponse(raw);
+  const embedding = getObject(source.embedding);
+  const splitting = getObject(source.documentSplitting);
+  const separators = splitting.separators;
+  const embeddingConfigured =
+    stringField(embedding, ['modelName', 'model_name', 'model_id']).length > 0;
+  const chunkingConfigured =
+    numberField(splitting, ['chunkSize', 'chunk_size']) > 0 &&
+    Array.isArray(separators) &&
+    separators.length > 0;
+
+  return {
+    complete: embeddingConfigured && chunkingConfigured,
+    embeddingConfigured,
+    chunkingConfigured,
+  };
 }
 
 function normalizeBaseUrl(baseUrl: string): string {
@@ -157,7 +202,11 @@ function nextDocumentCursor(
     return String(page + 1);
   }
 
-  const totalCount = numberField(responseObject, ['total_count', 'totalCount', 'total', 'count'], 0);
+  const totalCount = numberField(
+    responseObject,
+    ['total_count', 'totalCount', 'total', 'count'],
+    0,
+  );
   if (totalCount > page * pageSize) {
     return String(page + 1);
   }
@@ -226,6 +275,7 @@ function mapKnowledgeBase(raw: JsonObject): MappedWeKnoraKnowledgeBase {
     externalId,
     externalSpaceId: stringField(source, ['space_id', 'spaceId', 'external_space_id']),
     externalShareId: stringField(raw, ['share_id', 'shareId', 'id']),
+    permission: stringField(raw, ['permission'], stringField(source, ['permission'], 'viewer')),
     name: stringField(source, ['name'], externalId),
     description: stringField(source, ['description']),
     documentCount,
@@ -242,7 +292,11 @@ function mapDocument(raw: JsonObject, externalKnowledgeBaseId: string): MappedWe
     externalId,
     externalKnowledgeBaseId,
     fileId: stringField(raw, ['file_id', 'fileId'], externalId),
-    filename: stringField(raw, ['filename', 'file_name', 'fileName', 'name', 'title', 'source'], externalId),
+    filename: stringField(
+      raw,
+      ['filename', 'file_name', 'fileName', 'name', 'title', 'source'],
+      externalId,
+    ),
     bytes: numberField(raw, ['bytes', 'size', 'file_size', 'fileSize']),
     mimeType: stringField(raw, ['mime_type', 'mimeType', 'content_type', 'contentType']),
     status: mapWeKnoraDocumentStatus(stringField(raw, ['parse_status', 'parseStatus', 'status'])),
@@ -343,17 +397,21 @@ export function createWeKnoraClient(env: NodeJS.ProcessEnv = process.env): WeKno
     ): Promise<MappedWeKnoraKnowledgeBase> {
       const name = input.name.trim();
       const description = input.description?.trim() ?? '';
-      const knowledgeBase = getObject(
+      const knowledgeBase = unwrapObjectResponse(
         await requestJson<JsonValue>(config, ['knowledge-bases'], {
           method: 'POST',
           json: { name, description },
         }),
       );
       const externalId = stringField(knowledgeBase, ['id', 'knowledge_base_id', 'knowledgeBaseId']);
-      const share = getObject(
+      if (!externalId) {
+        throw new Error('WeKnora create knowledge base response is missing id');
+      }
+
+      const share = unwrapObjectResponse(
         await requestJson<JsonValue>(config, ['knowledge-bases', externalId, 'shares'], {
           method: 'POST',
-          json: { organization_id: config.orgId },
+          json: { organization_id: config.orgId, permission: 'editor' },
         }),
       );
 
@@ -361,6 +419,7 @@ export function createWeKnoraClient(env: NodeJS.ProcessEnv = process.env): WeKno
         ...knowledgeBase,
         id: stringField(share, ['id', 'share_id', 'shareId']),
         knowledge_base_id: externalId,
+        permission: stringField(share, ['permission'], 'editor'),
       });
     },
 
@@ -371,7 +430,7 @@ export function createWeKnoraClient(env: NodeJS.ProcessEnv = process.env): WeKno
       const form = new FormData();
       form.append('file', toBlob(file), file.filename);
 
-      const response = getObject(
+      const response = unwrapObjectResponse(
         await requestJson<JsonValue>(
           config,
           ['knowledge-bases', externalKnowledgeBaseId, 'knowledge', 'file'],
@@ -383,6 +442,40 @@ export function createWeKnoraClient(env: NodeJS.ProcessEnv = process.env): WeKno
       );
 
       return mapDocument(response, externalKnowledgeBaseId);
+    },
+
+    async copyInitializationConfig(
+      sourceExternalKnowledgeBaseId: string,
+      targetExternalKnowledgeBaseId: string,
+    ): Promise<WeKnoraInitializationStatus> {
+      const source = await requestJson<JsonValue>(
+        config,
+        ['initialization', 'config', sourceExternalKnowledgeBaseId],
+        { method: 'GET' },
+      );
+      const initializationConfig = sanitizeInitializationConfig(source);
+
+      await requestJson<JsonValue>(
+        config,
+        ['initialization', 'config', targetExternalKnowledgeBaseId],
+        {
+          method: 'PUT',
+          json: initializationConfig,
+        },
+      );
+
+      return await this.getInitializationStatus(targetExternalKnowledgeBaseId);
+    },
+
+    async getInitializationStatus(
+      externalKnowledgeBaseId: string,
+    ): Promise<WeKnoraInitializationStatus> {
+      const response = await requestJson<JsonValue>(
+        config,
+        ['initialization', 'config', externalKnowledgeBaseId],
+        { method: 'GET' },
+      );
+      return summarizeInitializationConfig(response);
     },
 
     async search(
