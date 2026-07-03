@@ -49,6 +49,7 @@ export enum QueryKeys {
   project = 'project',
   projectConversations = 'projectConversations',
   knowledgeBases = 'knowledgeBases',
+  knowledgeBaseCapabilities = 'knowledgeBaseCapabilities',
   knowledgeBase = 'knowledgeBase',
   knowledgeBaseDocuments = 'knowledgeBaseDocuments',
   knowledgeBaseSelector = 'knowledgeBaseSelector',

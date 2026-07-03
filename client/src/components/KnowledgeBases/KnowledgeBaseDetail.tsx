@@ -19,6 +19,16 @@ const tabs: Array<{ id: KnowledgeBaseTab; labelKey: TranslationKeys }> = [
   { id: 'settings', labelKey: 'com_ui_knowledge_base_settings' },
 ];
 
+const lifecycleLabelKeys: Partial<
+  Record<NonNullable<KnowledgeBase['lifecycleStatus']>, TranslationKeys>
+> = {
+  creating_external: 'com_ui_knowledge_lifecycle_creating_external',
+  initializing: 'com_ui_knowledge_lifecycle_initializing',
+  sharing: 'com_ui_knowledge_lifecycle_sharing',
+  failed: 'com_ui_knowledge_lifecycle_failed',
+  archived: 'com_ui_knowledge_lifecycle_archived',
+};
+
 function formatKnowledgeBaseDate(dateString?: string) {
   if (!dateString) {
     return '';
@@ -80,6 +90,10 @@ export function KnowledgeBaseDetail() {
   const processingDocuments = knowledgeBase.processingDocumentCount ?? 0;
   const failedDocuments = knowledgeBase.failedDocumentCount ?? 0;
   const updatedDate = formatKnowledgeBaseDate(knowledgeBase.updatedAt);
+  const lifecycleLabelKey =
+    knowledgeBase.lifecycleStatus && knowledgeBase.lifecycleStatus !== 'ready'
+      ? lifecycleLabelKeys[knowledgeBase.lifecycleStatus]
+      : undefined;
 
   return (
     <main className="flex h-full min-h-0 flex-col overflow-y-auto bg-surface-primary text-text-primary">
@@ -129,6 +143,11 @@ export function KnowledgeBaseDetail() {
                   })}
                 </span>
               ) : null}
+              {lifecycleLabelKey ? (
+                <span className="rounded-full bg-surface-secondary px-2 py-0.5 text-xs text-text-secondary">
+                  {localize(lifecycleLabelKey)}
+                </span>
+              ) : null}
               <span className="flex min-w-0 items-center gap-1.5">
                 <Clock3 className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span className="truncate">
@@ -170,6 +189,7 @@ export function KnowledgeBaseDetail() {
               hasMore={Boolean(hasNextPage)}
               onLoadMore={() => fetchNextPage()}
               provider={knowledgeBase.provider}
+              lifecycleStatus={knowledgeBase.lifecycleStatus}
             />
           ) : null}
           {activeTab === 'access' ? (

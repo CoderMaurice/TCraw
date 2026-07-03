@@ -1,6 +1,6 @@
-import { useRef, useState, type ChangeEvent } from 'react';
+import { useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import { Button, OGDialog, OGDialogTemplate, Spinner, useToastContext } from '@librechat/client';
-import { AlertCircle, FileText, RotateCcw, Trash2, Upload } from 'lucide-react';
+import { AlertCircle, FileText, Trash2, Upload } from 'lucide-react';
 import type { KnowledgeBaseDocument } from 'librechat-data-provider';
 import {
   useDeleteKnowledgeBaseDocumentMutation,
@@ -18,6 +18,7 @@ type KnowledgeBaseDocumentsProps = {
   hasMore?: boolean;
   onLoadMore?: () => void;
   provider?: 'local' | 'weknora';
+  lifecycleStatus?: string;
 };
 
 function formatBytes(bytes: number) {
@@ -47,41 +48,18 @@ export default function KnowledgeBaseDocuments({
   hasMore = false,
   onLoadMore,
   provider = 'local',
+  lifecycleStatus,
 }: KnowledgeBaseDocumentsProps) {
   const localize = useLocalize();
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const [file, setFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedFailedDocument, setSelectedFailedDocument] =
     useState<KnowledgeBaseDocument | null>(null);
-  const uploadDocuments = useUploadKnowledgeBaseDocumentsMutation(id);
   const deleteDocument = useDeleteKnowledgeBaseDocumentMutation(id);
+  const uploadDocuments = useUploadKnowledgeBaseDocumentsMutation(id);
   const { showToast } = useToastContext();
   const canDeleteDocuments = provider !== 'weknora';
-
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setFile(event.target.files?.[0] ?? null);
-  };
-
-  const handleUpload = async () => {
-    if (!file || uploadDocuments.isLoading) {
-      return;
-    }
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      await uploadDocuments.mutateAsync(formData);
-      setFile(null);
-      if (inputRef.current) {
-        inputRef.current.value = '';
-      }
-    } catch {
-      showToast({
-        message: localize('com_ui_knowledge_base_upload_error'),
-        status: 'error',
-      });
-    }
-  };
+  const canUploadDocuments = provider === 'weknora' && lifecycleStatus === 'ready';
+  let documentsContent: ReactNode;
 
   const handleDelete = async (documentId: string) => {
     if (deleteDocument.isLoading) {
@@ -97,10 +75,99 @@ export default function KnowledgeBaseDocuments({
     }
   };
 
-  const handleReupload = () => {
-    setSelectedFailedDocument(null);
-    inputRef.current?.click();
+  const handleUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || uploadDocuments.isLoading) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      await uploadDocuments.mutateAsync(formData);
+    } catch {
+      showToast({
+        message: localize('com_ui_knowledge_base_upload_error'),
+        status: 'error',
+      });
+    }
   };
+
+  if (isLoading) {
+    documentsContent = (
+      <div className="flex min-h-40 items-center justify-center">
+        <Spinner className="text-text-primary" />
+      </div>
+    );
+  } else if (documents.length === 0) {
+    documentsContent = (
+      <div className="rounded-lg border border-border-medium py-12 text-center text-sm text-text-secondary">
+        {localize('com_ui_no_knowledge_base_documents')}
+      </div>
+    );
+  } else {
+    documentsContent = (
+      <div className="overflow-hidden rounded-lg border border-border-medium">
+        <div className="grid grid-cols-[minmax(0,1fr)_7rem_7rem_8rem_3rem] items-center gap-3 border-b border-border-light bg-surface-secondary px-3 py-2 text-xs font-medium uppercase text-text-secondary">
+          <span>{localize('com_ui_filename')}</span>
+          <span>{localize('com_ui_status')}</span>
+          <span>{localize('com_ui_size')}</span>
+          <span className="sr-only">{localize('com_ui_knowledge_base_failure_reason')}</span>
+          <span className="sr-only">{localize('com_ui_delete')}</span>
+        </div>
+        {documents.map((document) => (
+          <div
+            key={document.id}
+            className="grid grid-cols-[minmax(0,1fr)_7rem_7rem_8rem_3rem] items-center gap-3 border-b border-border-light px-3 py-3 text-sm last:border-b-0"
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              <FileText className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden="true" />
+              <span className="truncate text-text-primary">{document.filename}</span>
+            </span>
+            <span
+              className={cn(
+                'truncate text-text-secondary',
+                document.status === 'failed' && 'text-red-600 dark:text-red-400',
+              )}
+            >
+              {localize(documentStatusLabelKeys[document.status])}
+            </span>
+            <span className="truncate text-text-secondary">{formatBytes(document.bytes)}</span>
+            <span>
+              {document.status === 'failed' ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 gap-1 px-2 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                  onClick={() => setSelectedFailedDocument(document)}
+                >
+                  <AlertCircle className="h-4 w-4" aria-hidden="true" />
+                  {localize('com_ui_knowledge_base_view_failure_reason')}
+                </Button>
+              ) : null}
+            </span>
+            {canDeleteDocuments ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={localize('com_ui_delete_document')}
+                disabled={deleteDocument.isLoading}
+                onClick={() => handleDelete(document.id)}
+              >
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+              </Button>
+            ) : (
+              <span aria-hidden="true" />
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <section className="flex min-h-0 flex-col gap-4">
@@ -108,98 +175,34 @@ export default function KnowledgeBaseDocuments({
         <h2 className="text-base font-semibold text-text-primary">
           {localize('com_ui_knowledge_base_documents')}
         </h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            ref={inputRef}
-            type="file"
-            aria-label={localize('com_ui_select_files')}
-            onChange={handleFileChange}
-            className="max-w-56 text-sm text-text-secondary file:mr-3 file:rounded-md file:border-0 file:bg-surface-secondary file:px-3 file:py-2 file:text-sm file:font-medium file:text-text-primary hover:file:bg-surface-tertiary"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={!file || uploadDocuments.isLoading}
-            onClick={handleUpload}
-          >
-            {uploadDocuments.isLoading ? (
-              <Spinner className="size-4" />
-            ) : (
-              <Upload className="h-4 w-4" aria-hidden="true" />
-            )}
-            {localize('com_ui_upload_documents')}
-          </Button>
-        </div>
+        {canUploadDocuments ? (
+          <div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="sr-only"
+              aria-label={localize('com_ui_upload_documents')}
+              onChange={handleUpload}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={uploadDocuments.isLoading}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {uploadDocuments.isLoading ? (
+                <Spinner className="size-4" />
+              ) : (
+                <Upload className="h-4 w-4" aria-hidden="true" />
+              )}
+              {localize('com_ui_upload_documents')}
+            </Button>
+          </div>
+        ) : null}
       </div>
 
-      {isLoading ? (
-        <div className="flex min-h-40 items-center justify-center">
-          <Spinner className="text-text-primary" />
-        </div>
-      ) : documents.length === 0 ? (
-        <div className="rounded-lg border border-border-medium py-12 text-center text-sm text-text-secondary">
-          {localize('com_ui_no_knowledge_base_documents')}
-        </div>
-      ) : (
-        <div className="overflow-hidden rounded-lg border border-border-medium">
-          <div className="grid grid-cols-[minmax(0,1fr)_7rem_7rem_8rem_3rem] items-center gap-3 border-b border-border-light bg-surface-secondary px-3 py-2 text-xs font-medium uppercase text-text-secondary">
-            <span>{localize('com_ui_filename')}</span>
-            <span>{localize('com_ui_status')}</span>
-            <span>{localize('com_ui_size')}</span>
-            <span className="sr-only">{localize('com_ui_knowledge_base_failure_reason')}</span>
-            <span className="sr-only">{localize('com_ui_delete')}</span>
-          </div>
-          {documents.map((document) => (
-            <div
-              key={document.id}
-              className="grid grid-cols-[minmax(0,1fr)_7rem_7rem_8rem_3rem] items-center gap-3 border-b border-border-light px-3 py-3 text-sm last:border-b-0"
-            >
-              <span className="flex min-w-0 items-center gap-2">
-                <FileText className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden="true" />
-                <span className="truncate text-text-primary">{document.filename}</span>
-              </span>
-              <span
-                className={cn(
-                  'truncate text-text-secondary',
-                  document.status === 'failed' && 'text-red-600 dark:text-red-400',
-                )}
-              >
-                {localize(documentStatusLabelKeys[document.status])}
-              </span>
-              <span className="truncate text-text-secondary">{formatBytes(document.bytes)}</span>
-              <span>
-                {document.status === 'failed' ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 gap-1 px-2 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                    onClick={() => setSelectedFailedDocument(document)}
-                  >
-                    <AlertCircle className="h-4 w-4" aria-hidden="true" />
-                    {localize('com_ui_knowledge_base_view_failure_reason')}
-                  </Button>
-                ) : null}
-              </span>
-              {canDeleteDocuments ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={localize('com_ui_delete_document')}
-                  disabled={deleteDocument.isLoading}
-                  onClick={() => handleDelete(document.id)}
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden="true" />
-                </Button>
-              ) : (
-                <span aria-hidden="true" />
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      {documentsContent}
 
       {hasMore ? (
         <div className="flex justify-center">
@@ -248,10 +251,6 @@ export default function KnowledgeBaseDocuments({
                   onClick={() => setSelectedFailedDocument(null)}
                 >
                   {localize('com_ui_close')}
-                </Button>
-                <Button type="button" variant="submit" onClick={handleReupload}>
-                  <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                  {localize('com_ui_knowledge_base_reupload_document')}
                 </Button>
               </div>
             }

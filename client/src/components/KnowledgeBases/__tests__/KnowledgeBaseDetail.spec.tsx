@@ -9,8 +9,8 @@ import {
   useInfiniteKnowledgeBaseDocumentsQuery,
   useUpdateKnowledgeBaseMutation,
   useDeleteKnowledgeBaseMutation,
-  useUploadKnowledgeBaseDocumentsMutation,
   useDeleteKnowledgeBaseDocumentMutation,
+  useUploadKnowledgeBaseDocumentsMutation,
 } from '~/data-provider';
 
 jest.mock('librechat-data-provider', () => ({
@@ -94,6 +94,8 @@ jest.mock('~/hooks', () => ({
       com_ui_knowledge_base_delete_confirm: 'Delete this knowledge base?',
       com_ui_confirm_delete_knowledge_base: 'Confirm delete',
       com_ui_load_more: 'Load more',
+      com_ui_upload_documents: 'Upload documents',
+      com_ui_knowledge_lifecycle_initializing: 'Configuring',
     };
     return (labels[key] ?? key).replaceAll('{{0}}', values?.[0] ?? '');
   },
@@ -104,8 +106,8 @@ jest.mock('~/data-provider', () => ({
   useInfiniteKnowledgeBaseDocumentsQuery: jest.fn(),
   useUpdateKnowledgeBaseMutation: jest.fn(),
   useDeleteKnowledgeBaseMutation: jest.fn(),
-  useUploadKnowledgeBaseDocumentsMutation: jest.fn(),
   useDeleteKnowledgeBaseDocumentMutation: jest.fn(),
+  useUploadKnowledgeBaseDocumentsMutation: jest.fn(),
 }));
 
 describe('KnowledgeBaseDetail', () => {
@@ -121,6 +123,7 @@ describe('KnowledgeBaseDetail', () => {
         name: 'Support',
         description: 'Support playbooks',
         provider: 'weknora',
+        lifecycleStatus: 'ready',
         documentCount: 22,
         readyDocumentCount: 19,
         processingDocumentCount: 2,
@@ -168,11 +171,11 @@ describe('KnowledgeBaseDetail', () => {
       mutateAsync: deleteKnowledgeBase,
       isLoading: false,
     });
-    (useUploadKnowledgeBaseDocumentsMutation as jest.Mock).mockReturnValue({
+    (useDeleteKnowledgeBaseDocumentMutation as jest.Mock).mockReturnValue({
       mutateAsync: jest.fn(),
       isLoading: false,
     });
-    (useDeleteKnowledgeBaseDocumentMutation as jest.Mock).mockReturnValue({
+    (useUploadKnowledgeBaseDocumentsMutation as jest.Mock).mockReturnValue({
       mutateAsync: jest.fn(),
       isLoading: false,
     });
@@ -206,6 +209,7 @@ describe('KnowledgeBaseDetail', () => {
     expect(screen.getByText('Ready')).toBeInTheDocument();
     expect(screen.getByText('indexing.md')).toBeInTheDocument();
     expect(screen.getAllByText('Processing')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Upload documents' })).toBeInTheDocument();
     expect(screen.queryAllByRole('button', { name: 'Delete document' })).toHaveLength(0);
 
     await userEvent.click(screen.getByRole('button', { name: 'Load more' }));
@@ -218,6 +222,36 @@ describe('KnowledgeBaseDetail', () => {
     expect(access).toHaveAttribute('data-resource-db-id', 'mongo_kb_1');
     expect(access).toHaveAttribute('data-resource-name', 'Support');
     expect(access).toHaveAttribute('data-resource-type', ResourceType.KNOWLEDGE_BASE);
+  });
+
+  it('hides upload for a non-ready knowledge base', () => {
+    (useKnowledgeBaseQuery as jest.Mock).mockReturnValue({
+      data: {
+        _id: 'mongo_kb_1',
+        id: 'kb_1',
+        name: 'Support',
+        description: 'Support playbooks',
+        provider: 'weknora',
+        lifecycleStatus: 'initializing',
+        documentCount: 0,
+        readyDocumentCount: 0,
+        processingDocumentCount: 0,
+        failedDocumentCount: 0,
+        updatedAt: '2026-01-02T03:04:05.000Z',
+      },
+      isLoading: false,
+    });
+    const router = createMemoryRouter(
+      [{ path: '/knowledge/:id', element: <KnowledgeBaseDetail /> }],
+      {
+        initialEntries: ['/knowledge/kb_1'],
+      },
+    );
+
+    render(<RouterProvider router={router} />);
+
+    expect(screen.getByText('Configuring')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Upload documents' })).not.toBeInTheDocument();
   });
 
   it('requires confirmation before deleting a knowledge base', async () => {
@@ -240,8 +274,7 @@ describe('KnowledgeBaseDetail', () => {
     expect(deleteKnowledgeBase).toHaveBeenCalledWith('kb_1');
   });
 
-  it('shows failed document details and opens file picker for re-upload', async () => {
-    const inputClick = jest.spyOn(HTMLInputElement.prototype, 'click').mockImplementation();
+  it('shows failed document details without exposing re-upload controls', async () => {
     (useInfiniteKnowledgeBaseDocumentsQuery as jest.Mock).mockReturnValue({
       data: {
         pages: [
@@ -272,20 +305,13 @@ describe('KnowledgeBaseDetail', () => {
       },
     );
 
-    try {
-      render(<RouterProvider router={router} />);
+    render(<RouterProvider router={router} />);
 
-      await userEvent.click(screen.getByRole('button', { name: 'View reason' }));
+    await userEvent.click(screen.getByRole('button', { name: 'View reason' }));
 
-      expect(screen.getByText('Failure reason')).toBeInTheDocument();
-      expect(screen.getByText('Failed')).toBeInTheDocument();
-      expect(screen.getByText('Embedding model is not configured')).toBeInTheDocument();
-
-      await userEvent.click(screen.getByRole('button', { name: 'Re-upload' }));
-
-      expect(inputClick).toHaveBeenCalled();
-    } finally {
-      inputClick.mockRestore();
-    }
+    expect(screen.getByText('Failure reason')).toBeInTheDocument();
+    expect(screen.getByText('Failed')).toBeInTheDocument();
+    expect(screen.getByText('Embedding model is not configured')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Re-upload' })).not.toBeInTheDocument();
   });
 });

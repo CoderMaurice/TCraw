@@ -5,7 +5,7 @@ import { Button, Input, Spinner, useMediaQuery } from '@librechat/client';
 import type { KnowledgeBase } from 'librechat-data-provider';
 import type { TranslationKeys } from '~/hooks';
 import OpenSidebar from '~/components/Chat/Menus/OpenSidebar';
-import { useKnowledgeBasesQuery } from '~/data-provider';
+import { useKnowledgeBaseCapabilitiesQuery, useKnowledgeBasesQuery } from '~/data-provider';
 import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
 import KnowledgeBaseCreateDialog from './KnowledgeBaseCreateDialog';
@@ -14,6 +14,16 @@ const accessLabelKeys: Record<NonNullable<KnowledgeBase['access']>, TranslationK
   owned: 'com_ui_knowledge_base_access_owned',
   shared: 'com_ui_knowledge_base_access_shared',
   team: 'com_ui_knowledge_base_access_team',
+};
+
+const lifecycleLabelKeys: Partial<
+  Record<NonNullable<KnowledgeBase['lifecycleStatus']>, TranslationKeys>
+> = {
+  creating_external: 'com_ui_knowledge_lifecycle_creating_external',
+  initializing: 'com_ui_knowledge_lifecycle_initializing',
+  sharing: 'com_ui_knowledge_lifecycle_sharing',
+  failed: 'com_ui_knowledge_lifecycle_failed',
+  archived: 'com_ui_knowledge_lifecycle_archived',
 };
 
 function formatKnowledgeBaseDate(dateString?: string) {
@@ -35,15 +45,17 @@ export function KnowledgeBasePage() {
   const localize = useLocalize();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const deferredSearch = useDeferredValue(search);
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
 
+  const { data: capabilities } = useKnowledgeBaseCapabilitiesQuery();
   const { data, isLoading } = useKnowledgeBasesQuery({
     limit: 50,
     search: deferredSearch || undefined,
   });
   const knowledgeBases = useMemo(() => data?.data ?? [], [data?.data]);
+  const canCreateKnowledgeBase = capabilities?.weknora.canCreate === true;
 
   return (
     <main className="flex h-full min-h-0 flex-col overflow-auto bg-surface-primary text-text-primary">
@@ -55,10 +67,23 @@ export function KnowledgeBasePage() {
               {localize('com_ui_knowledge_bases')}
             </h1>
           </div>
-          <Button type="button" variant="submit" size="sm" onClick={() => setIsCreating(true)}>
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            {localize('com_ui_create_knowledge_base')}
-          </Button>
+          {canCreateKnowledgeBase ? (
+            <KnowledgeBaseCreateDialog
+              open={isCreateOpen}
+              onOpenChange={setIsCreateOpen}
+              onCreated={(knowledgeBase) => navigate(`/knowledge/${knowledgeBase.id}`)}
+            >
+              <Button
+                type="button"
+                variant="submit"
+                className="gap-2"
+                onClick={() => setIsCreateOpen(true)}
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                {localize('com_ui_create_knowledge_base')}
+              </Button>
+            </KnowledgeBaseCreateDialog>
+          ) : null}
         </div>
 
         <label className="relative min-w-0">
@@ -77,12 +102,6 @@ export function KnowledgeBasePage() {
           />
         </label>
 
-        <KnowledgeBaseCreateDialog
-          open={isCreating}
-          onOpenChange={setIsCreating}
-          onCreated={(knowledgeBase) => navigate(`/knowledge/${knowledgeBase.id}`)}
-        />
-
         {isLoading ? (
           <div className="flex min-h-52 items-center justify-center">
             <Spinner className="text-text-primary" />
@@ -95,6 +114,10 @@ export function KnowledgeBasePage() {
               const failedDocuments = knowledgeBase.failedDocumentCount ?? 0;
               const updatedDate = formatKnowledgeBaseDate(knowledgeBase.updatedAt);
               const accessLabelKey = accessLabelKeys[knowledgeBase.access ?? 'owned'];
+              const lifecycleLabelKey =
+                knowledgeBase.lifecycleStatus && knowledgeBase.lifecycleStatus !== 'ready'
+                  ? lifecycleLabelKeys[knowledgeBase.lifecycleStatus]
+                  : undefined;
 
               return (
                 <button
@@ -122,7 +145,14 @@ export function KnowledgeBasePage() {
                       </span>
                     </span>
                     <span className="flex shrink-0 flex-col items-end gap-1">
-                      <span className="text-xs text-text-secondary">{localize(accessLabelKey)}</span>
+                      <span className="text-xs text-text-secondary">
+                        {localize(accessLabelKey)}
+                      </span>
+                      {lifecycleLabelKey ? (
+                        <span className="rounded-full bg-surface-tertiary px-2 py-0.5 text-xs text-text-secondary">
+                          {localize(lifecycleLabelKey)}
+                        </span>
+                      ) : null}
                     </span>
                   </span>
 

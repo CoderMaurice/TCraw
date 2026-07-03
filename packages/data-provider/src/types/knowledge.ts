@@ -5,12 +5,26 @@ export type KnowledgeBaseStatusCounts = {
   processingDocumentCount?: number;
 };
 
+export type KnowledgeBaseLifecycleStatus =
+  | 'creating_external'
+  | 'initializing'
+  | 'sharing'
+  | 'ready'
+  | 'failed'
+  | 'archived';
+
 export type KnowledgeBase = KnowledgeBaseStatusCounts & {
   _id?: string;
   id: string;
   name: string;
   description?: string;
   provider?: 'local' | 'weknora';
+  lifecycleStatus?: KnowledgeBaseLifecycleStatus;
+  lifecycleStep?: string;
+  lifecycleError?: string;
+  initializedAt?: string | null;
+  lastSyncedAt?: string | null;
+  configTemplateExternalId?: string;
   author: string;
   authorName?: string;
   tenantId?: string;
@@ -18,6 +32,16 @@ export type KnowledgeBase = KnowledgeBaseStatusCounts & {
   createdAt: string;
   updatedAt: string;
   access?: 'owned' | 'shared' | 'team';
+};
+
+export type KnowledgeBaseCapabilities = {
+  weknora: {
+    configured: boolean;
+    canCreate: boolean;
+    canUpload: boolean;
+    requiresTemplate: boolean;
+    templateConfigured: boolean;
+  };
 };
 
 export type KnowledgeBaseDocumentStatus = 'processing' | 'ready' | 'failed';
@@ -79,6 +103,7 @@ export type KnowledgeBaseSelectorItem = Pick<
   | 'readyDocumentCount'
   | 'failedDocumentCount'
   | 'processingDocumentCount'
+  | 'lifecycleStatus'
 >;
 
 export type KnowledgeBaseSelectorResponse = {

@@ -7,6 +7,7 @@ import type {
 } from '@tanstack/react-query';
 import type {
   KnowledgeBase,
+  KnowledgeBaseCapabilities,
   ListKnowledgeBasesRequest,
   ListKnowledgeBasesResponse,
   KnowledgeBaseSelectorResponse,
@@ -25,6 +26,22 @@ export const useKnowledgeBasesQuery = <TData = ListKnowledgeBasesResponse>(
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
       refetchOnMount: false,
+      ...config,
+    },
+  );
+};
+
+export const useKnowledgeBaseCapabilitiesQuery = (
+  config?: UseQueryOptions<KnowledgeBaseCapabilities>,
+): QueryObserverResult<KnowledgeBaseCapabilities> => {
+  return useQuery<KnowledgeBaseCapabilities>(
+    [QueryKeys.knowledgeBaseCapabilities],
+    () => dataService.getKnowledgeBaseCapabilities(),
+    {
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMount: false,
+      retry: false,
       ...config,
     },
   );

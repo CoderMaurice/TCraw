@@ -861,6 +861,10 @@ export function listKnowledgeBases(
   return request.get(endpoints.knowledgeBases(), { params });
 }
 
+export function getKnowledgeBaseCapabilities(): Promise<kb.KnowledgeBaseCapabilities> {
+  return request.get(endpoints.knowledgeBaseCapabilities());
+}
+
 export function getKnowledgeBase(id: string): Promise<kb.KnowledgeBase> {
   return request.get(endpoints.knowledgeBase(id));
 }

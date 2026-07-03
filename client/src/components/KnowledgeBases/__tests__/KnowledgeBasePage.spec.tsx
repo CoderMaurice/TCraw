@@ -2,7 +2,11 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { KnowledgeBasePage } from '../KnowledgeBasePage';
-import { useKnowledgeBasesQuery, useCreateKnowledgeBaseMutation } from '~/data-provider';
+import {
+  useCreateKnowledgeBaseMutation,
+  useKnowledgeBaseCapabilitiesQuery,
+  useKnowledgeBasesQuery,
+} from '~/data-provider';
 
 jest.mock('@librechat/client', () => ({
   Button: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
@@ -39,6 +43,11 @@ jest.mock('~/hooks', () => ({
       com_ui_knowledge_base_status_processing: 'Processing',
       com_ui_knowledge_base_status_processing_count: 'Processing: {{0}}',
       com_ui_knowledge_base_updated: 'Updated {{0}}',
+      com_ui_knowledge_base_name: 'Knowledge base name',
+      com_ui_knowledge_base_name_placeholder: 'New knowledge base',
+      com_ui_description: 'Description',
+      com_ui_knowledge_base_description_placeholder: 'Optional description',
+      com_ui_knowledge_lifecycle_initializing: 'Configuring',
       com_ui_ready: 'ready',
     };
     return (labels[key] ?? key).replaceAll('{{0}}', values?.[0] ?? '');
@@ -46,8 +55,9 @@ jest.mock('~/hooks', () => ({
 }));
 
 jest.mock('~/data-provider', () => ({
-  useKnowledgeBasesQuery: jest.fn(),
   useCreateKnowledgeBaseMutation: jest.fn(),
+  useKnowledgeBaseCapabilitiesQuery: jest.fn(),
+  useKnowledgeBasesQuery: jest.fn(),
 }));
 
 describe('KnowledgeBasePage', () => {
@@ -56,6 +66,17 @@ describe('KnowledgeBasePage', () => {
     (useCreateKnowledgeBaseMutation as jest.Mock).mockReturnValue({
       mutateAsync: jest.fn(),
       isLoading: false,
+    });
+    (useKnowledgeBaseCapabilitiesQuery as jest.Mock).mockReturnValue({
+      data: {
+        weknora: {
+          configured: true,
+          canCreate: false,
+          canUpload: true,
+          requiresTemplate: true,
+          templateConfigured: false,
+        },
+      },
     });
   });
 
@@ -87,7 +108,7 @@ describe('KnowledgeBasePage', () => {
 
     expect(useKnowledgeBasesQuery).toHaveBeenCalledWith({ limit: 50, search: undefined });
     expect(screen.getByRole('searchbox', { name: 'Search knowledge bases' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Create knowledge base' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Create knowledge base' })).not.toBeInTheDocument();
     expect(screen.getByText('Support')).toBeInTheDocument();
     expect(screen.getByText('Support playbooks')).toBeInTheDocument();
     expect(screen.queryByText('WeKnora')).not.toBeInTheDocument();
@@ -96,5 +117,31 @@ describe('KnowledgeBasePage', () => {
     expect(screen.getByText('Processing: 2')).toBeInTheDocument();
     expect(screen.getByText('Failed: 1')).toBeInTheDocument();
     expect(screen.getByText(/Updated/)).toBeInTheDocument();
+  });
+
+  it('shows create when knowledge base capabilities allow creation', () => {
+    (useKnowledgeBaseCapabilitiesQuery as jest.Mock).mockReturnValue({
+      data: {
+        weknora: {
+          configured: true,
+          canCreate: true,
+          canUpload: true,
+          requiresTemplate: true,
+          templateConfigured: true,
+        },
+      },
+    });
+    (useKnowledgeBasesQuery as jest.Mock).mockReturnValue({
+      data: { data: [] },
+      isLoading: false,
+    });
+
+    const router = createMemoryRouter([{ path: '/knowledge', element: <KnowledgeBasePage /> }], {
+      initialEntries: ['/knowledge'],
+    });
+
+    render(<RouterProvider router={router} />);
+
+    expect(screen.getByRole('button', { name: 'Create knowledge base' })).toBeInTheDocument();
   });
 });

@@ -150,6 +150,8 @@ const knowledgeBasesRoot = `${BASE_URL}/api/knowledge-bases`;
 
 export const knowledgeBases = () => knowledgeBasesRoot;
 
+export const knowledgeBaseCapabilities = () => `${knowledgeBasesRoot}/capabilities`;
+
 export const knowledgeBase = (id: string) => `${knowledgeBasesRoot}/${encodeURIComponent(id)}`;
 
 export const knowledgeBaseDocuments = (
