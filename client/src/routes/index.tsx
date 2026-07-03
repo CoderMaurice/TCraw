@@ -62,6 +62,11 @@ const loadKnowledgeBaseDetail = () =>
     Component: m.KnowledgeBaseDetail,
   }));
 
+const loadAdminUsersPage = () =>
+  import('~/components/Admin').then((m) => ({
+    Component: m.AdminUsersPage,
+  }));
+
 const baseEl = document.querySelector('base');
 const baseHref = baseEl?.getAttribute('href') || '/';
 
@@ -192,6 +197,10 @@ export const router = createBrowserRouter(
             {
               path: 'knowledge/:id',
               lazy: loadKnowledgeBaseDetail,
+            },
+            {
+              path: 'admin/users',
+              lazy: loadAdminUsersPage,
             },
             {
               path: 'agents',

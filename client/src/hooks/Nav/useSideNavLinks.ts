@@ -8,11 +8,13 @@ import {
   ScrollText,
   ArrowRightToLine,
   SlidersHorizontal,
+  UsersRound,
 } from 'lucide-react';
 import {
   Permissions,
   EModelEndpoint,
   PermissionTypes,
+  SystemRoles,
   isParamEndpoint,
   isAgentsEndpoint,
   isAssistantsEndpoint,
@@ -24,6 +26,7 @@ import {
   useMCPServerManager,
   useGetAgentsConfig,
   useHasAccess,
+  useAuthContext,
 } from '~/hooks';
 import MCPBuilderPanel from '~/components/SidePanel/MCPBuilder/MCPBuilderPanel';
 import AgentPanelSwitch from '~/components/SidePanel/Agents/AgentPanelSwitch';
@@ -83,6 +86,7 @@ export default function useSideNavLinks({
     permissionType: PermissionTypes.MCP_SERVERS,
     permission: Permissions.CREATE,
   });
+  const { user } = useAuthContext();
   const { availableMCPServers } = useMCPServerManager();
 
   const { agentsConfig } = useGetAgentsConfig({ endpointsConfig });
@@ -143,6 +147,17 @@ export default function useSideNavLinks({
         id: 'knowledge',
         activePath: '/knowledge',
         onClick: () => navigate('/knowledge'),
+      });
+    }
+
+    if (user?.role === SystemRoles.ADMIN) {
+      links.push({
+        title: 'com_ui_admin_people',
+        label: '',
+        icon: UsersRound,
+        id: 'admin-users',
+        activePath: '/admin/users',
+        onClick: () => navigate('/admin/users'),
       });
     }
 
@@ -220,6 +235,7 @@ export default function useSideNavLinks({
     availableMCPServers,
     hasAccessToUseMCPSettings,
     hasAccessToCreateMCP,
+    user?.role,
     includeHidePanel,
     hidePanel,
   ]);
