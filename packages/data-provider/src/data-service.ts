@@ -1202,6 +1202,18 @@ export function deleteGitHubSkillSyncCredential(
   return request.delete(endpoints.adminSkillsSyncCredential(credentialKey));
 }
 
+export function listAdminUsers(
+  params?: q.AdminUsersListParams,
+): Promise<q.AdminUsersListResponse> {
+  return request.get(endpoints.adminUsers(params));
+}
+
+export function searchAdminUsers(
+  params: q.AdminUsersSearchParams,
+): Promise<q.AdminUsersSearchResponse> {
+  return request.get(endpoints.adminUsersSearch(params));
+}
+
 /* Roles */
 export function listRoles(): Promise<q.ListRolesResponse> {
   return request.get(`${endpoints.adminRoles()}?limit=200`);

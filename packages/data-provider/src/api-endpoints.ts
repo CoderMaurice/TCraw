@@ -461,6 +461,25 @@ export const skillStates = () => `${BASE_URL}/api/user/settings/skills/active`;
 /* Roles */
 export const roles = () => `${BASE_URL}/api/roles`;
 export const adminRoles = () => `${BASE_URL}/api/admin/roles`;
+export const adminUsers = (params?: q.AdminUsersListParams) => {
+  const cleaned: Record<string, string> = {};
+  if (params?.limit != null) {
+    cleaned.limit = String(params.limit);
+  }
+  if (params?.offset != null) {
+    cleaned.offset = String(params.offset);
+  }
+  const query = Object.keys(cleaned).length > 0 ? `?${new URLSearchParams(cleaned)}` : '';
+  return `${BASE_URL}/api/admin/users${query}`;
+};
+
+export const adminUsersSearch = (params: q.AdminUsersSearchParams) => {
+  const cleaned: Record<string, string> = { q: params.q };
+  if (params.limit != null) {
+    cleaned.limit = String(params.limit);
+  }
+  return `${BASE_URL}/api/admin/users/search?${new URLSearchParams(cleaned)}`;
+};
 export const getRole = (roleName: string) => `${roles()}/${encodeURIComponent(roleName)}`;
 export const updatePromptPermissions = (roleName: string) => `${getRole(roleName)}/prompts`;
 export const updateMemoryPermissions = (roleName: string) => `${getRole(roleName)}/memories`;

@@ -218,6 +218,49 @@ export interface MCPAuthValuesResponse {
   authValueFlags: Record<string, boolean>;
 }
 
+export type AdminUsersListParams = {
+  limit?: number;
+  offset?: number;
+};
+
+export type AdminUserListItem = {
+  id: string;
+  name: string;
+  username: string;
+  email: string;
+  avatar: string;
+  role: string;
+  provider: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type AdminUsersListResponse = {
+  users: AdminUserListItem[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+export type AdminUsersSearchParams = {
+  q: string;
+  limit?: number;
+};
+
+export type AdminUserSearchResult = {
+  id: string;
+  name: string;
+  email: string;
+  username?: string;
+  avatarUrl?: string;
+};
+
+export type AdminUsersSearchResponse = {
+  users: AdminUserSearchResult[];
+  total: number;
+  capped: boolean;
+};
+
 /**
  * User Favorites — pinned agents, models, and model specs.
  * Exactly one variant should be set per entry; exclusivity is enforced
