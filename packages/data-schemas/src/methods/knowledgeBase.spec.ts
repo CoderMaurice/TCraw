@@ -110,6 +110,54 @@ describe('KnowledgeBase methods', () => {
     expect(updated.failedDocumentCount).toBe(1);
   });
 
+  it('persists lifecycle fields when upserting an external knowledge base', async () => {
+    const created = await methods.upsertExternalKnowledgeBase({
+      id: 'kb_lifecycle',
+      name: 'Lifecycle KB',
+      author: 'user_1',
+      tenantId: 'tenant-a',
+      provider: 'weknora',
+      externalId: 'wk_lifecycle',
+      externalSpaceId: 'org_1',
+      lifecycleStatus: 'initializing',
+      lifecycleStep: 'copy_config',
+      lifecycleError: '',
+      configTemplateExternalId: 'wk_template',
+    });
+
+    expect(created.lifecycleStatus).toBe('initializing');
+    expect(created.lifecycleStep).toBe('copy_config');
+    expect(created.configTemplateExternalId).toBe('wk_template');
+  });
+
+  it('updates lifecycle fields without changing user-facing metadata', async () => {
+    await methods.upsertExternalKnowledgeBase({
+      id: 'kb_lifecycle_update',
+      name: 'Lifecycle Update KB',
+      author: 'user_1',
+      tenantId: 'tenant-a',
+      provider: 'weknora',
+      externalId: 'wk_lifecycle_update',
+      externalSpaceId: 'org_1',
+      lifecycleStatus: 'initializing',
+      lifecycleStep: 'copy_config',
+    });
+
+    const updated = await methods.updateKnowledgeBaseLifecycle('kb_lifecycle_update', 'tenant-a', {
+      lifecycleStatus: 'ready',
+      lifecycleStep: 'ready',
+      lifecycleError: '',
+      initializedAt: new Date('2026-07-03T00:00:00.000Z'),
+      externalShareId: 'share_1',
+    });
+
+    expect(updated?.name).toBe('Lifecycle Update KB');
+    expect(updated?.lifecycleStatus).toBe('ready');
+    expect(updated?.lifecycleStep).toBe('ready');
+    expect(updated?.externalShareId).toBe('share_1');
+    expect(updated?.initializedAt?.toISOString()).toBe('2026-07-03T00:00:00.000Z');
+  });
+
   it('enforces unique external knowledge base identity without constraining local records', async () => {
     await methods.createKnowledgeBase({
       id: 'kb-local-1',

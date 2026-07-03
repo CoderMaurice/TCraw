@@ -45,6 +45,30 @@ const knowledgeBaseSchema: Schema<IKnowledgeBaseMongoDocument> =
         type: String,
         default: '',
       },
+      lifecycleStatus: {
+        type: String,
+        enum: ['creating_external', 'initializing', 'sharing', 'ready', 'failed', 'archived'],
+        default: 'ready',
+        index: true,
+      },
+      lifecycleStep: {
+        type: String,
+        default: '',
+      },
+      lifecycleError: {
+        type: String,
+        default: '',
+      },
+      initializedAt: {
+        type: Date,
+      },
+      lastSyncedAt: {
+        type: Date,
+      },
+      configTemplateExternalId: {
+        type: String,
+        default: '',
+      },
       documentCount: {
         type: Number,
         default: 0,
@@ -78,6 +102,7 @@ const knowledgeBaseSchema: Schema<IKnowledgeBaseMongoDocument> =
 
 knowledgeBaseSchema.index({ tenantId: 1, name: 1 });
 knowledgeBaseSchema.index({ tenantId: 1, updatedAt: -1 });
+knowledgeBaseSchema.index({ tenantId: 1, lifecycleStatus: 1, updatedAt: -1 });
 knowledgeBaseSchema.index(
   { tenantId: 1, provider: 1, externalId: 1 },
   {

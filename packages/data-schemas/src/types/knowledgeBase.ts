@@ -2,6 +2,13 @@ import type { KnowledgeBaseDocumentStatus } from 'librechat-data-provider';
 import type { Document, Types } from 'mongoose';
 
 export type KnowledgeBaseProvider = 'local' | 'weknora';
+export type KnowledgeBaseLifecycleStatus =
+  | 'creating_external'
+  | 'initializing'
+  | 'sharing'
+  | 'ready'
+  | 'failed'
+  | 'archived';
 
 export interface IKnowledgeBase {
   _id?: Types.ObjectId;
@@ -14,6 +21,12 @@ export interface IKnowledgeBase {
   externalId?: string;
   externalSpaceId?: string;
   externalShareId?: string;
+  lifecycleStatus?: KnowledgeBaseLifecycleStatus;
+  lifecycleStep?: string;
+  lifecycleError?: string;
+  initializedAt?: Date | null;
+  lastSyncedAt?: Date | null;
+  configTemplateExternalId?: string;
   documentCount: number;
   readyDocumentCount: number;
   failedDocumentCount: number;
@@ -58,6 +71,12 @@ export type CreateKnowledgeBaseInput = Pick<IKnowledgeBase, 'id' | 'name' | 'aut
       | 'externalId'
       | 'externalSpaceId'
       | 'externalShareId'
+      | 'lifecycleStatus'
+      | 'lifecycleStep'
+      | 'lifecycleError'
+      | 'initializedAt'
+      | 'lastSyncedAt'
+      | 'configTemplateExternalId'
       | 'documentCount'
       | 'readyDocumentCount'
       | 'failedDocumentCount'

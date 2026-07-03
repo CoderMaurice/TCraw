@@ -13,6 +13,19 @@ export type { KnowledgeBaseProvider } from '~/types';
 
 export type UpdateKnowledgeBaseInput = Partial<Pick<IKnowledgeBase, 'name' | 'description'>>;
 
+export type UpdateKnowledgeBaseLifecycleInput = Partial<
+  Pick<
+    IKnowledgeBase,
+    | 'lifecycleStatus'
+    | 'lifecycleStep'
+    | 'lifecycleError'
+    | 'externalShareId'
+    | 'initializedAt'
+    | 'lastSyncedAt'
+    | 'configTemplateExternalId'
+  >
+>;
+
 export type UpsertExternalKnowledgeBaseInput = CreateKnowledgeBaseInput &
   Required<Pick<IKnowledgeBase, 'provider' | 'externalId' | 'externalSpaceId'>> &
   Partial<Pick<IKnowledgeBase, 'externalShareId' | 'processingDocumentCount'>>;
@@ -41,6 +54,11 @@ export interface KnowledgeBaseMethods {
     id: string,
     tenantId: string | undefined,
     update: UpdateKnowledgeBaseInput,
+  ): Promise<IKnowledgeBase | null>;
+  updateKnowledgeBaseLifecycle(
+    id: string,
+    tenantId: string | undefined,
+    update: UpdateKnowledgeBaseLifecycleInput,
   ): Promise<IKnowledgeBase | null>;
   createKnowledgeBaseDocument(
     input: CreateKnowledgeBaseDocumentInput,
@@ -167,6 +185,12 @@ export function createKnowledgeBaseMethods(
           externalId: input.externalId,
           externalSpaceId: input.externalSpaceId,
           externalShareId: input.externalShareId ?? '',
+          lifecycleStatus: input.lifecycleStatus ?? 'ready',
+          lifecycleStep: input.lifecycleStep ?? '',
+          lifecycleError: input.lifecycleError ?? '',
+          initializedAt: input.initializedAt ?? null,
+          lastSyncedAt: input.lastSyncedAt ?? new Date(),
+          configTemplateExternalId: input.configTemplateExternalId ?? '',
           documentCount: input.documentCount ?? 0,
           readyDocumentCount: input.readyDocumentCount ?? 0,
           failedDocumentCount: input.failedDocumentCount ?? 0,
@@ -244,6 +268,27 @@ export function createKnowledgeBaseMethods(
     if (Object.keys($set).length === 0) {
       return await findKnowledgeBaseById(id, tenantId);
     }
+    return await KnowledgeBase.findOneAndUpdate(
+      knowledgeBaseFilter(id, tenantId),
+      { $set },
+      { new: true, runValidators: true },
+    ).lean<IKnowledgeBase>();
+  }
+
+  async function updateKnowledgeBaseLifecycle(
+    id: string,
+    tenantId: string | undefined,
+    update: UpdateKnowledgeBaseLifecycleInput,
+  ): Promise<IKnowledgeBase | null> {
+    const KnowledgeBase = getKnowledgeBaseModel();
+    const $set = Object.fromEntries(
+      Object.entries(update).filter(([, value]) => value !== undefined),
+    );
+
+    if (Object.keys($set).length === 0) {
+      return await findKnowledgeBaseById(id, tenantId);
+    }
+
     return await KnowledgeBase.findOneAndUpdate(
       knowledgeBaseFilter(id, tenantId),
       { $set },
@@ -418,6 +463,7 @@ export function createKnowledgeBaseMethods(
     upsertExternalKnowledgeBase,
     findKnowledgeBasesByResourceIds,
     updateKnowledgeBase,
+    updateKnowledgeBaseLifecycle,
     createKnowledgeBaseDocument,
     findKnowledgeBaseDocuments,
     findReadyKnowledgeBaseDocumentFileIds,
