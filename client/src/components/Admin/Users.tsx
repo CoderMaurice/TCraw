@@ -49,6 +49,27 @@ function Value({ value, localize }: { value?: string; localize: Localize }) {
   return <span>{value?.trim() ? value : localize('com_ui_unknown')}</span>;
 }
 
+function DetailValue({
+  label,
+  value,
+  localize,
+}: {
+  label: string;
+  value?: string;
+  localize: Localize;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1 md:flex-row md:items-center">
+      <span className="text-[10px] font-medium uppercase tracking-wide text-text-secondary md:hidden">
+        {label}
+      </span>
+      <div className="min-w-0 text-text-secondary">
+        <Value value={value} localize={localize} />
+      </div>
+    </div>
+  );
+}
+
 function UserAvatar({ user }: { user: DisplayUser }) {
   const source = user.avatarUrl || user.avatar;
 
@@ -207,7 +228,7 @@ export function AdminUsersPage() {
                 return (
                   <div
                     key={item.id}
-                    className="grid gap-3 px-4 py-4 text-sm md:grid-cols-[minmax(220px,1.5fr)_minmax(120px,0.8fr)_minmax(90px,0.6fr)_minmax(90px,0.6fr)_minmax(110px,0.7fr)_minmax(110px,0.7fr)]"
+                    className="grid gap-3 px-4 py-4 text-sm md:items-center md:grid-cols-[minmax(220px,1.5fr)_minmax(120px,0.8fr)_minmax(90px,0.6fr)_minmax(90px,0.6fr)_minmax(110px,0.7fr)_minmax(110px,0.7fr)]"
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <UserAvatar user={item} />
@@ -218,21 +239,31 @@ export function AdminUsersPage() {
                         <div className="truncate text-text-secondary">{item.email}</div>
                       </div>
                     </div>
-                    <div className="flex items-center text-text-secondary">
-                      <Value value={item.username} localize={localize} />
-                    </div>
-                    <div className="flex items-center text-text-secondary">
-                      <Value value={item.role} localize={localize} />
-                    </div>
-                    <div className="flex items-center text-text-secondary">
-                      <Value value={item.provider} localize={localize} />
-                    </div>
-                    <div className="flex items-center text-text-secondary">
-                      <Value value={created} localize={localize} />
-                    </div>
-                    <div className="flex items-center text-text-secondary">
-                      <Value value={updated} localize={localize} />
-                    </div>
+                    <DetailValue
+                      label={localize('com_ui_admin_people_username')}
+                      value={item.username}
+                      localize={localize}
+                    />
+                    <DetailValue
+                      label={localize('com_ui_admin_people_role')}
+                      value={item.role}
+                      localize={localize}
+                    />
+                    <DetailValue
+                      label={localize('com_ui_admin_people_provider')}
+                      value={item.provider}
+                      localize={localize}
+                    />
+                    <DetailValue
+                      label={localize('com_ui_admin_people_created')}
+                      value={created}
+                      localize={localize}
+                    />
+                    <DetailValue
+                      label={localize('com_ui_admin_people_updated')}
+                      value={updated}
+                      localize={localize}
+                    />
                   </div>
                 );
               })}

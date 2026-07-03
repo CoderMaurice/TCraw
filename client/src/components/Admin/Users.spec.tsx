@@ -10,7 +10,7 @@ jest.mock(
   () => ({
     Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
     Spinner: () => <div data-testid="spinner" />,
-    useMediaQuery: () => false,
+    useMediaQuery: jest.fn(),
   }),
   { virtual: true },
 );
@@ -43,6 +43,7 @@ jest.mock('~/data-provider', () => ({
 
 const mockUseAdminUsers = useAdminUsers as jest.Mock;
 const mockUseAdminUserSearch = useAdminUserSearch as jest.Mock;
+const mockUseMediaQuery = jest.requireMock('@librechat/client').useMediaQuery as jest.Mock;
 
 function createListQuery(overrides: Partial<ReturnType<typeof mockUseAdminUsers>> = {}) {
   return {
@@ -78,11 +79,13 @@ function createSearchQuery(overrides: Partial<ReturnType<typeof mockUseAdminUser
 describe('AdminUsersPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseMediaQuery.mockReturnValue(false);
     mockUseAdminUsers.mockReturnValue(createListQuery());
     mockUseAdminUserSearch.mockReturnValue(createSearchQuery());
   });
 
-  it('renders the provider column in the people list', () => {
+  it('renders compact labels in mobile rows', () => {
+    mockUseMediaQuery.mockReturnValue(true);
     mockUseAdminUsers.mockReturnValue(
       createListQuery({
         data: {
@@ -109,7 +112,11 @@ describe('AdminUsersPage', () => {
     render(<AdminUsersPage />);
 
     expect(screen.getByRole('heading', { name: 'People' })).toBeInTheDocument();
-    expect(screen.getByText('Provider')).toBeInTheDocument();
+    expect(screen.getByText('Username', { selector: '.md\\:hidden' })).toBeInTheDocument();
+    expect(screen.getByText('Role', { selector: '.md\\:hidden' })).toBeInTheDocument();
+    expect(screen.getByText('Provider', { selector: '.md\\:hidden' })).toBeInTheDocument();
+    expect(screen.getByText('Created', { selector: '.md\\:hidden' })).toBeInTheDocument();
+    expect(screen.getByText('Updated', { selector: '.md\\:hidden' })).toBeInTheDocument();
     expect(screen.getByText('local')).toBeInTheDocument();
   });
 
@@ -125,6 +132,28 @@ describe('AdminUsersPage', () => {
 
     expect(screen.getByText('You do not have permission to view people.')).toBeInTheDocument();
     expect(screen.queryByText('Could not load people.')).not.toBeInTheDocument();
+  });
+
+  it('shows a retryable error state for generic failures', async () => {
+    const user = userEvent.setup();
+    const refetch = jest.fn();
+
+    mockUseAdminUsers.mockReturnValue(
+      createListQuery({
+        isError: true,
+        error: { status: 500 },
+        refetch,
+      }),
+    );
+
+    render(<AdminUsersPage />);
+
+    expect(screen.getByText('Could not load people.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 
   it('shows the search empty state when a search returns no matches', async () => {
@@ -168,6 +197,32 @@ describe('AdminUsersPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('No people match your search.')).toBeInTheDocument();
+    });
+  });
+
+  it('waits for two trimmed search characters before enabling search', async () => {
+    const user = userEvent.setup();
+
+    render(<AdminUsersPage />);
+
+    const search = screen.getByRole('searchbox', { name: 'Search people' });
+
+    await user.type(search, ' a');
+
+    await waitFor(() => {
+      expect(mockUseAdminUserSearch).toHaveBeenLastCalledWith(
+        { q: 'a', limit: 25 },
+        expect.objectContaining({ enabled: false }),
+      );
+    });
+
+    await user.type(search, 'b');
+
+    await waitFor(() => {
+      expect(mockUseAdminUserSearch).toHaveBeenLastCalledWith(
+        { q: 'ab', limit: 25 },
+        expect.objectContaining({ enabled: true }),
+      );
     });
   });
 

@@ -62,3 +62,19 @@ npx jest src/components/Admin/Users.spec.tsx --runInBand
 ```
 
 Result: pass, 4 tests passing.
+
+## Rereview Fix
+
+Addressed the remaining rereview findings for the Admin Users page:
+
+- added compact mobile labels for the non-user fields while keeping the desktop table header layout unchanged
+- added focused tests for the generic retryable error state and the trimmed two-character search threshold
+
+Verification:
+
+```bash
+cd /Users/maurice/Desktop/ZITOO/TCraw-admin-users-worktree/client
+npx jest src/components/Admin/Users.spec.tsx --runInBand
+```
+
+Result: pass, 6 tests passing.
