@@ -182,8 +182,8 @@ export function AdminUsersPage() {
           {search.length > 0 ? (
             <button
               type="button"
-              aria-label={localize('com_ui_clear_search')}
-              title={localize('com_ui_clear_search')}
+              aria-label={localize('com_ui_admin_people_clear_search')}
+              title={localize('com_ui_admin_people_clear_search')}
               className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-text-secondary hover:bg-surface-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring-primary"
               onClick={() => {
                 setSearch('');
@@ -214,7 +214,7 @@ export function AdminUsersPage() {
                 className="rounded-lg border border-border-medium px-3 py-2 text-text-primary hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring-primary"
                 onClick={() => refetch()}
               >
-                {localize('com_ui_retry')}
+                {localize('com_ui_admin_people_retry')}
               </button>
             </div>
           )

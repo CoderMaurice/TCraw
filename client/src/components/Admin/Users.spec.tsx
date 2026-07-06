@@ -111,12 +111,12 @@ describe('AdminUsersPage', () => {
 
     render(<AdminUsersPage />);
 
-    expect(screen.getByRole('heading', { name: 'People' })).toBeInTheDocument();
-    expect(screen.getByText('Username', { selector: '.md\\:hidden' })).toBeInTheDocument();
-    expect(screen.getByText('Role', { selector: '.md\\:hidden' })).toBeInTheDocument();
-    expect(screen.getByText('Provider', { selector: '.md\\:hidden' })).toBeInTheDocument();
-    expect(screen.getByText('Created', { selector: '.md\\:hidden' })).toBeInTheDocument();
-    expect(screen.getByText('Updated', { selector: '.md\\:hidden' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '团队管理' })).toBeInTheDocument();
+    expect(screen.getByText('用户名', { selector: '.md\\:hidden' })).toBeInTheDocument();
+    expect(screen.getByText('角色', { selector: '.md\\:hidden' })).toBeInTheDocument();
+    expect(screen.getByText('登录方式', { selector: '.md\\:hidden' })).toBeInTheDocument();
+    expect(screen.getByText('创建时间', { selector: '.md\\:hidden' })).toBeInTheDocument();
+    expect(screen.getByText('更新时间', { selector: '.md\\:hidden' })).toBeInTheDocument();
     expect(screen.getByText('local')).toBeInTheDocument();
   });
 
@@ -130,8 +130,8 @@ describe('AdminUsersPage', () => {
 
     render(<AdminUsersPage />);
 
-    expect(screen.getByText('You do not have permission to view people.')).toBeInTheDocument();
-    expect(screen.queryByText('Could not load people.')).not.toBeInTheDocument();
+    expect(screen.getByText('你没有权限查看团队管理。')).toBeInTheDocument();
+    expect(screen.queryByText('团队管理加载失败。')).not.toBeInTheDocument();
   });
 
   it('shows a retryable error state for generic failures', async () => {
@@ -148,10 +148,10 @@ describe('AdminUsersPage', () => {
 
     render(<AdminUsersPage />);
 
-    expect(screen.getByText('Could not load people.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(screen.getByText('团队管理加载失败。')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    await user.click(screen.getByRole('button', { name: '重试' }));
 
     expect(refetch).toHaveBeenCalledTimes(1);
   });
@@ -193,10 +193,10 @@ describe('AdminUsersPage', () => {
 
     render(<AdminUsersPage />);
 
-    await user.type(screen.getByRole('searchbox', { name: 'Search people' }), 'ma');
+    await user.type(screen.getByRole('searchbox', { name: '搜索团队成员' }), 'ma');
 
     await waitFor(() => {
-      expect(screen.getByText('No people match your search.')).toBeInTheDocument();
+      expect(screen.getByText('没有匹配的团队成员。')).toBeInTheDocument();
     });
   });
 
@@ -228,14 +228,14 @@ describe('AdminUsersPage', () => {
 
     render(<AdminUsersPage />);
 
-    const search = screen.getByRole('searchbox', { name: 'Search people' });
+    const search = screen.getByRole('searchbox', { name: '搜索团队成员' });
     await user.type(search, ' ');
 
-    const clearSearch = screen.getByRole('button', { name: 'Clear search' });
+    const clearSearch = screen.getByRole('button', { name: '清空搜索' });
     expect(clearSearch).toBeInTheDocument();
-    expect(clearSearch).toHaveAttribute('title', 'Clear search');
+    expect(clearSearch).toHaveAttribute('title', '清空搜索');
 
-    await user.click(screen.getByRole('button', { name: 'Next page' }));
+    await user.click(screen.getByRole('button', { name: '下一页' }));
 
     await waitFor(() => {
       expect(mockUseAdminUsers).toHaveBeenLastCalledWith(
@@ -247,7 +247,7 @@ describe('AdminUsersPage', () => {
     await user.click(clearSearch);
 
     await waitFor(() => {
-      expect(screen.getByRole('searchbox', { name: 'Search people' })).toHaveValue('');
+      expect(screen.getByRole('searchbox', { name: '搜索团队成员' })).toHaveValue('');
       expect(mockUseAdminUsers).toHaveBeenLastCalledWith(
         { limit: 25, offset: 0 },
         expect.objectContaining({ enabled: true }),
@@ -260,7 +260,7 @@ describe('AdminUsersPage', () => {
 
     render(<AdminUsersPage />);
 
-    const search = screen.getByRole('searchbox', { name: 'Search people' });
+    const search = screen.getByRole('searchbox', { name: '搜索团队成员' });
 
     await user.type(search, ' a');
 
@@ -309,8 +309,8 @@ describe('AdminUsersPage', () => {
 
     render(<AdminUsersPage />);
 
-    const previousPage = screen.getByRole('button', { name: 'Previous page' });
-    const nextPage = screen.getByRole('button', { name: 'Next page' });
+    const previousPage = screen.getByRole('button', { name: '上一页' });
+    const nextPage = screen.getByRole('button', { name: '下一页' });
 
     expect(previousPage).toBeDisabled();
     expect(nextPage).toBeEnabled();
@@ -324,6 +324,6 @@ describe('AdminUsersPage', () => {
       );
     });
 
-    expect(screen.getByRole('button', { name: 'Next page' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '下一页' })).toBeDisabled();
   });
 });
