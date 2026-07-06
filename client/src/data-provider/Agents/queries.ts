@@ -165,6 +165,7 @@ export const useMarketplaceAgentsInfiniteQuery = (
     search?: string;
     limit?: number;
     promoted?: 0 | 1;
+    ownership?: 'mine' | 'shared';
     cursor?: string; // For pagination
   },
   config?: UseInfiniteQueryOptions<t.AgentListResponse, unknown>,

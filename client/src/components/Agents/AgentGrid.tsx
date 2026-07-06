@@ -12,6 +12,7 @@ import AgentCard from './AgentCard';
 interface AgentGridProps {
   category: string;
   searchQuery: string;
+  ownership?: 'all' | 'mine' | 'shared';
   onSelectAgent: (agent: t.Agent) => void;
   scrollElementRef?: React.RefObject<HTMLElement>;
 }
@@ -22,6 +23,7 @@ interface AgentGridProps {
 const AgentGrid: React.FC<AgentGridProps> = ({
   category,
   searchQuery,
+  ownership = 'all',
   onSelectAgent,
   scrollElementRef,
 }) => {
@@ -38,10 +40,15 @@ const AgentGrid: React.FC<AgentGridProps> = ({
       search?: string;
       limit: number;
       promoted?: 0 | 1;
+      ownership?: 'mine' | 'shared';
     } = {
       requiredPermission: PermissionBits.VIEW, // View permission for marketplace viewing
       limit: 6,
     };
+
+    if (ownership !== 'all') {
+      params.ownership = ownership;
+    }
 
     // Handle search
     if (searchQuery) {
@@ -61,7 +68,7 @@ const AgentGrid: React.FC<AgentGridProps> = ({
     }
 
     return params;
-  }, [category, searchQuery]);
+  }, [category, ownership, searchQuery]);
 
   // Use infinite query for marketplace agents
   const {

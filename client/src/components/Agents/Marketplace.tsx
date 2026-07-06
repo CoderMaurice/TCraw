@@ -17,6 +17,14 @@ interface AgentMarketplaceProps {
   className?: string;
 }
 
+type OwnershipFilter = 'all' | 'mine' | 'shared';
+
+const ownershipFilters: Array<{ value: OwnershipFilter; labelKey: TranslationKeys }> = [
+  { value: 'all', labelKey: 'com_agents_scope_all' },
+  { value: 'mine', labelKey: 'com_agents_scope_mine' },
+  { value: 'shared', labelKey: 'com_agents_scope_shared' },
+];
+
 /**
  * AgentMarketplace - Main component for browsing and discovering agents
  *
@@ -34,6 +42,9 @@ const AgentMarketplace: React.FC<AgentMarketplaceProps> = ({ className = '' }) =
 
   // Get URL parameters
   const searchQuery = searchParams.get('q') || '';
+  const ownershipParam = searchParams.get('scope');
+  const ownershipFilter: OwnershipFilter =
+    ownershipParam === 'mine' || ownershipParam === 'shared' ? ownershipParam : 'all';
 
   // Animation state
   type Direction = 'left' | 'right';
@@ -174,6 +185,19 @@ const AgentMarketplace: React.FC<AgentMarketplaceProps> = ({ className = '' }) =
     }
   };
 
+  const handleOwnershipChange = (scope: OwnershipFilter) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (scope === 'all') {
+      newParams.delete('scope');
+    } else {
+      newParams.set('scope', scope);
+    }
+
+    const params = newParams.toString();
+    const path = displayCategory === 'promoted' ? '/agents' : `/agents/${displayCategory}`;
+    navigate(`${path}${params ? `?${params}` : ''}`);
+  };
+
   const hasAccessToMarketplace = useHasAccess({
     permissionType: PermissionTypes.MARKETPLACE,
     permission: Permissions.USE,
@@ -238,6 +262,35 @@ const AgentMarketplace: React.FC<AgentMarketplaceProps> = ({ className = '' }) =
                   isLoading={categoriesQuery.isLoading}
                   onChange={handleTabChange}
                 />
+
+                <div
+                  className="mt-3 flex justify-center"
+                  role="tablist"
+                  aria-label={localize('com_agents_scope_filter')}
+                >
+                  <div className="inline-flex rounded-lg bg-surface-secondary p-1">
+                    {ownershipFilters.map((filter) => {
+                      const isActive = ownershipFilter === filter.value;
+                      return (
+                        <button
+                          key={filter.value}
+                          type="button"
+                          role="tab"
+                          aria-selected={isActive}
+                          className={cn(
+                            'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                            isActive
+                              ? 'bg-surface-primary text-text-primary shadow-sm'
+                              : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary',
+                          )}
+                          onClick={() => handleOwnershipChange(filter.value)}
+                        >
+                          {localize(filter.labelKey)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
             {/* Scrollable content area */}
@@ -315,6 +368,7 @@ const AgentMarketplace: React.FC<AgentMarketplaceProps> = ({ className = '' }) =
                     key={`grid-${displayCategory}`}
                     category={displayCategory}
                     searchQuery={searchQuery}
+                    ownership={ownershipFilter}
                     onSelectAgent={handleAgentSelect}
                     scrollElementRef={scrollContainerRef}
                   />
@@ -395,6 +449,7 @@ const AgentMarketplace: React.FC<AgentMarketplaceProps> = ({ className = '' }) =
                       key={`grid-${nextCategory}`}
                       category={nextCategory}
                       searchQuery={searchQuery}
+                      ownership={ownershipFilter}
                       onSelectAgent={handleAgentSelect}
                       scrollElementRef={scrollContainerRef}
                     />

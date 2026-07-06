@@ -75,6 +75,12 @@ const { loadTools } = require('~/app/clients/tools/util');
 const { findPluginAuthsByKeys } = require('~/models');
 
 const KNOWLEDGE_SEARCH_TOOL = 'knowledge_search';
+const hasBoundKnowledgeBases = (agent) =>
+  Array.isArray(agent?.knowledge_base_ids) &&
+  agent.knowledge_base_ids.some((id) => typeof id === 'string' && id.trim().length > 0);
+
+const buildKnowledgeSearchContext = () =>
+  `- Note: Enterprise knowledge bases are bound to this agent. Use the ${KNOWLEDGE_SEARCH_TOOL} tool before answering questions about internal documents, policies, rules, procedures, metrics, incentives, or other company-specific knowledge.`;
 const { getFlowStateManager, getMCPServersRegistry } = require('~/config');
 const { getLogStores } = require('~/cache');
 
@@ -971,6 +977,8 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
   const hasWebSearch = filteredTools.includes(Tools.web_search);
   const hasFileSearch = filteredTools.includes(Tools.file_search);
   const hasExecuteCode = filteredTools.includes(Tools.execute_code);
+  const hasKnowledgeSearch =
+    filteredTools.includes(KNOWLEDGE_SEARCH_TOOL) && hasBoundKnowledgeBases(agent);
 
   if (hasWebSearch) {
     toolContextMap[Tools.web_search] = buildWebSearchContext();
@@ -1007,17 +1015,21 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
 
   if (hasFileSearch && tool_resources) {
     try {
-      const { toolContext } = await primeSearchFiles({
+      const { files, toolContext } = await primeSearchFiles({
         req,
         tool_resources,
         agentId: agent.id,
       });
-      if (toolContext) {
+      if (toolContext && (files.length > 0 || !hasKnowledgeSearch)) {
         dynamicToolContextMap[Tools.file_search] = toolContext;
       }
     } catch (error) {
       logger.error('[loadToolDefinitionsWrapper] Error priming search files:', error);
     }
+  }
+
+  if (hasKnowledgeSearch) {
+    dynamicToolContextMap[KNOWLEDGE_SEARCH_TOOL] = buildKnowledgeSearchContext();
   }
 
   const imageFiles = tool_resources?.[EToolResources.image_edit]?.files ?? [];

@@ -44,6 +44,13 @@ const {
 const { getMCPRequestContext } = require('~/server/services/MCPRequestContext');
 const { createFileSearchTool, primeFiles: primeSearchFiles } = require('./fileSearch');
 const { KNOWLEDGE_SEARCH_TOOL, createKnowledgeSearchTool } = require('./knowledgeSearch');
+
+const hasBoundKnowledgeBases = (agent) =>
+  Array.isArray(agent?.knowledge_base_ids) &&
+  agent.knowledge_base_ids.some((id) => typeof id === 'string' && id.trim().length > 0);
+
+const buildKnowledgeSearchContext = () =>
+  `- Note: Enterprise knowledge bases are bound to this agent. Use the ${KNOWLEDGE_SEARCH_TOOL} tool before answering questions about internal documents, policies, rules, procedures, metrics, incentives, or other company-specific knowledge.`;
 const { primeFiles: primeCodeFiles } = require('~/server/services/Files/Code/process');
 const { getUserPluginAuthValue } = require('~/server/services/PluginService');
 const { loadAuthValues } = require('~/server/services/Tools/credentials');
@@ -267,6 +274,8 @@ const loadTools = async ({
   const toolContextMap = {};
   /** @type {Record<string, string>} */
   const dynamicToolContextMap = {};
+  const knowledgeSearchAvailable =
+    Array.isArray(tools) && tools.includes(KNOWLEDGE_SEARCH_TOOL) && hasBoundKnowledgeBases(agent);
   /**
    * @type {import('@librechat/agents').CodeEnvFile[] | undefined}
    * Captured by the `execute_code` factory when files are primed. Surfaced
@@ -291,7 +300,7 @@ const loadTools = async ({
           ...options,
           agentId: agent?.id,
         });
-        if (toolContext) {
+        if (toolContext && (files.length > 0 || !knowledgeSearchAvailable)) {
           dynamicToolContextMap[tool] = toolContext;
         }
         if (files?.length) {
@@ -339,12 +348,16 @@ const loadTools = async ({
       };
       continue;
     } else if (tool === KNOWLEDGE_SEARCH_TOOL) {
-      requestedTools[tool] = async () =>
-        createKnowledgeSearchTool({
+      requestedTools[tool] = async () => {
+        if (hasBoundKnowledgeBases(agent)) {
+          dynamicToolContextMap[tool] = buildKnowledgeSearchContext();
+        }
+        return createKnowledgeSearchTool({
           req: options.req,
           agent,
           knowledgeBaseIds: agent?.knowledge_base_ids,
         });
+      };
       continue;
     } else if (tool === Tools.web_search) {
       const result = await loadWebSearchAuth({

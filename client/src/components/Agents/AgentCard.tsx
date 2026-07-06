@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Label, OGDialog, OGDialogTrigger } from '@librechat/client';
 import type t from 'librechat-data-provider';
-import { useLocalize, TranslationKeys, useAgentCategories } from '~/hooks';
+import { useLocalize, TranslationKeys, useAgentCategories, useAuthContext } from '~/hooks';
 import { cn, renderAgentAvatar, getContactDisplayName } from '~/utils';
 import AgentDetailContent from './AgentDetailContent';
 
@@ -17,6 +17,7 @@ interface AgentCardProps {
 const AgentCard: React.FC<AgentCardProps> = ({ agent, onSelect, className = '' }) => {
   const localize = useLocalize();
   const { categories } = useAgentCategories();
+  const { user } = useAuthContext();
   const [isOpen, setIsOpen] = useState(false);
 
   const categoryLabel = useMemo(() => {
@@ -34,6 +35,10 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, onSelect, className = '' }
   }, [agent.category, categories, localize]);
 
   const displayName = getContactDisplayName(agent);
+  const sharedAuthorName = agent.author && agent.author !== user?.id ? agent.authorName : undefined;
+  const accessLabel = localize(
+    agent.isPublic ? 'com_agents_access_public' : 'com_agents_access_private',
+  );
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
@@ -68,12 +73,24 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, onSelect, className = '' }
             }
           }}
         >
-          {/* Category badge - top right */}
-          {categoryLabel && (
-            <span className="absolute right-4 top-3 rounded-md bg-surface-hover px-2 py-0.5 text-xs text-text-secondary">
-              {categoryLabel}
+          {/* Badges - top right */}
+          <div className="absolute right-4 top-3 flex max-w-[calc(100%-2rem)] items-center gap-1.5">
+            <span
+              className={cn(
+                'rounded-md px-2 py-0.5 text-xs',
+                agent.isPublic
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                  : 'bg-surface-hover text-text-secondary',
+              )}
+            >
+              {accessLabel}
             </span>
-          )}
+            {categoryLabel && (
+              <span className="rounded-md bg-surface-hover px-2 py-0.5 text-xs text-text-secondary">
+                {categoryLabel}
+              </span>
+            )}
+          </div>
 
           {/* Avatar */}
           <div className="flex-shrink-0 self-center">
@@ -103,7 +120,7 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, onSelect, className = '' }
             )}
 
             {/* Author */}
-            {displayName && (
+            {displayName && !sharedAuthorName && (
               <div className="mt-1 text-xs text-text-tertiary">
                 <span className="truncate">
                   {localize('com_ui_by_author', { 0: displayName || '' })}
@@ -111,6 +128,12 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, onSelect, className = '' }
               </div>
             )}
           </div>
+
+          {sharedAuthorName && (
+            <div className="absolute bottom-3 right-4 max-w-[45%] truncate text-xs text-text-tertiary">
+              {localize('com_agents_shared_from', { 0: sharedAuthorName })}
+            </div>
+          )}
         </div>
       </OGDialogTrigger>
 

@@ -126,6 +126,29 @@ afterAll(async () => {
 });
 
 describe('Agent Methods', () => {
+  describe('Default Agent Tools', () => {
+    beforeEach(async () => {
+      await Agent.deleteMany({});
+      await User.deleteMany({});
+    });
+
+    test('should add image generation to newly created agents by default', async () => {
+      const agent = await createBasicAgent();
+
+      expect(agent.tools).toContain('image_gen_oai');
+      expect(agent.versions![0].tools).toContain('image_gen_oai');
+    });
+
+    test('should preserve requested tools when adding default image generation', async () => {
+      const agent = await createBasicAgent({
+        tools: ['execute_code', 'image_gen_oai'],
+      });
+
+      expect(agent.tools).toEqual(['execute_code', 'image_gen_oai']);
+      expect(agent.versions![0].tools).toEqual(['execute_code', 'image_gen_oai']);
+    });
+  });
+
   describe('Agent Resource File Operations', () => {
     beforeEach(async () => {
       await Agent.deleteMany({});
@@ -2665,7 +2688,7 @@ describe('Agent Methods', () => {
       expect(agent.name).toBe('Complex Agent');
       expect(agent.description).toBe('Complex description');
       expect(agent.instructions).toBe('Complex instructions');
-      expect(agent.tools).toEqual(['tool1', 'tool2']);
+      expect(agent.tools).toEqual(['tool1', 'tool2', 'image_gen_oai']);
       expect(agent.actions).toEqual(['action1', 'action2']);
       expect(agent.model_parameters?.temperature).toBe(0.8);
       expect(agent.model_parameters?.max_tokens).toBe(1000);
@@ -3420,10 +3443,19 @@ describe('Support Contact Field', () => {
     beforeEach(async () => {
       await Agent.deleteMany({});
       await AclEntry.deleteMany({});
+      await User.deleteMany({});
 
       // Create two users
       userA = new mongoose.Types.ObjectId();
       userB = new mongoose.Types.ObjectId();
+
+      await User.create({
+        _id: userA,
+        name: 'Alice Author',
+        username: 'alice',
+        email: `alice-${uuidv4()}@example.com`,
+        provider: 'local',
+      });
 
       // Create agents for user A
       agentA1 = await createAgent({
@@ -3490,6 +3522,17 @@ describe('Support Contact Field', () => {
       expect(result.data).toHaveLength(1);
       expect(result.data[0].id).toBe(agentA1.id);
       expect(result.data[0].name).toBe('Agent A1');
+    });
+
+    test('should include authorName from the author user record', async () => {
+      const result = await getListAgentsByAccess({
+        accessibleIds: [agentA1._id] as mongoose.Types.ObjectId[],
+        otherParams: {},
+      });
+
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].author).toBe(userA.toString());
+      expect(result.data[0].authorName).toBe('Alice Author');
     });
 
     test('should omit skill configuration from the default list projection', async () => {

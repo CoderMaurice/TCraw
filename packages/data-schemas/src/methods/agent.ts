@@ -28,6 +28,15 @@ const TOOL_RESOURCE_KEYS: ReadonlyArray<keyof AgentToolResources> = [
   EToolResources.ocr,
 ];
 
+const DEFAULT_AGENT_TOOLS = ['image_gen_oai'] as const;
+
+function mergeDefaultAgentTools(tools: unknown): string[] {
+  const requestedTools = Array.isArray(tools)
+    ? tools.filter((tool) => typeof tool === 'string')
+    : [];
+  return Array.from(new Set([...requestedTools, ...DEFAULT_AGENT_TOOLS]));
+}
+
 export interface AgentDeps {
   /** Removes all ACL permissions for a resource. Injected from PermissionService. */
   removeAllPermissions: (params: { resourceType: string; resourceId: unknown }) => Promise<void>;
@@ -340,10 +349,14 @@ export function createAgentMethods(
         agentData.skills_enabled = false;
       }
     }
-    const { author: _author, ...versionData } = agentData;
+    const normalizedAgentData = {
+      ...agentData,
+      tools: mergeDefaultAgentTools(agentData.tools),
+    };
+    const { author: _author, ...versionData } = normalizedAgentData;
     const timestamp = new Date();
     const initialAgentData = {
-      ...agentData,
+      ...normalizedAgentData,
       versions: [
         {
           ...versionData,
@@ -351,8 +364,8 @@ export function createAgentMethods(
           updatedAt: timestamp,
         },
       ],
-      category: (agentData.category as string) || 'general',
-      mcpServerNames: extractMCPServerNames(agentData.tools as string[] | undefined),
+      category: (normalizedAgentData.category as string) || 'general',
+      mcpServerNames: extractMCPServerNames(normalizedAgentData.tools),
     };
 
     return (await Agent.create(initialAgentData)).toObject() as IAgent;
@@ -885,12 +898,42 @@ export function createAgentMethods(
     }
 
     const agents = (await query.lean()) as Array<Record<string, unknown>>;
+    const authorIds = Array.from(
+      new Set(
+        agents
+          .map((agent) => agent.author)
+          .filter(Boolean)
+          .map((author) => (author as Types.ObjectId).toString()),
+      ),
+    );
+    const authorNameById = new Map<string, string>();
+    if (authorIds.length > 0) {
+      const User = mongoose.models.User as Model<{
+        _id: Types.ObjectId;
+        name?: string;
+        username?: string;
+        email?: string;
+      }>;
+      const authors = await User.find({ _id: { $in: authorIds } })
+        .select('_id name username email')
+        .lean();
+      for (const author of authors) {
+        const name = author.name || author.username || author.email;
+        if (name) {
+          authorNameById.set(author._id.toString(), name);
+        }
+      }
+    }
 
     const hasMore = isPaginated && normalizedLimit ? agents.length > normalizedLimit : false;
     const data = (isPaginated && normalizedLimit ? agents.slice(0, normalizedLimit) : agents).map(
       (agent) => {
         if (agent.author) {
-          agent.author = (agent.author as Types.ObjectId).toString();
+          const authorId = (agent.author as Types.ObjectId).toString();
+          if (!agent.authorName && authorNameById.has(authorId)) {
+            agent.authorName = authorNameById.get(authorId);
+          }
+          agent.author = authorId;
         }
         return agent;
       },

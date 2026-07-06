@@ -302,6 +302,23 @@ describe('AgentGrid Integration with useGetMarketplaceAgentsQuery', () => {
         limit: 6,
       });
     });
+
+    it('should pass ownership filter to marketplace query', () => {
+      render(
+        <AgentGrid
+          category="all"
+          searchQuery=""
+          ownership="mine"
+          onSelectAgent={mockOnSelectAgent}
+        />,
+      );
+
+      expect(mockUseMarketplaceAgentsInfiniteQuery).toHaveBeenCalledWith({
+        requiredPermission: 1,
+        ownership: 'mine',
+        limit: 6,
+      });
+    });
   });
 
   // Create wrapper with QueryClient

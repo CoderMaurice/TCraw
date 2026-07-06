@@ -8,6 +8,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 // Mock useLocalize hook
 jest.mock('~/hooks/useLocalize', () => () => (key: string) => {
   const mockTranslations: Record<string, string> = {
+    com_agents_access_private: 'Private',
+    com_agents_access_public: 'Public',
     com_agents_created_by: 'Created by',
     com_agents_agent_card_label: '{{name}} agent. {{description}}',
     com_agents_category_general: 'General',
@@ -22,7 +24,10 @@ jest.mock('~/hooks/useLocalize', () => () => (key: string) => {
 jest.mock('~/hooks', () => ({
   useLocalize: () => (key: string, values?: Record<string, string | number>) => {
     const mockTranslations: Record<string, string> = {
+      com_agents_access_private: 'Private',
+      com_agents_access_public: 'Public',
       com_agents_created_by: 'Created by',
+      com_agents_shared_from: 'Shared by {{0}}',
       com_agents_agent_card_label: '{{name}} agent. {{description}}',
       com_agents_category_general: 'General',
       com_agents_category_hr: 'Human Resources',
@@ -51,6 +56,9 @@ jest.mock('~/hooks', () => ({
     ],
   }),
   useDefaultConvo: jest.fn(() => jest.fn(() => ({}))),
+  useAuthContext: jest.fn(() => ({
+    user: { id: 'current-user' },
+  })),
   useFavorites: jest.fn(() => ({
     isFavoriteAgent: jest.fn(() => false),
     toggleFavoriteAgent: jest.fn(),
@@ -308,6 +316,38 @@ describe('AgentCard', () => {
     expect(screen.getByText('by John Doe')).toBeInTheDocument();
   });
 
+  it('displays shared author marker for agents owned by another user', () => {
+    const sharedAgent = {
+      ...mockAgent,
+      author: 'other-user',
+      authorName: '王海燕',
+    };
+
+    render(
+      <Wrapper>
+        <AgentCard agent={sharedAgent as t.Agent} onSelect={mockOnSelect} />
+      </Wrapper>,
+    );
+
+    expect(screen.getByText('Shared by 王海燕')).toBeInTheDocument();
+  });
+
+  it('does not display shared author marker for current user agents', () => {
+    const ownAgent = {
+      ...mockAgent,
+      author: 'current-user',
+      authorName: 'Maurice',
+    };
+
+    render(
+      <Wrapper>
+        <AgentCard agent={ownAgent as t.Agent} onSelect={mockOnSelect} />
+      </Wrapper>,
+    );
+
+    expect(screen.queryByText('Shared by Maurice')).not.toBeInTheDocument();
+  });
+
   it('has proper accessibility attributes', () => {
     render(
       <Wrapper>
@@ -336,6 +376,31 @@ describe('AgentCard', () => {
     );
 
     expect(screen.getByText('General')).toBeInTheDocument();
+  });
+
+  it('displays private access badge when agent is not public', () => {
+    render(
+      <Wrapper>
+        <AgentCard agent={mockAgent} onSelect={mockOnSelect} />
+      </Wrapper>,
+    );
+
+    expect(screen.getByText('Private')).toBeInTheDocument();
+  });
+
+  it('displays public access badge when agent is public', () => {
+    const publicAgent = {
+      ...mockAgent,
+      isPublic: true,
+    };
+
+    render(
+      <Wrapper>
+        <AgentCard agent={publicAgent} onSelect={mockOnSelect} />
+      </Wrapper>,
+    );
+
+    expect(screen.getByText('Public')).toBeInTheDocument();
   });
 
   it('displays custom category label', () => {

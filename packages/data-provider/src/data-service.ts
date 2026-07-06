@@ -601,6 +601,7 @@ export const getMarketplaceAgents = (params: {
   limit?: number;
   cursor?: string;
   promoted?: 0 | 1;
+  ownership?: 'mine' | 'shared';
 }): Promise<a.AgentListResponse> => {
   return request.get(
     endpoints.agents({
