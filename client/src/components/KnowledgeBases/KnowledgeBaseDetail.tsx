@@ -7,17 +7,21 @@ import { useInfiniteKnowledgeBaseDocumentsQuery, useKnowledgeBaseQuery } from '~
 import { useLocalize } from '~/hooks';
 import type { TranslationKeys } from '~/hooks';
 import { cn } from '~/utils';
-import KnowledgeBaseAccess from './KnowledgeBaseAccess';
 import KnowledgeBaseDocuments from './KnowledgeBaseDocuments';
 import KnowledgeBaseSettings from './KnowledgeBaseSettings';
 
-type KnowledgeBaseTab = 'documents' | 'access' | 'settings';
+type KnowledgeBaseTab = 'documents' | 'settings';
 
 const tabs: Array<{ id: KnowledgeBaseTab; labelKey: TranslationKeys }> = [
   { id: 'documents', labelKey: 'com_ui_knowledge_base_documents' },
-  { id: 'access', labelKey: 'com_ui_knowledge_base_access' },
   { id: 'settings', labelKey: 'com_ui_knowledge_base_settings' },
 ];
+
+const accessLabelKeys: Record<NonNullable<KnowledgeBase['access']>, TranslationKeys> = {
+  owned: 'com_ui_knowledge_base_access_owned',
+  shared: 'com_ui_knowledge_base_access_shared',
+  team: 'com_ui_knowledge_base_access_team',
+};
 
 const lifecycleLabelKeys: Partial<
   Record<NonNullable<KnowledgeBase['lifecycleStatus']>, TranslationKeys>
@@ -56,14 +60,16 @@ export function KnowledgeBaseDetail() {
     isFetchingNextPage,
     fetchNextPage,
     hasNextPage,
-  } = useInfiniteKnowledgeBaseDocumentsQuery(id, { limit: 50 }, {
-    refetchInterval: (data) =>
-      data?.pages.some((page) =>
-        page.data.some((document) => document.status === 'processing'),
-      )
-        ? 2000
-        : false,
-  });
+  } = useInfiniteKnowledgeBaseDocumentsQuery(
+    id,
+    { limit: 50 },
+    {
+      refetchInterval: (data) =>
+        data?.pages.some((page) => page.data.some((document) => document.status === 'processing'))
+          ? 2000
+          : false,
+    },
+  );
 
   const documents = useMemo(
     () => documentsData?.pages.flatMap((page) => page.data) ?? [],
@@ -94,6 +100,7 @@ export function KnowledgeBaseDetail() {
     knowledgeBase.lifecycleStatus && knowledgeBase.lifecycleStatus !== 'ready'
       ? lifecycleLabelKeys[knowledgeBase.lifecycleStatus]
       : undefined;
+  const accessLabelKey = accessLabelKeys[knowledgeBase.access ?? 'owned'];
 
   return (
     <main className="flex h-full min-h-0 flex-col overflow-y-auto bg-surface-primary text-text-primary">
@@ -107,7 +114,7 @@ export function KnowledgeBaseDetail() {
           {localize('com_ui_all_knowledge_bases')}
         </button>
 
-        <header className="mt-5 flex items-start gap-3">
+        <header className="mt-5 flex items-start gap-3 border-b border-border-light pb-6">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-surface-secondary text-text-secondary">
             <Database className="h-6 w-6" aria-hidden="true" />
           </span>
@@ -148,6 +155,9 @@ export function KnowledgeBaseDetail() {
                   {localize(lifecycleLabelKey)}
                 </span>
               ) : null}
+              <span className="rounded-full bg-surface-secondary px-2 py-0.5 text-xs text-text-secondary">
+                {localize(accessLabelKey)}
+              </span>
               <span className="flex min-w-0 items-center gap-1.5">
                 <Clock3 className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span className="truncate">
@@ -160,7 +170,7 @@ export function KnowledgeBaseDetail() {
           </div>
         </header>
 
-        <div className="mt-8 flex border-b border-border-light">
+        <div className="mt-5 flex border-b border-border-light">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -190,10 +200,11 @@ export function KnowledgeBaseDetail() {
               onLoadMore={() => fetchNextPage()}
               provider={knowledgeBase.provider}
               lifecycleStatus={knowledgeBase.lifecycleStatus}
+              totalDocuments={totalDocuments}
+              readyDocuments={knowledgeBase.readyDocumentCount ?? 0}
+              processingDocuments={processingDocuments}
+              failedDocuments={failedDocuments}
             />
-          ) : null}
-          {activeTab === 'access' ? (
-            <KnowledgeBaseAccess resourceDbId={knowledgeBase._id} name={knowledgeBase.name} />
           ) : null}
           {activeTab === 'settings' ? (
             <KnowledgeBaseSettings

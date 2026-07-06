@@ -665,6 +665,75 @@ describe('knowledge base service', () => {
     expect(deps.findKnowledgeBaseDocuments).not.toHaveBeenCalled();
   });
 
+  it('syncs local document counts after listing a complete WeKnora document page', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+    deps.weknoraClient = {
+      listDocuments: jest.fn().mockResolvedValue({
+        data: [
+          {
+            externalId: 'wk_doc_ready',
+            externalKnowledgeBaseId: 'wk_kb_1',
+            fileId: 'file_ready',
+            filename: 'ready.pdf',
+            bytes: 123,
+            mimeType: 'application/pdf',
+            status: 'ready',
+            error: '',
+          },
+          {
+            externalId: 'wk_doc_processing',
+            externalKnowledgeBaseId: 'wk_kb_1',
+            fileId: 'file_processing',
+            filename: 'processing.pdf',
+            bytes: 456,
+            mimeType: 'application/pdf',
+            status: 'processing',
+            error: '',
+          },
+          {
+            externalId: 'wk_doc_failed',
+            externalKnowledgeBaseId: 'wk_kb_1',
+            fileId: 'file_failed',
+            filename: 'failed.pdf',
+            bytes: 789,
+            mimeType: 'application/pdf',
+            status: 'failed',
+            error: 'parse failed',
+          },
+        ],
+        total: 3,
+      }),
+    } as unknown as WeKnoraClient;
+
+    deps.findKnowledgeBaseById.mockResolvedValue(
+      makeKnowledgeBase({
+        id: 'kb_weknora',
+        provider: 'weknora',
+        externalId: 'wk_kb_1',
+        documentCount: 0,
+        readyDocumentCount: 0,
+        failedDocumentCount: 0,
+        processingDocumentCount: 0,
+      }),
+    );
+    deps.checkPermission.mockResolvedValue(true);
+    deps.updateKnowledgeBaseLifecycle.mockResolvedValue(null);
+
+    await listKnowledgeBaseDocumentsForUser(auth, 'kb_weknora', { limit: 50 }, deps);
+
+    expect(deps.updateKnowledgeBaseLifecycle).toHaveBeenCalledWith(
+      'kb_weknora',
+      auth.tenantId,
+      expect.objectContaining({
+        documentCount: 3,
+        readyDocumentCount: 1,
+        failedDocumentCount: 1,
+        processingDocumentCount: 1,
+      }),
+    );
+  });
+
   it('rejects WeKnora-backed document listing when the external id is missing', async () => {
     const auth = makeAuth();
     const deps = makeDeps();
@@ -727,7 +796,9 @@ describe('knowledge base service', () => {
       uploadDocument: jest.fn(),
     } as unknown as WeKnoraClient;
 
-    await expect(assertKnowledgeBaseUploadable(auth, 'kb_initializing', deps)).rejects.toMatchObject({
+    await expect(
+      assertKnowledgeBaseUploadable(auth, 'kb_initializing', deps),
+    ).rejects.toMatchObject({
       statusCode: 409,
       message: 'Knowledge base is not ready for uploads',
     });

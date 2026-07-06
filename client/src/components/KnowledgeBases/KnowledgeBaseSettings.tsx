@@ -12,10 +12,18 @@ import {
 import type { KnowledgeBase } from 'librechat-data-provider';
 import { useDeleteKnowledgeBaseMutation, useUpdateKnowledgeBaseMutation } from '~/data-provider';
 import { useLocalize } from '~/hooks';
+import type { TranslationKeys } from '~/hooks';
+import KnowledgeBaseAccess from './KnowledgeBaseAccess';
 
 type KnowledgeBaseSettingsProps = {
   knowledgeBase: KnowledgeBase;
   onDeleted: () => void;
+};
+
+const accessLabelKeys: Record<NonNullable<KnowledgeBase['access']>, TranslationKeys> = {
+  owned: 'com_ui_knowledge_base_access_owned',
+  shared: 'com_ui_knowledge_base_access_shared',
+  team: 'com_ui_knowledge_base_access_team',
 };
 
 export default function KnowledgeBaseSettings({
@@ -30,6 +38,7 @@ export default function KnowledgeBaseSettings({
   const updateKnowledgeBase = useUpdateKnowledgeBaseMutation(knowledgeBase.id);
   const deleteKnowledgeBase = useDeleteKnowledgeBaseMutation();
   const { showToast } = useToastContext();
+  const accessLabelKey = accessLabelKeys[knowledgeBase.access ?? 'owned'];
 
   useEffect(() => {
     setName(knowledgeBase.name);
@@ -117,6 +126,18 @@ export default function KnowledgeBaseSettings({
           )}
         </Button>
       </form>
+
+      <div className="border-t border-border-light pt-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+          <span className="font-medium text-text-primary">
+            {localize('com_ui_knowledge_base_access')}
+          </span>
+          <span className="rounded-full bg-surface-secondary px-2.5 py-1 text-xs text-text-secondary">
+            {localize(accessLabelKey)}
+          </span>
+        </div>
+        <KnowledgeBaseAccess resourceDbId={knowledgeBase._id} name={knowledgeBase.name} />
+      </div>
 
       <div className="border-t border-border-light pt-5">
         <Button

@@ -224,6 +224,7 @@ export interface ListWeKnoraDocumentsInput {
 export interface ListWeKnoraDocumentsResult {
   data: MappedWeKnoraDocument[];
   nextCursor?: string;
+  total?: number;
 }
 
 export interface MappedWeKnoraSearchResult {
@@ -277,8 +278,6 @@ export interface WeKnoraClient {
     sourceExternalKnowledgeBaseId: string,
     targetExternalKnowledgeBaseId: string,
   ): Promise<WeKnoraInitializationStatus>;
-  getInitializationStatus(
-    externalKnowledgeBaseId: string,
-  ): Promise<WeKnoraInitializationStatus>;
+  getInitializationStatus(externalKnowledgeBaseId: string): Promise<WeKnoraInitializationStatus>;
   search(query: string, externalKnowledgeBaseIds: string[]): Promise<MappedWeKnoraSearchResult[]>;
 }

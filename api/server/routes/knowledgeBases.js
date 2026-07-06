@@ -232,6 +232,21 @@ router.post('/:id/documents', uploadDocumentMiddleware, async (req, res) => {
         mimeType: req.file.mimetype,
         bytes: req.file.size ?? 0,
       });
+      const countUpdate = {
+        documentCount: (kb.documentCount ?? 0) + 1,
+        readyDocumentCount: kb.readyDocumentCount ?? 0,
+        failedDocumentCount: kb.failedDocumentCount ?? 0,
+        processingDocumentCount: kb.processingDocumentCount ?? 0,
+        lastSyncedAt: new Date(),
+      };
+      if (document.status === 'ready') {
+        countUpdate.readyDocumentCount += 1;
+      } else if (document.status === 'failed') {
+        countUpdate.failedDocumentCount += 1;
+      } else if (document.status === 'processing') {
+        countUpdate.processingDocumentCount += 1;
+      }
+      await deps.updateKnowledgeBaseLifecycle(kb.id, auth.tenantId, countUpdate);
 
       return res.status(201).json(mapWeKnoraDocumentToRecord(document, kb, auth));
     } finally {

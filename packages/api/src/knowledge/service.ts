@@ -66,6 +66,49 @@ function withAccessLabel(
   };
 }
 
+function countDocumentsByStatus(documents: KnowledgeBaseDocumentRecord[]) {
+  return documents.reduce(
+    (counts, document) => {
+      counts.documentCount += 1;
+      if (document.status === 'ready') {
+        counts.readyDocumentCount += 1;
+      } else if (document.status === 'failed') {
+        counts.failedDocumentCount += 1;
+      } else if (document.status === 'processing') {
+        counts.processingDocumentCount += 1;
+      }
+      return counts;
+    },
+    {
+      documentCount: 0,
+      readyDocumentCount: 0,
+      failedDocumentCount: 0,
+      processingDocumentCount: 0,
+    },
+  );
+}
+
+async function syncWeKnoraDocumentCounts(
+  kb: KnowledgeBaseRecord,
+  documents: KnowledgeBaseDocumentRecord[],
+  input: ListKnowledgeBaseDocumentsForUserInput,
+  total: number | undefined,
+  tenantId: string | undefined,
+  deps: KnowledgeBaseServiceDependencies,
+): Promise<void> {
+  const update = {
+    documentCount: typeof total === 'number' ? total : documents.length,
+    lastSyncedAt: new Date(),
+  } as Parameters<KnowledgeBaseServiceDependencies['updateKnowledgeBaseLifecycle']>[2];
+
+  const isCompleteFirstPage = !input.cursor && update.documentCount === documents.length;
+  if (isCompleteFirstPage) {
+    Object.assign(update, countDocumentsByStatus(documents));
+  }
+
+  await deps.updateKnowledgeBaseLifecycle(kb.id, tenantId, update);
+}
+
 export interface KnowledgeBaseCapabilities {
   weknora: {
     configured: boolean;
@@ -335,6 +378,7 @@ export async function listKnowledgeBaseDocumentsForUser(
 
     const result = await deps.weknoraClient.listDocuments(kb.externalId, input);
     const data = result.data.map((document) => mapWeKnoraDocumentToRecord(document, kb, auth));
+    await syncWeKnoraDocumentCounts(kb, data, input, result.total, auth.tenantId, deps);
     return { data, nextCursor: result.nextCursor };
   }
 

@@ -500,8 +500,14 @@ export function createWeKnoraClient(env: NodeJS.ProcessEnv = process.env): WeKno
       const data = getArray(response).map((document) =>
         mapDocument(document, externalKnowledgeBaseId),
       );
+      const responseObject = getObject(response);
       return {
         data,
+        total: numberField(
+          responseObject,
+          ['total_count', 'totalCount', 'total', 'count'],
+          data.length,
+        ),
         nextCursor: nextDocumentCursor(response, page, pageSize, data.length),
       };
     },

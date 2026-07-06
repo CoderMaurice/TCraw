@@ -23,6 +23,11 @@ export type UpdateKnowledgeBaseLifecycleInput = Partial<
     | 'initializedAt'
     | 'lastSyncedAt'
     | 'configTemplateExternalId'
+    | 'documentCount'
+    | 'readyDocumentCount'
+    | 'failedDocumentCount'
+    | 'processingDocumentCount'
+    | 'lastIndexedAt'
   >
 >;
 

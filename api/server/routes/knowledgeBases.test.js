@@ -164,6 +164,7 @@ describe('knowledge base routes', () => {
     mockWeKnoraClient.uploadDocument.mockReset();
     mockReadFile.mockReset();
     mockUnlink.mockReset();
+    db.updateKnowledgeBaseLifecycle.mockClear();
     mockKnowledgeBaseAccessMiddleware.mockClear();
     mockKnowledgeBaseCreateMiddleware.mockClear();
     logger.error.mockClear();
@@ -444,6 +445,11 @@ describe('knowledge base routes', () => {
       id: 'kb_weknora',
       provider: 'weknora',
       externalId: 'wk_kb_1',
+      tenantId: 'tenant_1',
+      documentCount: 2,
+      readyDocumentCount: 2,
+      failedDocumentCount: 0,
+      processingDocumentCount: 0,
     });
     mockWeKnoraClient.uploadDocument.mockResolvedValue({
       externalId: 'wk_doc_1',
@@ -476,6 +482,16 @@ describe('knowledge base routes', () => {
     });
     expect(mockReadFile).toHaveBeenCalledWith('/tmp/handbook.pdf');
     expect(mockUnlink).toHaveBeenCalledWith('/tmp/handbook.pdf');
+    expect(db.updateKnowledgeBaseLifecycle).toHaveBeenCalledWith(
+      'kb_weknora',
+      'tenant_1',
+      expect.objectContaining({
+        documentCount: 3,
+        readyDocumentCount: 2,
+        failedDocumentCount: 0,
+        processingDocumentCount: 1,
+      }),
+    );
     expect(mockMapWeKnoraDocumentToRecord).toHaveBeenCalledWith(
       {
         externalId: 'wk_doc_1',
@@ -487,11 +503,11 @@ describe('knowledge base routes', () => {
         status: 'processing',
         error: '',
       },
-      {
+      expect.objectContaining({
         id: 'kb_weknora',
         provider: 'weknora',
         externalId: 'wk_kb_1',
-      },
+      }),
       expect.objectContaining({ userId: 'user_1' }),
     );
   });

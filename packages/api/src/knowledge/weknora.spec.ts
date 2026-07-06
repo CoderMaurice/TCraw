@@ -186,6 +186,7 @@ describe('WeKnora adapter', () => {
           error: '',
         },
       ],
+      total: 8,
       nextCursor: '4',
     });
     expect(fetch).toHaveBeenCalledWith(
