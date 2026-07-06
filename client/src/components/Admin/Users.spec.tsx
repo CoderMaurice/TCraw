@@ -200,6 +200,61 @@ describe('AdminUsersPage', () => {
     });
   });
 
+  it('shows a localized clear action and resets the list when cleared', async () => {
+    const user = userEvent.setup();
+
+    mockUseAdminUsers.mockReturnValue(
+      createListQuery({
+        data: {
+          users: [
+            {
+              id: 'user_1',
+              name: 'Maurice Moss',
+              username: 'maurice',
+              email: 'maurice@example.com',
+              avatar: '',
+              role: SystemRoles.ADMIN,
+              provider: 'local',
+              createdAt: '2026-01-02T03:04:05.000Z',
+              updatedAt: '2026-01-03T03:04:05.000Z',
+            },
+          ],
+          total: 26,
+          limit: 25,
+          offset: 0,
+        },
+      }),
+    );
+
+    render(<AdminUsersPage />);
+
+    const search = screen.getByRole('searchbox', { name: 'Search people' });
+    await user.type(search, ' ');
+
+    const clearSearch = screen.getByRole('button', { name: 'Clear search' });
+    expect(clearSearch).toBeInTheDocument();
+    expect(clearSearch).toHaveAttribute('title', 'Clear search');
+
+    await user.click(screen.getByRole('button', { name: 'Next page' }));
+
+    await waitFor(() => {
+      expect(mockUseAdminUsers).toHaveBeenLastCalledWith(
+        { limit: 25, offset: 25 },
+        expect.objectContaining({ enabled: true }),
+      );
+    });
+
+    await user.click(clearSearch);
+
+    await waitFor(() => {
+      expect(screen.getByRole('searchbox', { name: 'Search people' })).toHaveValue('');
+      expect(mockUseAdminUsers).toHaveBeenLastCalledWith(
+        { limit: 25, offset: 0 },
+        expect.objectContaining({ enabled: true }),
+      );
+    });
+  });
+
   it('waits for two trimmed search characters before enabling search', async () => {
     const user = userEvent.setup();
 
