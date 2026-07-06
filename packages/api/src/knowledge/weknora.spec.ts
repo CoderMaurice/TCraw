@@ -16,6 +16,15 @@ function mockJsonResponse(body: unknown): Response {
   } as Response;
 }
 
+function mockJsonErrorResponse(status: number, body: unknown): Response {
+  return {
+    ok: false,
+    status,
+    statusText: 'Bad Request',
+    json: async () => body,
+  } as Response;
+}
+
 type FetchMock = jest.Mock<Promise<Response>, [input: RequestInfo | URL, init?: RequestInit]>;
 
 const originalFetch = globalThis.fetch;
@@ -255,35 +264,51 @@ describe('WeKnora adapter', () => {
     );
   });
 
-  it('copies only initialization config sections from a template knowledge base', async () => {
+  it('copies initialization settings from a template knowledge base using WeKnora config DTO', async () => {
     const fetch = mockFetch(
       mockJsonResponse({
         success: true,
         data: {
-          hasFiles: true,
-          knowledge_count: 3,
-          llm: { source: 'remote', modelName: 'gpt-5.5', apiKey: 'secret-llm-key' },
-          embedding: {
-            source: 'remote',
-            modelName: 'Qwen/Qwen3-Embedding-8B',
-            apiKey: 'secret-embedding-key',
-            dimension: 4096,
+          id: 'wk_template',
+          summary_model_id: 'model_llm',
+          embedding_model_id: 'model_embedding',
+          vlm_config: {
+            enabled: true,
+            model_id: 'model_vlm',
           },
-          documentSplitting: {
-            chunkSize: 512,
-            chunkOverlap: 80,
+          storage_provider_config: {
+            provider: 'local',
+          },
+          chunking_config: {
+            chunk_size: 512,
+            chunk_overlap: 80,
             separators: ['\n\n', '\n', '。', '！', '？', ';', '；'],
+            parser_engine_rules: [{ file_types: ['pdf'], engine: 'mineru' }],
+            enable_parent_child: true,
+            parent_chunk_size: 4096,
+            child_chunk_size: 384,
           },
-          multimodal: { enabled: true, vlm: { modelName: 'Qwen3-VL-235B-A22B-Instruct' } },
-          nodeExtract: { enabled: false },
-          rerank: { enabled: false },
+          extract_config: {
+            enabled: false,
+          },
+          question_generation_config: {
+            enabled: false,
+            question_count: 0,
+          },
         },
       }),
       mockJsonResponse({ success: true, data: {} }),
       mockJsonResponse({
         success: true,
         data: {
-          embedding: { modelName: 'Qwen/Qwen3-Embedding-8B' },
+          id: 'wk_new',
+          summary_model_id: 'model_llm',
+          embedding_model_id: 'model_embedding',
+        },
+      }),
+      mockJsonResponse({
+        success: true,
+        data: {
           documentSplitting: {
             chunkSize: 512,
             chunkOverlap: 80,
@@ -306,7 +331,7 @@ describe('WeKnora adapter', () => {
 
     expect(fetch).toHaveBeenNthCalledWith(
       1,
-      'https://weknora.example.com/api/initialization/config/wk_template',
+      'https://weknora.example.com/api/knowledge-bases/wk_template',
       {
         method: 'GET',
         headers: {
@@ -329,24 +354,74 @@ describe('WeKnora adapter', () => {
     );
     const putBody = JSON.parse(fetch.mock.calls[1][1]?.body as string);
     expect(putBody).toEqual({
-      llm: { source: 'remote', modelName: 'gpt-5.5', apiKey: 'secret-llm-key' },
-      embedding: {
-        source: 'remote',
-        modelName: 'Qwen/Qwen3-Embedding-8B',
-        apiKey: 'secret-embedding-key',
-        dimension: 4096,
+      llmModelId: 'model_llm',
+      embeddingModelId: 'model_embedding',
+      vlm_config: {
+        enabled: true,
+        model_id: 'model_vlm',
       },
       documentSplitting: {
         chunkSize: 512,
         chunkOverlap: 80,
         separators: ['\n\n', '\n', '。', '！', '？', ';', '；'],
+        parserEngineRules: [{ file_types: ['pdf'], engine: 'mineru' }],
+        enableParentChild: true,
+        parentChunkSize: 4096,
+        childChunkSize: 384,
       },
-      multimodal: { enabled: true, vlm: { modelName: 'Qwen3-VL-235B-A22B-Instruct' } },
-      nodeExtract: { enabled: false },
-      rerank: { enabled: false },
+      multimodal: { enabled: true },
+      storageProvider: 'local',
+      nodeExtract: {
+        enabled: false,
+        text: '',
+        tags: [],
+        nodes: [],
+        relations: [],
+      },
+      questionGeneration: {
+        enabled: false,
+        questionCount: 0,
+      },
     });
-    expect(putBody.hasFiles).toBeUndefined();
-    expect(putBody.knowledge_count).toBeUndefined();
+    expect(fetch).toHaveBeenNthCalledWith(
+      3,
+      'https://weknora.example.com/api/knowledge-bases/wk_new',
+      {
+        method: 'GET',
+        headers: {
+          'X-API-Key': 'test-api-key',
+          Accept: 'application/json',
+        },
+      },
+    );
+    expect(fetch).toHaveBeenNthCalledWith(
+      4,
+      'https://weknora.example.com/api/initialization/config/wk_new',
+      {
+        method: 'GET',
+        headers: {
+          'X-API-Key': 'test-api-key',
+          Accept: 'application/json',
+        },
+      },
+    );
+  });
+
+  it('includes WeKnora error response details in failed requests', async () => {
+    mockFetch(
+      mockJsonErrorResponse(400, {
+        success: false,
+        error: {
+          message: "Key: 'KBModelConfigRequest.LLMModelID' failed",
+        },
+      }),
+    );
+
+    const client = createWeKnoraClient(env);
+
+    await expect(client?.createKnowledgeBase({ name: 'Broken KB' })).rejects.toThrow(
+      'WeKnora request failed with status 400 Bad Request: {"success":false,"error":{"message":"Key: \'KBModelConfigRequest.LLMModelID\' failed"}}',
+    );
   });
 
   it('searches with configured topK and maps result metadata', async () => {

@@ -42,14 +42,7 @@ type WeKnoraConfig = {
   fetch: FetchLike;
 };
 
-const INITIALIZATION_CONFIG_KEYS = [
-  'llm',
-  'embedding',
-  'documentSplitting',
-  'multimodal',
-  'nodeExtract',
-  'rerank',
-] as const;
+const DEFAULT_CHUNK_SEPARATORS = ['\n\n', '\n', '。', '！', '？', ';', '；'];
 
 function isJsonObject(value: JsonValue | undefined): value is JsonObject {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -63,6 +56,12 @@ function unwrapObjectResponse(response: JsonValue): JsonObject {
   const object = getObject(response);
   const data = getObject(object.data);
   return Object.keys(data).length > 0 ? data : object;
+}
+
+function summarizeErrorBody(body: JsonValue): string {
+  return JSON.stringify(body)
+    .replace(/sk-[A-Za-z0-9_-]+/g, 'sk-[redacted]')
+    .slice(0, 1000);
 }
 
 function getArray(response: JsonValue): JsonObject[] {
@@ -111,31 +110,130 @@ function metadataField(source: JsonObject): WeKnoraMetadata {
   return metadata as WeKnoraMetadata;
 }
 
-function sanitizeInitializationConfig(raw: JsonValue): JsonObject {
+function boolField(source: JsonObject, fields: string[], fallback = false): boolean {
+  const value = fields.map((field) => source[field]).find((fieldValue) => fieldValue != null);
+
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    return value === 'true';
+  }
+
+  return fallback;
+}
+
+function arrayField(source: JsonObject, fields: string[]): JsonValue[] | undefined {
+  const value = fields.map((field) => source[field]).find(Array.isArray);
+  return Array.isArray(value) ? value : undefined;
+}
+
+function mapDocumentSplitting(source: JsonObject): JsonObject {
+  const chunkingConfig = getObject(source.chunking_config ?? source.chunkingConfig);
+  const documentSplitting = getObject(source.documentSplitting);
+  const raw = Object.keys(chunkingConfig).length > 0 ? chunkingConfig : documentSplitting;
+  const separators = arrayField(raw, ['separators']) ?? DEFAULT_CHUNK_SEPARATORS;
+  const parserEngineRules = arrayField(raw, ['parser_engine_rules', 'parserEngineRules']);
+  const languages = arrayField(raw, ['languages']);
+  const strategy = stringField(raw, ['strategy']);
+  const tokenLimit = numberField(raw, ['token_limit', 'tokenLimit'], 0);
+
+  return {
+    chunkSize: numberField(raw, ['chunk_size', 'chunkSize'], 512),
+    chunkOverlap: numberField(raw, ['chunk_overlap', 'chunkOverlap'], 80),
+    separators,
+    ...(parserEngineRules ? { parserEngineRules } : {}),
+    enableParentChild: boolField(raw, ['enable_parent_child', 'enableParentChild']),
+    parentChunkSize: numberField(raw, ['parent_chunk_size', 'parentChunkSize'], 4096),
+    childChunkSize: numberField(raw, ['child_chunk_size', 'childChunkSize'], 384),
+    ...(strategy ? { strategy } : {}),
+    ...(tokenLimit > 0 ? { tokenLimit } : {}),
+    ...(languages ? { languages } : {}),
+  };
+}
+
+function buildInitializationConfigRequest(raw: JsonValue): JsonObject {
   const source = unwrapObjectResponse(raw);
-  return INITIALIZATION_CONFIG_KEYS.reduce<JsonObject>((config, key) => {
-    const value = source[key];
-    if (isJsonObject(value) || Array.isArray(value)) {
-      return { ...config, [key]: value };
-    }
-    return config;
-  }, {});
+  const vlmConfig = getObject(source.vlm_config ?? source.vlmConfig);
+  const asrConfig = getObject(source.asr_config ?? source.asrConfig);
+  const extractConfig = getObject(source.extract_config ?? source.extractConfig);
+  const questionGenerationConfig = getObject(
+    source.question_generation_config ?? source.questionGenerationConfig,
+  );
+  const storageProviderConfig = getObject(
+    source.storage_provider_config ?? source.storageProviderConfig,
+  );
+  const storageConfig = getObject(source.storage_config ?? source.storageConfig);
+  const llmModelId = stringField(source, ['summary_model_id', 'summaryModelId', 'llmModelId']);
+  const embeddingModelId = stringField(source, ['embedding_model_id', 'embeddingModelId']);
+  const vlmModelId = stringField(vlmConfig, ['model_id', 'modelId']);
+  const asrModelId = stringField(asrConfig, ['model_id', 'modelId']);
+  const asrLanguage = stringField(asrConfig, ['language']);
+  const storageProvider =
+    stringField(storageProviderConfig, ['provider']) ||
+    stringField(storageConfig, ['provider']) ||
+    'local';
+
+  return {
+    llmModelId,
+    embeddingModelId,
+    ...(vlmModelId || boolField(vlmConfig, ['enabled'])
+      ? {
+          vlm_config: {
+            enabled: boolField(vlmConfig, ['enabled']),
+            ...(vlmModelId ? { model_id: vlmModelId } : {}),
+          },
+        }
+      : {}),
+    ...(asrModelId || boolField(asrConfig, ['enabled'])
+      ? {
+          asr_config: {
+            enabled: boolField(asrConfig, ['enabled']),
+            ...(asrModelId ? { model_id: asrModelId } : {}),
+            ...(asrLanguage ? { language: asrLanguage } : {}),
+          },
+        }
+      : {}),
+    documentSplitting: mapDocumentSplitting(source),
+    multimodal: {
+      enabled: boolField(vlmConfig, ['enabled']) && Boolean(vlmModelId),
+    },
+    storageProvider,
+    nodeExtract: {
+      enabled: boolField(extractConfig, ['enabled']),
+      text: stringField(extractConfig, ['text']),
+      tags: arrayField(extractConfig, ['tags']) ?? [],
+      nodes: arrayField(extractConfig, ['nodes']) ?? [],
+      relations: arrayField(extractConfig, ['relations']) ?? [],
+    },
+    questionGeneration: {
+      enabled: boolField(questionGenerationConfig, ['enabled']),
+      questionCount: numberField(questionGenerationConfig, ['question_count', 'questionCount'], 0),
+    },
+  };
 }
 
 function summarizeInitializationConfig(raw: JsonValue): WeKnoraInitializationStatus {
   const source = unwrapObjectResponse(raw);
   const embedding = getObject(source.embedding);
   const splitting = getObject(source.documentSplitting);
+  const llmModelId = stringField(source, ['summary_model_id', 'summaryModelId', 'llmModelId']);
+  const embeddingModelId = stringField(source, ['embedding_model_id', 'embeddingModelId']);
   const separators = splitting.separators;
-  const embeddingConfigured =
-    stringField(embedding, ['modelName', 'model_name', 'model_id']).length > 0;
+  const embeddingConfigured = Boolean(
+    embeddingModelId || stringField(embedding, ['modelName', 'model_name', 'model_id']),
+  );
   const chunkingConfigured =
     numberField(splitting, ['chunkSize', 'chunk_size']) > 0 &&
     Array.isArray(separators) &&
     separators.length > 0;
 
   return {
-    complete: embeddingConfigured && chunkingConfigured,
+    complete:
+      Boolean(llmModelId || source.llm || source.summaryModelId) &&
+      embeddingConfigured &&
+      chunkingConfigured,
     embeddingConfigured,
     chunkingConfigured,
   };
@@ -237,7 +335,20 @@ async function requestJson<T extends JsonValue>(
   });
 
   if (!response.ok) {
-    throw new Error(`WeKnora request failed with status ${response.status} ${response.statusText}`);
+    let errorBody = '';
+    try {
+      errorBody = summarizeErrorBody(await response.json());
+    } catch {
+      errorBody = '';
+    }
+    throw new Error(
+      [
+        `WeKnora request failed with status ${response.status} ${response.statusText}`.trim(),
+        errorBody,
+      ]
+        .filter(Boolean)
+        .join(': '),
+    );
   }
 
   return (await response.json()) as T;
@@ -418,12 +529,18 @@ export function createWeKnoraClient(env: NodeJS.ProcessEnv = process.env): WeKno
       });
     },
 
-    async shareKnowledgeBase(externalKnowledgeBaseId: string): Promise<{ externalShareId: string }> {
+    async shareKnowledgeBase(
+      externalKnowledgeBaseId: string,
+    ): Promise<{ externalShareId: string }> {
       const share = unwrapObjectResponse(
-        await requestJson<JsonValue>(config, ['knowledge-bases', externalKnowledgeBaseId, 'shares'], {
-          method: 'POST',
-          json: { organization_id: config.orgId, permission: 'editor' },
-        }),
+        await requestJson<JsonValue>(
+          config,
+          ['knowledge-bases', externalKnowledgeBaseId, 'shares'],
+          {
+            method: 'POST',
+            json: { organization_id: config.orgId, permission: 'editor' },
+          },
+        ),
       );
       return {
         externalShareId: stringField(share, ['id', 'share_id', 'shareId']),
@@ -457,10 +574,10 @@ export function createWeKnoraClient(env: NodeJS.ProcessEnv = process.env): WeKno
     ): Promise<WeKnoraInitializationStatus> {
       const source = await requestJson<JsonValue>(
         config,
-        ['initialization', 'config', sourceExternalKnowledgeBaseId],
+        ['knowledge-bases', sourceExternalKnowledgeBaseId],
         { method: 'GET' },
       );
-      const initializationConfig = sanitizeInitializationConfig(source);
+      const initializationConfig = buildInitializationConfigRequest(source);
 
       await requestJson<JsonValue>(
         config,
@@ -471,7 +588,20 @@ export function createWeKnoraClient(env: NodeJS.ProcessEnv = process.env): WeKno
         },
       );
 
-      return await this.getInitializationStatus(targetExternalKnowledgeBaseId);
+      const target = await requestJson<JsonValue>(
+        config,
+        ['knowledge-bases', targetExternalKnowledgeBaseId],
+        { method: 'GET' },
+      );
+      const targetConfig = await requestJson<JsonValue>(
+        config,
+        ['initialization', 'config', targetExternalKnowledgeBaseId],
+        { method: 'GET' },
+      );
+      return summarizeInitializationConfig({
+        ...unwrapObjectResponse(target),
+        documentSplitting: unwrapObjectResponse(targetConfig).documentSplitting,
+      });
     },
 
     async getInitializationStatus(
