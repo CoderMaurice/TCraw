@@ -229,6 +229,96 @@ describe('knowledge base service', () => {
     expect(result.lifecycleStatus).toBe('ready');
   });
 
+  it('rejects non-admin knowledge base creation after the user already owns one', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+    const ownedResourceId = mongoId('64f1f77bcf86cd799439099');
+
+    deps.weknoraClient = {
+      createKnowledgeBase: jest.fn(),
+    } as unknown as WeKnoraClient;
+    deps.findAccessibleResources.mockResolvedValue([ownedResourceId]);
+    deps.findKnowledgeBasesByResourceIds.mockResolvedValue([
+      makeKnowledgeBase({
+        _id: ownedResourceId,
+        id: 'kb_existing',
+        author: auth.userId,
+        provider: 'weknora',
+      }),
+    ]);
+
+    await expect(
+      createKnowledgeBaseForUser(auth, { name: 'Second KB' }, deps),
+    ).rejects.toMatchObject({
+      statusCode: 403,
+      message: 'Non-admin users can create at most one knowledge base',
+    });
+
+    expect(deps.weknoraClient.createKnowledgeBase).not.toHaveBeenCalled();
+  });
+
+  it('allows admin knowledge base creation after owning one', async () => {
+    const auth = { ...makeAuth(), role: 'ADMIN' };
+    const deps = makeDeps();
+    const ownedResourceId = mongoId('64f1f77bcf86cd799439099');
+
+    deps.weknoraClient = {
+      createKnowledgeBase: jest.fn().mockResolvedValue({
+        externalId: 'wk_admin_new',
+        externalSpaceId: '3c6805d0-88c3-46dd-8d20-3a90dd51d63d',
+        externalShareId: '',
+        name: 'Admin KB',
+        description: '',
+        documentCount: 0,
+        readyDocumentCount: 0,
+        failedDocumentCount: 0,
+        processingDocumentCount: 0,
+      }),
+      copyInitializationConfig: jest.fn().mockResolvedValue({
+        complete: true,
+        embeddingConfigured: true,
+        chunkingConfigured: true,
+      }),
+      shareKnowledgeBase: jest.fn().mockResolvedValue({ externalShareId: 'share_admin' }),
+    } as unknown as WeKnoraClient;
+    deps.findAccessibleResources.mockResolvedValue([ownedResourceId]);
+    deps.findKnowledgeBasesByResourceIds.mockResolvedValue([
+      makeKnowledgeBase({
+        _id: ownedResourceId,
+        id: 'kb_existing',
+        author: auth.userId,
+        provider: 'weknora',
+      }),
+    ]);
+    deps.upsertExternalKnowledgeBase.mockResolvedValue(
+      makeKnowledgeBase({
+        _id: mongoId('64f1f77bcf86cd799439088'),
+        id: 'kb_admin_new',
+        provider: 'weknora',
+        externalId: 'wk_admin_new',
+        lifecycleStatus: 'initializing',
+      }),
+    );
+    deps.updateKnowledgeBaseLifecycle.mockResolvedValue(
+      makeKnowledgeBase({
+        id: 'kb_admin_new',
+        provider: 'weknora',
+        externalId: 'wk_admin_new',
+        externalShareId: 'share_admin',
+        lifecycleStatus: 'ready',
+      }),
+    );
+
+    await expect(
+      createKnowledgeBaseForUser(auth, { name: 'Admin KB' }, deps),
+    ).resolves.toMatchObject({
+      id: 'kb_admin_new',
+      lifecycleStatus: 'ready',
+    });
+
+    expect(deps.weknoraClient.createKnowledgeBase).toHaveBeenCalled();
+  });
+
   it('reports WeKnora create capabilities from configured client and template env', () => {
     const deps = makeDeps();
     deps.weknoraClient = {
@@ -802,6 +892,50 @@ describe('knowledge base service', () => {
       statusCode: 409,
       message: 'Knowledge base is not ready for uploads',
     });
+  });
+
+  it('rejects non-admin uploads when a WeKnora knowledge base already has five documents', async () => {
+    const auth = makeAuth();
+    const deps = makeDeps();
+
+    deps.findKnowledgeBaseById.mockResolvedValue(
+      makeKnowledgeBase({
+        id: 'kb_full',
+        provider: 'weknora',
+        externalId: 'wk_full',
+        lifecycleStatus: 'ready',
+        documentCount: 5,
+      }),
+    );
+    deps.checkPermission.mockResolvedValue(true);
+    deps.weknoraClient = {
+      uploadDocument: jest.fn(),
+    } as unknown as WeKnoraClient;
+
+    await expect(assertKnowledgeBaseUploadable(auth, 'kb_full', deps)).rejects.toMatchObject({
+      statusCode: 403,
+      message: 'Non-admin users can upload at most five documents per knowledge base',
+    });
+  });
+
+  it('allows admin uploads when a WeKnora knowledge base already has five documents', async () => {
+    const auth = { ...makeAuth(), role: 'ADMIN' };
+    const deps = makeDeps();
+    const kb = makeKnowledgeBase({
+      id: 'kb_full',
+      provider: 'weknora',
+      externalId: 'wk_full',
+      lifecycleStatus: 'ready',
+      documentCount: 5,
+    });
+
+    deps.findKnowledgeBaseById.mockResolvedValue(kb);
+    deps.checkPermission.mockResolvedValue(true);
+    deps.weknoraClient = {
+      uploadDocument: jest.fn(),
+    } as unknown as WeKnoraClient;
+
+    await expect(assertKnowledgeBaseUploadable(auth, 'kb_full', deps)).resolves.toEqual(kb);
   });
 
   it('skips WeKnora search when the current user lacks VIEW on a bound knowledge base', async () => {
