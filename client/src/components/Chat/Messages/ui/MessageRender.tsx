@@ -12,6 +12,7 @@ import SiblingSwitch from '~/components/Chat/Messages/SiblingSwitch';
 import HoverButtons from '~/components/Chat/Messages/HoverButtons';
 import MessageIcon from '~/components/Chat/Messages/MessageIcon';
 import SubRow from '~/components/Chat/Messages/SubRow';
+import { getMessageTurnLayoutClasses } from '~/hooks/Messages/messageAlignment';
 import { fontSizeAtom } from '~/store/fontSize';
 import { MessageContext } from '~/Providers';
 import store from '~/store';
@@ -150,6 +151,11 @@ const MessageRender = memo(function MessageRender({
   );
 
   const { hasParallelContent } = useContentMetadata(msg);
+  const isCreatedByUser = msg?.isCreatedByUser === true;
+  const turnLayout = getMessageTurnLayoutClasses({
+    isCreatedByUser,
+    hasParallelContent,
+  });
   const messageId = msg?.messageId ?? '';
   const messageContextValue = useMemo(
     () => ({
@@ -192,12 +198,13 @@ const MessageRender = memo(function MessageRender({
       className={cn(
         baseClasses.common,
         baseClasses.chat,
+        turnLayout.row,
         conditionalClasses.focus,
         'message-render',
       )}
     >
       {!hasParallelContent && (
-        <div className="relative flex flex-shrink-0 flex-col items-center">
+        <div className={cn('relative flex flex-shrink-0 flex-col items-center', turnLayout.avatar)}>
           <div className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full">
             <MessageIcon iconData={iconData} assistant={assistant} agent={agent} />
           </div>
@@ -207,8 +214,8 @@ const MessageRender = memo(function MessageRender({
       <div
         className={cn(
           'relative flex flex-col',
-          hasParallelContent ? 'w-full' : 'w-11/12',
-          msg.isCreatedByUser ? 'user-turn' : 'agent-turn',
+          turnLayout.body,
+          isCreatedByUser ? 'user-turn' : 'agent-turn',
         )}
       >
         {!hasParallelContent && (
@@ -219,7 +226,7 @@ const MessageRender = memo(function MessageRender({
           </h2>
         )}
 
-        <div className="flex flex-col gap-1">
+        <div className={cn('flex flex-col gap-1', turnLayout.content)}>
           <div className="flex min-h-[20px] max-w-full flex-grow flex-col gap-0">
             <MessageContext.Provider value={messageContextValue}>
               <MessageContent
@@ -241,7 +248,7 @@ const MessageRender = memo(function MessageRender({
           {hasNoChildren && isSubmitting ? (
             <PlaceholderRow />
           ) : (
-            <SubRow classes="text-xs">
+            <SubRow classes={cn('text-xs', turnLayout.actions)}>
               <SiblingSwitch
                 siblingIdx={siblingIdx}
                 siblingCount={siblingCount}
