@@ -219,10 +219,19 @@ const MessageRender = memo(function MessageRender({
         )}
       >
         {!hasParallelContent && (
-          <h2 className={cn('select-none font-semibold', fontSize)}>
+          <h2
+            className={cn(
+              'flex w-fit select-none items-center font-semibold',
+              turnLayout.header,
+              fontSize,
+            )}
+          >
             <span className="sr-only">{getHeaderPrefixForScreenReader(msg, localize)}</span>
-            {messageLabel}
-            <MessageTimestamp value={msg.createdAt ?? msg.clientTimestamp} />
+            <span>{messageLabel}</span>
+            <MessageTimestamp
+              value={msg.createdAt ?? msg.clientTimestamp}
+              className={turnLayout.timestamp}
+            />
           </h2>
         )}
 

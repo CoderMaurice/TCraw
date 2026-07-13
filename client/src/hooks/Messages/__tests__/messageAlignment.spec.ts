@@ -8,7 +8,9 @@ describe('message turn alignment', () => {
       row: 'justify-end',
       avatar: 'order-2',
       body: 'order-1 items-end w-fit max-w-[85%] md:max-w-[47rem] xl:max-w-[55rem]',
+      header: 'flex-row-reverse justify-start text-right',
       content: 'items-end',
+      timestamp: 'mr-2',
       actions: 'justify-end',
     });
   });
@@ -20,7 +22,9 @@ describe('message turn alignment', () => {
       row: 'justify-start',
       avatar: 'order-1',
       body: 'order-2 items-start w-11/12',
+      header: 'flex-row justify-start text-left',
       content: 'items-start',
+      timestamp: 'ml-2',
       actions: 'justify-start',
     });
   });
@@ -32,7 +36,9 @@ describe('message turn alignment', () => {
       row: 'justify-end',
       avatar: 'order-2',
       body: 'order-1 items-end w-full',
+      header: 'flex-row-reverse justify-start text-right',
       content: 'items-end',
+      timestamp: 'mr-2',
       actions: 'justify-end',
     });
   });

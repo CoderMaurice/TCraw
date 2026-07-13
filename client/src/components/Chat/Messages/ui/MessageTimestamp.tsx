@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import useTimeTick from '~/hooks/useTimeTick';
-import { getMessageTimestamp } from '~/utils';
+import { cn, getMessageTimestamp } from '~/utils';
 
 /**
  * Inline message timestamp shown next to the author name in the message header.
@@ -9,7 +9,13 @@ import { getMessageTimestamp } from '~/utils';
  * ("10 minutes ago") with the absolute date on hover; older messages show the
  * absolute date directly.
  */
-export default function MessageTimestamp({ value }: { value?: string | null }) {
+export default function MessageTimestamp({
+  value,
+  className,
+}: {
+  value?: string | null;
+  className?: string;
+}) {
   const { i18n } = useTranslation();
   // Re-render on a shared interval so relative labels stay current while idle.
   useTimeTick();
@@ -23,7 +29,10 @@ export default function MessageTimestamp({ value }: { value?: string | null }) {
     <time
       dateTime={timestamp.iso}
       title={timestamp.isRecent ? timestamp.absolute : undefined}
-      className="ml-2 text-xs font-normal text-text-secondary transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100 [@media(hover:hover)]:opacity-0"
+      className={cn(
+        'text-xs font-normal text-text-secondary transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100 [@media(hover:hover)]:opacity-0',
+        className,
+      )}
     >
       {timestamp.isRecent ? timestamp.relative : timestamp.absolute}
     </time>
