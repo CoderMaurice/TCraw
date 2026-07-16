@@ -3,6 +3,7 @@ import type { DWClientDownStream } from 'dingtalk-stream';
 import { DingTalkRuntime } from './runtime';
 
 interface MockDingTalkClient {
+  connected: boolean;
   callback?: (message: DWClientDownStream) => void;
   socketCallBackResponse: jest.Mock;
   disconnect: jest.Mock;
@@ -12,10 +13,13 @@ interface MockDingTalkClient {
 jest.mock('dingtalk-stream', () => ({
   __clients: [],
   DWClient: class {
+    connected = false;
     callback?: (message: DWClientDownStream) => void;
     socketCallBackResponse = jest.fn();
     disconnect = jest.fn();
-    connect = jest.fn(async () => undefined);
+    connect = jest.fn(async () => {
+      this.connected = true;
+    });
 
     constructor() {
       const mocked = jest.requireMock('dingtalk-stream') as { __clients: MockDingTalkClient[] };

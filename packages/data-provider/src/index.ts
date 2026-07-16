@@ -25,6 +25,7 @@ export * from './types/assistants';
 export * from './types/files';
 export * from './types/knowledge';
 export * from './types/mcpServers';
+export * from './types/dingtalk';
 export * from './types/mutations';
 export * from './types/queries';
 export * from './types/skills';

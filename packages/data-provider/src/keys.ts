@@ -79,6 +79,8 @@ export enum QueryKeys {
   activeJobs = 'activeJobs',
   /* Agent API Keys */
   agentApiKeys = 'agentApiKeys',
+  /* DingTalk integrations */
+  dingtalkBinding = 'dingtalkBinding',
   /* Skills */
   skills = 'skills',
   skill = 'skill',
@@ -103,6 +105,8 @@ export const DynamicQueryKeys = {
 export enum MutationKeys {
   createAgentApiKey = 'createAgentApiKey',
   deleteAgentApiKey = 'deleteAgentApiKey',
+  upsertDingtalkBinding = 'upsertDingtalkBinding',
+  deleteDingtalkBinding = 'deleteDingtalkBinding',
   fileUpload = 'fileUpload',
   fileDelete = 'fileDelete',
   updatePreset = 'updatePreset',

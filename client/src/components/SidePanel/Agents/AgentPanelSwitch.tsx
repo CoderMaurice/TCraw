@@ -3,6 +3,7 @@ import { useRecoilValue } from 'recoil';
 import { AgentPanelProvider, useAgentPanelContext } from '~/Providers/AgentPanelContext';
 import { Panel, isEphemeralAgent } from '~/common';
 import VersionPanel from './Version/VersionPanel';
+import { DingTalkPanel } from './DingTalk';
 import ActionsPanel from './ActionsPanel';
 import AgentPanel from './AgentPanel';
 import store from '~/store';
@@ -31,6 +32,9 @@ function AgentPanelSwitchWithContext() {
   }
   if (activePanel === Panel.version) {
     return <VersionPanel />;
+  }
+  if (activePanel === Panel.dingtalk) {
+    return <DingTalkPanel />;
   }
   return <AgentPanel />;
 }

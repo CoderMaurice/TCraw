@@ -17,6 +17,8 @@ import type {
 const SINGLE_CONVERSATION_TYPE = '1';
 const MAX_REPLY_CHARS = 5000;
 const RESPONSE_TIMEOUT_MS = 10 * 60 * 1000;
+const STREAM_CONNECT_TIMEOUT_MS = 15 * 1000;
+const STREAM_CONNECT_POLL_MS = 100;
 const DINGTALK_WEBHOOK_HOSTS = new Set(['api.dingtalk.com', 'oapi.dingtalk.com']);
 
 export interface DingTalkRuntimeDependencies {
@@ -93,6 +95,16 @@ function assertDingTalkWebhook(value: string): URL {
     throw new Error('DingTalk session webhook host is not allowed');
   }
   return url;
+}
+
+async function waitForStreamConnection(client: DWClient): Promise<void> {
+  const expiresAt = Date.now() + STREAM_CONNECT_TIMEOUT_MS;
+  while (!client.connected && Date.now() < expiresAt) {
+    await new Promise((resolve) => setTimeout(resolve, STREAM_CONNECT_POLL_MS));
+  }
+  if (!client.connected) {
+    throw new Error('Timed out while connecting to DingTalk Stream');
+  }
 }
 
 export class DingTalkRuntime implements DingTalkRuntimeControl {
@@ -175,6 +187,7 @@ export class DingTalkRuntime implements DingTalkRuntimeControl {
 
     try {
       await client.connect();
+      await waitForStreamConnection(client);
       await this.deps.setDingTalkBindingStatus(binding.id, 'connected');
       logger.info('[DingTalk] Stream binding connected', {
         bindingId: binding.id,

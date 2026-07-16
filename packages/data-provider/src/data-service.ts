@@ -127,6 +127,21 @@ export function deleteAgentApiKey(id: string): Promise<void> {
   return request.delete(endpoints.apiKeyById(id));
 }
 
+export function getDingTalkBinding(agentId: string): Promise<t.DingTalkBindingResponse> {
+  return request.get(endpoints.dingtalkAgentBinding(agentId));
+}
+
+export function upsertDingTalkBinding(
+  agentId: string,
+  payload: t.UpsertDingTalkBindingRequest,
+): Promise<t.DingTalkBindingResponse> {
+  return request.put(endpoints.dingtalkAgentBinding(agentId), payload);
+}
+
+export function deleteDingTalkBinding(agentId: string): Promise<void> {
+  return request.delete(endpoints.dingtalkAgentBinding(agentId));
+}
+
 export function getPresets(): Promise<s.TPreset[]> {
   return request.get(endpoints.presets());
 }
@@ -1212,9 +1227,7 @@ export function deleteGitHubSkillSyncCredential(
   return request.delete(endpoints.adminSkillsSyncCredential(credentialKey));
 }
 
-export function listAdminUsers(
-  params?: q.AdminUsersListParams,
-): Promise<q.AdminUsersListResponse> {
+export function listAdminUsers(params?: q.AdminUsersListParams): Promise<q.AdminUsersListResponse> {
   return request.get(endpoints.adminUsers(params));
 }
 

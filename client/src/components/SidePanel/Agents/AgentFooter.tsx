@@ -18,6 +18,7 @@ import DuplicateAgent from './DuplicateAgent';
 import AdminSettings from './AdminSettings';
 import DeleteButton from './DeleteButton';
 import { Panel } from '~/common';
+import { DingTalkButton } from './DingTalk';
 
 export default function AgentFooter({
   activePanel,
@@ -79,6 +80,9 @@ export default function AgentFooter({
     <div className="mb-1 flex w-full flex-col gap-2">
       {showButtons && <AdvancedButton setActivePanel={setActivePanel} />}
       {showButtons && agent_id && <VersionButton setActivePanel={setActivePanel} />}
+      {showButtons && agent_id && agent?.author === user?.id && (
+        <DingTalkButton setActivePanel={setActivePanel} />
+      )}
       {user?.role === SystemRoles.ADMIN && showButtons && <AdminSettings />}
       {/* Context Button */}
       <div className="flex items-center justify-end gap-2">
