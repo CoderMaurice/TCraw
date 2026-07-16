@@ -36,6 +36,7 @@ import { createUserModel } from './user';
 import { createRoleModel } from './role';
 import { createFileModel } from './file';
 import { createKeyModel } from './key';
+import { createDingTalkModels } from './dingtalk';
 
 /**
  * Creates all database models for all collections
@@ -79,7 +80,11 @@ export function createModels(mongoose: typeof import('mongoose')): {
   AuditLog: ReturnType<typeof createAuditLogModel>;
   Group: ReturnType<typeof createGroupModel>;
   Config: ReturnType<typeof createConfigModel>;
+  DingTalkBinding: ReturnType<typeof createDingTalkModels>['DingTalkBinding'];
+  DingTalkConversation: ReturnType<typeof createDingTalkModels>['DingTalkConversation'];
+  DingTalkMessageReceipt: ReturnType<typeof createDingTalkModels>['DingTalkMessageReceipt'];
 } {
+  const dingtalkModels = createDingTalkModels(mongoose);
   return {
     User: createUserModel(mongoose),
     Token: createTokenModel(mongoose),
@@ -119,5 +124,6 @@ export function createModels(mongoose: typeof import('mongoose')): {
     AuditLog: createAuditLogModel(mongoose),
     Group: createGroupModel(mongoose),
     Config: createConfigModel(mongoose),
+    ...dingtalkModels,
   };
 }

@@ -77,6 +77,8 @@ export * from './stream';
 export { memoryDiagnostics } from './utils/memory';
 /* RUM */
 export * from './rum/proxy';
+/* Integrations */
+export * from './integrations/dingtalk';
 /* types */
 export type * from './mcp/types';
 export type * from './flow/types';

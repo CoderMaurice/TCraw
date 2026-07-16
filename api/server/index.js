@@ -44,6 +44,7 @@ const { jwtLogin, ldapLogin, passportLogin } = require('~/strategies');
 const { checkMigrations } = require('./services/start/migration');
 const optionalJwtAuth = require('./middleware/optionalJwtAuth');
 const initializeMCPs = require('./services/initializeMCPs');
+const dingTalkRuntime = require('./services/DingTalk');
 const configureSocialLogins = require('./socialLogins');
 const createSpaFallback = require('./utils/fallback');
 const { getAppConfig } = require('./services/Config');
@@ -275,6 +276,7 @@ const startServer = async () => {
   app.use('/api/tags', routes.tags);
   app.use('/api/mcp', routes.mcp);
   app.use('/api/rum', routes.rum);
+  app.use('/api/integrations/dingtalk', routes.dingtalk);
 
   app.use('/metrics', metricsRouter);
 
@@ -319,6 +321,7 @@ const startServer = async () => {
       await runAsSystem(async () => {
         await initializeMCPs();
         await initializeOAuthReconnectManager();
+        await dingTalkRuntime.start();
       });
       await checkMigrations();
 

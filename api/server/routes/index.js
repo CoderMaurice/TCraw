@@ -37,9 +37,11 @@ const keys = require('./keys');
 const user = require('./user');
 const mcp = require('./mcp');
 const rum = require('./rum');
+const dingtalk = require('./dingtalk');
 
 module.exports = {
   rum,
+  dingtalk,
   mcp,
   auth,
   adminAuth,
