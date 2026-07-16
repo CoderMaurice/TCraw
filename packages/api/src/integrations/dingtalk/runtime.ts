@@ -33,11 +33,21 @@ export interface DingTalkRuntimeDependencies {
   fetch?: typeof fetch;
 }
 
-function getErrorMessage(error: object | string): string {
+function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
-    return error.message;
+    const cause = (error as Error & { cause?: unknown }).cause;
+    const causeMessage = cause ? getErrorMessage(cause) : '';
+    return causeMessage && causeMessage !== error.message
+      ? `${error.message}: ${causeMessage}`
+      : error.message;
   }
-  return typeof error === 'string' ? error : 'Unknown DingTalk integration error';
+  if (typeof error === 'string') {
+    return error;
+  }
+  if (error && typeof error === 'object' && 'message' in error) {
+    return String(error.message);
+  }
+  return 'Unknown DingTalk integration error';
 }
 
 function parseInboundMessage(message: DWClientDownStream): DingTalkInboundMessage {
@@ -116,7 +126,7 @@ export class DingTalkRuntime implements DingTalkRuntimeControl {
   constructor(deps: DingTalkRuntimeDependencies) {
     this.deps = deps;
     this.fetcher = deps.fetch ?? fetch;
-    this.internalApiUrl = (deps.internalApiUrl ?? 'http://127.0.0.1:3080').replace(/\/+$/, '');
+    this.internalApiUrl = (deps.internalApiUrl ?? 'http://localhost:3080').replace(/\/+$/, '');
   }
 
   async start(): Promise<void> {

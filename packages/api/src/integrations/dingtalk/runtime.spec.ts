@@ -92,7 +92,6 @@ function createDependencies(fetcher: jest.MockedFunction<typeof fetch>) {
     claimDingTalkMessage: jest.fn(async () => true),
     finishDingTalkMessage: jest.fn(async () => undefined),
     saveConvo: jest.fn(async () => null),
-    internalApiUrl: 'http://127.0.0.1:3080',
     fetch: fetcher,
   };
 }
@@ -136,7 +135,7 @@ describe('DingTalkRuntime', () => {
     );
     expect(fetcher).toHaveBeenNthCalledWith(
       1,
-      'http://127.0.0.1:3080/api/integrations/dingtalk/responses',
+      'http://localhost:3080/api/integrations/dingtalk/responses',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ Authorization: 'Bearer sk-internal' }),
