@@ -12,7 +12,6 @@ import { cn } from '~/utils';
 interface MCPServerCardProps {
   server: MCPServerDefinition;
   getServerStatusIconProps: (serverName: string) => MCPServerStatusIconProps;
-  canCreateEditMCPs: boolean;
 }
 
 /**
@@ -26,7 +25,6 @@ interface MCPServerCardProps {
 export default function MCPServerCard({
   server,
   getServerStatusIconProps,
-  canCreateEditMCPs,
 }: MCPServerCardProps) {
   const localize = useLocalize();
   const triggerRef = useRef<HTMLDivElement>(null);
@@ -47,7 +45,7 @@ export default function MCPServerCard({
   const displayName = server.config?.title || server.serverName;
   const description = server.config?.description;
   const statusDotColor = getStatusDotColor(serverStatus, isInitializing);
-  const canEdit = canCreateEditMCPs && canEditThisServer;
+  const canEdit = canEditThisServer;
 
   const handleInitialize = () => {
     /** If server has custom user vars and is not already connected, show config dialog first

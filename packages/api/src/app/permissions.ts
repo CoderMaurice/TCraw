@@ -668,31 +668,6 @@ export async function updateInterfacePermissions({
     }
 
     /**
-     * One-time migration: correct MCP_SERVERS.CREATE for USER role.
-     * Before the explicit roleDefaults fix, Zod schema defaults resolved CREATE to true
-     * for all roles. ADMIN should keep CREATE: true, but USER should have CREATE: false
-     * unless explicitly configured otherwise in librechat.yaml.
-     */
-    if (roleName === SystemRoles.USER) {
-      const existingMcpPerms = existingPermissions?.[PermissionTypes.MCP_SERVERS];
-      const mcpCreateExplicit =
-        typeof interfaceConfig?.mcpServers === 'object' && 'create' in interfaceConfig.mcpServers;
-      if (
-        existingMcpPerms?.[Permissions.CREATE] === true &&
-        !mcpCreateExplicit &&
-        defaultPerms[PermissionTypes.MCP_SERVERS]?.[Permissions.CREATE] === false
-      ) {
-        logger.debug(
-          `Role '${roleName}': Migrating MCP_SERVERS.CREATE from true to false (Zod default correction)`,
-        );
-        permissionsToUpdate[PermissionTypes.MCP_SERVERS] = {
-          ...permissionsToUpdate[PermissionTypes.MCP_SERVERS],
-          [Permissions.CREATE]: false,
-        };
-      }
-    }
-
-    /**
      * Backfill MCP_SERVERS.CONFIGURE_OBO for existing roles that pre-date the permission.
      * The MCP_SERVERS permission type already exists on these role docs, so the
      * `addPermissionIfNeeded` block above does not re-seed it. Only fill in the field

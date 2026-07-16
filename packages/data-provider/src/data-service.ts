@@ -387,8 +387,10 @@ export const getAvailableTools = (
 
 /* MCP Tools - Decoupled from regular tools */
 
-export const getMCPTools = (): Promise<q.MCPServersResponse> => {
-  return request.get(endpoints.mcp.tools);
+export const getMCPTools = ({
+  includeAgentAccess = true,
+}: { includeAgentAccess?: boolean } = {}): Promise<q.MCPServersResponse> => {
+  return request.get(endpoints.mcp.tools({ includeAgentAccess }));
 };
 
 export const getVerifyAgentToolAuth = (
@@ -653,8 +655,11 @@ export const deleteAgentAction = async ({
  *
  * Ensure and List loaded mcp server configs from the cache Enriched with effective permissions.
  */
-export const getMCPServers = async (): Promise<mcp.MCPServersListResponse> => {
-  return request.get(endpoints.mcp.servers);
+export const getMCPServers = async ({
+  includeAgentAccess = true,
+}: { includeAgentAccess?: boolean } = {}): Promise<mcp.MCPServersListResponse> => {
+  const query = includeAgentAccess ? '' : '?includeAgentAccess=false';
+  return request.get(`${endpoints.mcp.servers}${query}`);
 };
 
 /**

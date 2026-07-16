@@ -2594,6 +2594,71 @@ describe('MCP Routes', () => {
       expect(logger.error).toHaveBeenCalledTimes(2);
       expect(mockGetServerToolFunctions).toHaveBeenCalledTimes(2);
     });
+
+    it('should hide consume-only tools when agent access is excluded', async () => {
+      const { Constants } = require('librechat-data-provider');
+      const { getMCPServerTools } = require('~/server/services/Config');
+
+      mockResolveAllMcpConfigs.mockResolvedValueOnce({
+        direct: {
+          type: 'sse',
+          url: 'https://direct.example.com/sse',
+          title: 'Direct Server',
+        },
+        'agent-only': {
+          type: 'sse',
+          url: 'https://agent-only.example.com/sse',
+          title: 'Agent Only Server',
+          consumeOnly: true,
+        },
+      });
+
+      getMCPServerTools.mockImplementation((_userId, serverName) => {
+        if (serverName === 'direct') {
+          return Promise.resolve({
+            [`search${Constants.mcp_delimiter}direct`]: {
+              type: 'function',
+              function: {
+                name: `search${Constants.mcp_delimiter}direct`,
+                description: 'Search direct server',
+                parameters: { type: 'object' },
+              },
+            },
+          });
+        }
+        return Promise.resolve({
+          [`secret${Constants.mcp_delimiter}agent-only`]: {
+            type: 'function',
+            function: {
+              name: `secret${Constants.mcp_delimiter}agent-only`,
+              description: 'Secret agent-only tool',
+              parameters: { type: 'object' },
+            },
+          },
+        });
+      });
+
+      const response = await request(app).get('/api/mcp/tools?includeAgentAccess=false');
+
+      expect(response.status).toBe(200);
+      expect(response.body.servers.direct).toMatchObject({
+        name: 'direct',
+        tools: [
+          {
+            name: 'search',
+            pluginKey: `search${Constants.mcp_delimiter}direct`,
+            description: 'Search direct server',
+          },
+        ],
+      });
+      expect(response.body.servers['agent-only']).toBeUndefined();
+      expect(getMCPServerTools).toHaveBeenCalledTimes(1);
+      expect(getMCPServerTools).toHaveBeenCalledWith(
+        'test-user-id',
+        'direct',
+        expect.objectContaining({ title: 'Direct Server' }),
+      );
+    });
   });
 
   describe('GET /servers', () => {
@@ -2636,6 +2701,34 @@ describe('MCP Routes', () => {
         'test-user-id',
         expect.objectContaining({ id: 'test-user-id' }),
       );
+    });
+
+    it('should hide consume-only servers when agent access is excluded', async () => {
+      mockResolveAllMcpConfigs.mockResolvedValue({
+        direct: {
+          type: 'sse',
+          url: 'http://direct.example.com/sse',
+          title: 'Direct Server',
+          source: 'user',
+        },
+        'agent-only': {
+          type: 'sse',
+          url: 'http://agent-only.example.com/sse',
+          title: 'Agent Only Server',
+          source: 'user',
+          consumeOnly: true,
+        },
+      });
+
+      const response = await request(app).get('/api/mcp/servers?includeAgentAccess=false');
+
+      expect(response.status).toBe(200);
+      expect(response.body.direct).toMatchObject({
+        type: 'sse',
+        url: 'http://direct.example.com/sse',
+        title: 'Direct Server',
+      });
+      expect(response.body['agent-only']).toBeUndefined();
     });
 
     it('should return empty object when no servers are configured', async () => {

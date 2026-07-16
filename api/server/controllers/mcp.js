@@ -35,6 +35,13 @@ const { hasCapability } = require('~/server/middleware/roles/capabilities');
 const { getMCPManager, getMCPServersRegistry } = require('~/config');
 const db = require('~/models');
 
+const excludesAgentAccess = (req) => req.query?.includeAgentAccess === 'false';
+
+const filterConsumeOnlyServers = (serverConfigs) =>
+  Object.fromEntries(
+    Object.entries(serverConfigs).filter(([, config]) => config?.consumeOnly !== true),
+  );
+
 /**
  * Handles MCP-specific errors and sends appropriate HTTP responses.
  * @param {Error} error - The error to handle
@@ -85,7 +92,10 @@ const getMCPTools = async (req, res) => {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const mcpConfig = await resolveAllMcpConfigs(userId, req.user);
+    const resolvedMcpConfig = await resolveAllMcpConfigs(userId, req.user);
+    const mcpConfig = excludesAgentAccess(req)
+      ? filterConsumeOnlyServers(resolvedMcpConfig)
+      : resolvedMcpConfig;
     const configuredServers = Object.keys(mcpConfig);
 
     if (!configuredServers.length) {
@@ -262,8 +272,11 @@ const getMCPServersList = async (req, res) => {
     }
 
     const serverConfigs = await resolveAllMcpConfigs(userId, req.user);
-    const canEditByServer = await computeCanEditByServer(req, serverConfigs);
-    return res.json(redactAllServerSecrets(serverConfigs, { canEditByServer }));
+    const visibleServerConfigs = excludesAgentAccess(req)
+      ? filterConsumeOnlyServers(serverConfigs)
+      : serverConfigs;
+    const canEditByServer = await computeCanEditByServer(req, visibleServerConfigs);
+    return res.json(redactAllServerSecrets(visibleServerConfigs, { canEditByServer }));
   } catch (error) {
     logger.error('[getMCPServersList]', error);
     res.status(500).json({ error: error.message });

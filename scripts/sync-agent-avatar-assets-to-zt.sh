@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REMOTE_HOST="${TCRAW_REMOTE_HOST:-zt}"
-REMOTE_IMAGES_DIR="${TCRAW_REMOTE_IMAGES_DIR:-/opt/librechat/images}"
+REMOTE_IMAGES_DIR="${TCRAW_REMOTE_IMAGES_DIR:-/root/projects/TCraw/data/images}"
 LOCAL_IMAGES_DIR="${TCRAW_LOCAL_IMAGES_DIR:-client/public/images}"
 MONGO_CONTAINER="${TCRAW_MONGO_CONTAINER:-chat-mongodb}"
 MONGO_DATABASE="${TCRAW_MONGO_DATABASE:-LibreChat}"

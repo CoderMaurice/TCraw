@@ -26,9 +26,6 @@ import type {
 } from './types';
 export { buildWeKnoraKnowledgeContext } from './context';
 
-const NON_ADMIN_MAX_KNOWLEDGE_BASES = 1;
-const NON_ADMIN_MAX_DOCUMENTS_PER_KB = 5;
-
 function createServiceError(message: string, statusCode: number): KnowledgeBaseServiceError {
   const error = new Error(message) as KnowledgeBaseServiceError;
   error.statusCode = statusCode;
@@ -41,14 +38,6 @@ function normalizeOptionalDescription(description?: string): string | undefined 
 
 function normalizeOptionalName(name?: string): string | undefined {
   return typeof name === 'string' ? name.trim() : undefined;
-}
-
-function isAdmin(auth: KnowledgeAuthContext): boolean {
-  return auth.role?.toUpperCase() === 'ADMIN';
-}
-
-function getAuthorId(kb: KnowledgeBaseRecord): string | undefined {
-  return kb.author?.toString?.() ?? kb.author;
 }
 
 function getMongoResourceId(kb: KnowledgeBaseRecord): string {
@@ -118,37 +107,6 @@ async function syncWeKnoraDocumentCounts(
   }
 
   await deps.updateKnowledgeBaseLifecycle(kb.id, tenantId, update);
-}
-
-async function assertKnowledgeBaseCreateLimit(
-  auth: KnowledgeAuthContext,
-  deps: KnowledgeBaseServiceDependencies,
-): Promise<void> {
-  if (isAdmin(auth)) {
-    return;
-  }
-
-  const resourceIds =
-    (await deps.findAccessibleResources({
-      userId: auth.userId,
-      role: auth.role,
-      resourceType: ResourceType.KNOWLEDGE_BASE,
-      requiredPermissions: PermissionBits.VIEW,
-    })) ?? [];
-  if (resourceIds.length === 0) {
-    return;
-  }
-
-  const knowledgeBases = await deps.findKnowledgeBasesByResourceIds(resourceIds, auth.tenantId);
-  const ownedActiveCount = knowledgeBases.filter(
-    (knowledgeBase) =>
-      knowledgeBase.provider === 'weknora' &&
-      getAuthorId(knowledgeBase) === auth.userId &&
-      knowledgeBase.lifecycleStatus !== 'archived',
-  ).length;
-  if (ownedActiveCount >= NON_ADMIN_MAX_KNOWLEDGE_BASES) {
-    throw createServiceError('Non-admin users can create at most one knowledge base', 403);
-  }
 }
 
 export interface KnowledgeBaseCapabilities {
@@ -265,7 +223,6 @@ export async function createKnowledgeBaseForUser(
   if (!templateExternalId) {
     throw createServiceError('WeKnora default configuration template is not configured', 500);
   }
-  await assertKnowledgeBaseCreateLimit(auth, deps);
 
   const external = await deps.weknoraClient.createKnowledgeBase({
     name: input.name.trim(),
@@ -482,12 +439,6 @@ export async function assertKnowledgeBaseUploadable(
   }
   if (!deps.weknoraClient) {
     throw createServiceError('WeKnora client is not configured', 500);
-  }
-  if (!isAdmin(auth) && (kb.documentCount ?? 0) >= NON_ADMIN_MAX_DOCUMENTS_PER_KB) {
-    throw createServiceError(
-      'Non-admin users can upload at most five documents per knowledge base',
-      403,
-    );
   }
 
   return kb;

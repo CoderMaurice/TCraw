@@ -11,7 +11,7 @@ import MCPServerList from './MCPServerList';
 export default function MCPBuilderPanel() {
   const localize = useLocalize();
   const { availableMCPServers, isLoading, getServerStatusIconProps, getConfigDialogProps } =
-    useMCPServerManager();
+    useMCPServerManager({ includeAgentAccess: false });
 
   const hasCreateAccess = useHasAccess({
     permissionType: PermissionTypes.MCP_SERVERS,

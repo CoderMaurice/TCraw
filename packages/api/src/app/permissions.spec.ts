@@ -2680,12 +2680,11 @@ describe('updateInterfacePermissions - permissions', () => {
     );
 
     expect(userCall[1][PermissionTypes.MCP_SERVERS]).toEqual({
-      [Permissions.CREATE]: false,
       [Permissions.CONFIGURE_OBO]: false,
     });
   });
 
-  it('should migrate existing MCP_SERVERS.CREATE=true to false for USER when no explicit config (regression: #12306 migration)', async () => {
+  it('should preserve existing MCP_SERVERS.CREATE=true for USER when no explicit config', async () => {
     mockGetRoleByName.mockResolvedValue({
       permissions: {
         [PermissionTypes.MCP_SERVERS]: {
@@ -2722,13 +2721,11 @@ describe('updateInterfacePermissions - permissions', () => {
     );
 
     expect(userCall[1][PermissionTypes.MCP_SERVERS]).toEqual({
-      [Permissions.CREATE]: false,
       [Permissions.CONFIGURE_OBO]: false,
     });
     expect(userCall[1]).not.toHaveProperty(PermissionTypes.AGENTS);
 
-    // Admin's MCP_SERVERS doesn't migrate CREATE (already true) but does receive
-    // the CONFIGURE_OBO backfill since the mocked role doc lacked that sub-key.
+    // Admin receives the CONFIGURE_OBO backfill since the mocked role doc lacked that sub-key.
     expect(adminCall[1][PermissionTypes.MCP_SERVERS]).toEqual({
       [Permissions.CONFIGURE_OBO]: true,
     });

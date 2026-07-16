@@ -953,7 +953,7 @@ router.get(
 router.patch(
   '/servers/:serverName',
   requireJwtAuth,
-  checkMCPCreate,
+  checkMCPUsePermissions,
   canAccessMCPServerResource({
     requiredPermission: PermissionBits.EDIT,
     resourceIdParam: 'serverName',
@@ -970,7 +970,7 @@ router.patch(
 router.delete(
   '/servers/:serverName',
   requireJwtAuth,
-  checkMCPCreate,
+  checkMCPUsePermissions,
   canAccessMCPServerResource({
     requiredPermission: PermissionBits.DELETE,
     resourceIdParam: 'serverName',

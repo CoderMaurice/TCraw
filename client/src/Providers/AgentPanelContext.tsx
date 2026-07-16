@@ -66,8 +66,12 @@ export function AgentPanelProvider({ children }: { children: React.ReactNode }) 
 
     if (mcpData?.servers) {
       for (const [serverName, serverData] of Object.entries(mcpData.servers)) {
-        // Get title and description from config with fallbacks
         const serverConfig = availableMCPServersMap?.[serverName];
+        if (!serverConfig) {
+          continue;
+        }
+
+        // Get title and description from config with fallbacks
         const displayName = serverConfig?.title || serverName;
         const displayDescription =
           serverConfig?.description || `${localize('com_ui_tool_collection_prefix')} ${serverName}`;

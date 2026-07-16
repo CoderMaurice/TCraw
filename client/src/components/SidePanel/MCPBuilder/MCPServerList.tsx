@@ -1,8 +1,7 @@
 import { MCPIcon } from '@librechat/client';
-import { PermissionTypes, Permissions } from 'librechat-data-provider';
 import type { MCPServerStatusIconProps } from '~/components/MCP/MCPServerStatusIcon';
 import type { MCPServerDefinition } from '~/hooks';
-import { useLocalize, useHasAccess } from '~/hooks';
+import { useLocalize } from '~/hooks';
 import MCPServerCard from './MCPServerCard';
 
 interface MCPServerListProps {
@@ -20,10 +19,6 @@ export default function MCPServerList({
   isFiltered = false,
 }: MCPServerListProps) {
   const localize = useLocalize();
-  const canCreateEditMCPs = useHasAccess({
-    permissionType: PermissionTypes.MCP_SERVERS,
-    permission: Permissions.CREATE,
-  });
 
   if (servers.length === 0) {
     return (
@@ -54,7 +49,6 @@ export default function MCPServerList({
           <MCPServerCard
             server={server}
             getServerStatusIconProps={getServerStatusIconProps}
-            canCreateEditMCPs={canCreateEditMCPs}
           />
         </div>
       ))}

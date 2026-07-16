@@ -317,7 +317,10 @@ export const agents = ({ path = '', options }: { path?: string; options?: object
 export const activeJobs = () => `${BASE_URL}/api/agents/chat/active`;
 
 export const mcp = {
-  tools: `${BASE_URL}/api/mcp/tools`,
+  tools: (options?: { includeAgentAccess?: boolean }) =>
+    `${BASE_URL}/api/mcp/tools${buildQuery({
+      includeAgentAccess: options?.includeAgentAccess === false ? false : undefined,
+    })}`,
   servers: `${BASE_URL}/api/mcp/servers`,
 };
 
