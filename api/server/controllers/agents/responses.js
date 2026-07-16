@@ -155,6 +155,14 @@ async function loadPreviousMessages(conversationId, userId) {
   }
 }
 
+function getPersistenceContext(req) {
+  return {
+    userId: req?.user?.id,
+    isTemporary: req?.body?.isTemporary,
+    interfaceConfig: req?.config?.interfaceConfig,
+  };
+}
+
 /**
  * Save input messages to database
  * @param {import('express').Request} req
@@ -167,7 +175,7 @@ async function saveInputMessages(req, conversationId, inputMessages, agentId) {
   for (const msg of inputMessages) {
     if (msg.role === 'user') {
       await db.saveMessage(
-        req,
+        getPersistenceContext(req),
         {
           messageId: msg.messageId || nanoid(),
           conversationId,
@@ -208,7 +216,7 @@ async function saveResponseOutput(req, conversationId, responseId, response, age
 
   // Save the assistant message
   await db.saveMessage(
-    req,
+    getPersistenceContext(req),
     {
       messageId: responseId,
       conversationId,
@@ -235,11 +243,7 @@ async function saveResponseOutput(req, conversationId, responseId, response, age
  */
 async function saveConversation(req, conversationId, agentId, agent) {
   await db.saveConvo(
-    {
-      userId: req?.user?.id,
-      isTemporary: req?.body?.isTemporary,
-      interfaceConfig: req?.config?.interfaceConfig,
-    },
+    getPersistenceContext(req),
     {
       conversationId,
       endpoint: EModelEndpoint.agents,
